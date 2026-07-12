@@ -1,0 +1,457 @@
+/* RegiBase (Nextcloud native) — ported from the standalone app, scoped to #regibase-root. */
+#regibase-root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f0f3f9;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --primary-ink: #ffffff;
+  --accent: #059669;
+  --danger: #dc2626;
+  --shadow: 0 1px 3px rgba(15, 23, 42, .08), 0 8px 24px rgba(15, 23, 42, .06);
+  --radius: 14px;
+  --sidebar-w: 288px;
+}
+/* Pre-JS fallback: follow the OS until JS applies the chosen theme. */
+@media (prefers-color-scheme: dark) {
+  #regibase-root:not([data-rbtheme]) {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1b2740;
+    --border: #263450;
+    --text: #e6edf7;
+    --muted: #93a3bd;
+    --primary: #4f8cff;
+    --accent: #10b981;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+}
+/* Authoritative: set by JS from the user's setting (規定=Nextcloudに合わせる / ダーク / ライト). */
+#regibase-root[data-rbtheme="light"] {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f0f3f9;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --accent: #059669;
+  --shadow: 0 1px 3px rgba(15, 23, 42, .08), 0 8px 24px rgba(15, 23, 42, .06);
+}
+#regibase-root[data-rbtheme="dark"] {
+  --bg: #0b1220;
+  --surface: #131c2e;
+  --surface-2: #1b2740;
+  --border: #263450;
+  --text: #e6edf7;
+  --muted: #93a3bd;
+  --primary: #4f8cff;
+  --accent: #10b981;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+
+/* NC 32's #content is a flex row that expects an #app-content child to grow.
+   We render #regibase directly, so make it fill the full width/height itself. */
+#content.app-regibase { display: flex; }
+#regibase, #regibase.app-regibase { flex: 1 1 auto; min-width: 0; width: 100%; height: calc(100dvh - var(--header-height, 50px)); }
+#regibase-root { width: 100%; height: 100%; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif; }
+#regibase-root, #regibase-root * { box-sizing: border-box; }
+#regibase-root button { font-family: inherit; cursor: pointer; }
+/* NC core sets `h2,h3,... { color: var(--color-main-text) }` on the bare element,
+   which overrides inheritance and leaks NC's text colour into our themed modals
+   (dark-on-dark when RegiBase is dark but Nextcloud is light). Force our colour. */
+#regibase-root h1, #regibase-root h2, #regibase-root h3, #regibase-root h4, #regibase-root h5, #regibase-root h6 { color: var(--text); }
+#regibase-root input, #regibase-root select, #regibase-root textarea { font-family: inherit; font-size: 16px; }
+/* Neutralise Nextcloud's global form theming:
+   - core forces select{height:36px} which, with our padding, clips the text; let it grow.
+   - core's input:not(...) rule does NOT exclude checkboxes, so raw checkboxes get a 2px
+     border/box; strip that so our checkmarks render plainly. */
+#regibase-root select { height: auto; min-height: 44px; line-height: normal; }
+/* Tell the browser which scheme native controls should paint in — otherwise a
+   dark OS/Nextcloud color-scheme paints checkboxes black even in our light theme. */
+#regibase-root[data-rbtheme="light"] { color-scheme: light; }
+#regibase-root[data-rbtheme="dark"] { color-scheme: dark; }
+/* radios: keep native, just strip NC's added frame */
+#regibase-root input[type='radio'] { -webkit-appearance: auto; appearance: auto; margin: 0; border: none; background: none; box-shadow: none; min-height: 0; cursor: pointer; }
+/* checkboxes: draw our own so the box is a soft grey (not the black native fill) */
+#regibase-root input[type='checkbox'] {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box;
+  width: 18px; height: 18px; min-width: 18px; min-height: 18px; max-width: 18px; max-height: 18px;
+  padding: 0; margin: 0; flex: 0 0 auto; position: relative; vertical-align: middle;
+  border: 2px solid var(--muted); border-radius: 4px; background: var(--surface-2);
+  box-shadow: none; cursor: pointer;
+}
+#regibase-root input[type='checkbox']:hover { border-color: var(--primary); }
+#regibase-root input[type='checkbox']:checked { background: var(--primary); border-color: var(--primary); }
+#regibase-root input[type='checkbox']:checked::after {
+  content: ''; position: absolute; left: 4px; top: 0; width: 5px; height: 9px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+#regibase-root.regibase-loading { color: var(--muted); padding: 40px; }
+
+/* Prevent accidental text selection on UI chrome; keep it on inputs and shown values. */
+#regibase-root { -webkit-user-select: none; user-select: none; }
+#regibase-root input, #regibase-root textarea, #regibase-root [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+#regibase-root .detail-row .val, #regibase-root .selectable { -webkit-user-select: text; user-select: text; }
+
+/* ---------- Layout ---------- */
+#regibase-root .layout { display: flex; width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+#regibase-root .sidebar {
+  width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; min-height: 0;
+}
+#regibase-root .brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 12px; font-weight: 800; font-size: 20px; letter-spacing: .3px; cursor: default; -webkit-user-select: none; user-select: none; }
+#regibase-root .brand .logo { font-size: 24px; }
+#regibase-root .coll-home { display: flex; align-items: center; gap: 8px; width: calc(100% - 20px); margin: 2px 10px 4px; padding: 10px 12px; text-align: left; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 10px; font-size: 14px; font-weight: 600; }
+#regibase-root .coll-home:hover { background: var(--surface-2); border-color: var(--primary); }
+#regibase-root .coll-home.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+#regibase-root .brand .tag { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; }
+#regibase-root .coll-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 10px; }
+#regibase-root .coll-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border: none; background: transparent; color: var(--text);
+  border-radius: 10px; font-size: 14.5px; margin-bottom: 2px;
+}
+#regibase-root .coll-item:hover { background: var(--surface-2); }
+#regibase-root .coll-item.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); font-weight: 700; }
+#regibase-root .coll-item .ic { font-size: 20px; width: 26px; text-align: center; }
+#regibase-root .coll-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .coll-item .ct { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 1px 8px; border-radius: 999px; }
+#regibase-root .coll-item.active .ct { color: var(--primary); }
+#regibase-root .sidebar-foot { padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+#regibase-root .main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+#regibase-root .scrollnav { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 8; }
+#regibase-root .scrollnav-btn { width: 42px; height: 42px; border-radius: 50%; border: none; background: var(--primary); color: var(--primary-ink); box-shadow: 0 3px 12px rgba(0,0,0,.4); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: .5; transition: opacity .2s, filter .2s; }
+#regibase-root .scrollnav:hover .scrollnav-btn, #regibase-root .scrollnav-btn:focus { opacity: 1; }
+#regibase-root .scrollnav-btn:hover { filter: brightness(1.1); }
+#regibase-root .topbar {
+  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  border-bottom: 1px solid var(--border); background: var(--surface); min-height: 62px;
+}
+#regibase-root .topbar .title { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 10px; min-width: 0; }
+#regibase-root .topbar .title .ic { font-size: 22px; }
+#regibase-root .topbar .title .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .topbar .spacer { flex: 1; }
+#regibase-root .hamburger { display: none; }
+
+#regibase-root .content { flex: 1; overflow-y: auto; padding: 18px 20px 40px; }
+/* unified sticky toolbar: search / sort + bulk actions in one frame */
+#regibase-root .listtoolbar { position: sticky; top: 0; z-index: 6; margin-bottom: 14px; padding: 10px 12px; background: color-mix(in srgb, var(--primary) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.07); display: flex; flex-direction: column; gap: 10px; opacity: .8; transition: opacity .2s; }
+#regibase-root[data-rbtheme="dark"] .listtoolbar { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+#regibase-root .listtoolbar:hover, #regibase-root .listtoolbar:focus-within { opacity: 1; }
+#regibase-root .lt-search { display: flex; gap: 10px; }
+#regibase-root .lt-search .searchinput { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; }
+#regibase-root .lt-search .searchinput:focus { border-color: var(--primary); }
+#regibase-root .lt-search .sortselect { flex: 0 0 auto; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; cursor: pointer; }
+#regibase-root .lt-search .sortselect:focus { border-color: var(--primary); }
+#regibase-root .lt-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border); }
+#regibase-root .selcount { font-weight: 700; font-size: 13px; color: var(--muted); }
+#regibase-root .selspacer { flex: 1; }
+#regibase-root .btn:disabled, #regibase-root .btn[disabled] { opacity: .4; cursor: default; pointer-events: none; box-shadow: none; }
+@media (max-width: 780px) {
+  #regibase-root .lt-search { flex-wrap: wrap; }
+  #regibase-root .lt-search .sortselect { flex: 1; }
+  #regibase-root .lt-actions { gap: 6px; }
+  #regibase-root .lt-actions .btn.sm { padding: 6px 8px; font-size: 12px; }
+}
+
+/* selection bar */
+
+/* record item wrappers + checkboxes */
+#regibase-root .rec-wrap { position: relative; }
+#regibase-root .rec-wrap.row { display: flex; align-items: center; gap: 10px; }
+#regibase-root .rec-wrap.row .rec-row, #regibase-root .rec-wrap.row .rec-drow { flex: 1; min-width: 0; }
+#regibase-root .rec-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); flex: 0 0 auto; }
+#regibase-root .rec-wrap.card .rec-check, #regibase-root .rec-wrap.img .rec-check { position: absolute; top: 10px; left: 10px; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+#regibase-root .rec-wrap.img .rec-check { top: 8px; left: 8px; }
+#regibase-root .rec-wrap.sel .rec-card, #regibase-root .rec-wrap.sel .rec-row, #regibase-root .rec-wrap.sel .rec-drow, #regibase-root .rec-wrap.sel .rec-imgcard { outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary); }
+
+/* per-record copy button */
+#regibase-root .rec-copy { border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; font-size: 14px; line-height: 1; padding: 6px 9px; cursor: pointer; }
+#regibase-root .rec-copy:hover { color: var(--primary); border-color: var(--primary); }
+#regibase-root .rec-wrap.card .rec-copy, #regibase-root .rec-wrap.img .rec-copy { position: absolute; top: 8px; right: 8px; z-index: 2; }
+#regibase-root .rec-wrap.row .rec-copy.inline { flex: 0 0 auto; }
+#regibase-root .loadmore { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px 0 6px; }
+#regibase-root .loadmore-info { font-size: 12px; color: var(--muted); }
+
+/* strict delete confirm */
+#regibase-root .confirm-check { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 14px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+#regibase-root .confirm-check input { width: 18px; height: 18px; accent-color: var(--danger); }
+
+/* record cards */
+#regibase-root .rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+#regibase-root .rec-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 15px; box-shadow: var(--shadow); text-align: left; color: var(--text); display: block; width: 100%;
+}
+#regibase-root .rec-card:hover { border-color: var(--primary); }
+/* reserve a top strip for the overlaid checkbox (left) and copy button (right) */
+#regibase-root .rec-wrap.card .rec-card { padding-top: 36px; }
+#regibase-root .rec-card .rt { font-weight: 700; font-size: 15px; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .rec-card .rl { font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+#regibase-root .rec-card .rl span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* buttons */
+#regibase-root .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+#regibase-root .btn:hover { background: var(--surface-2); }
+#regibase-root .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+#regibase-root .btn.primary:hover { filter: brightness(1.06); }
+#regibase-root .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+#regibase-root .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+#regibase-root .btn.accent:hover { filter: brightness(1.06); }
+#regibase-root .btn.ghost { border-color: transparent; background: transparent; }
+#regibase-root .btn.block { width: 100%; justify-content: center; }
+#regibase-root .btn.sm { padding: 6px 10px; font-size: 13px; }
+
+/* view switcher */
+#regibase-root .viewswitch { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 2px; margin-right: 4px; }
+#regibase-root .vbtn { border: none; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; padding: 6px 9px; border-radius: 8px; }
+#regibase-root .vbtn:hover { color: var(--text); }
+#regibase-root .vbtn.on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow); }
+
+/* リスト型 */
+#regibase-root .rec-list { display: flex; flex-direction: column; gap: 6px; }
+#regibase-root .rec-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+#regibase-root .rec-row:hover { border-color: var(--primary); }
+#regibase-root .rec-row .rr-title { font-weight: 600; font-size: 14.5px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+#regibase-root .rec-row .rr-sub { color: var(--muted); font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .rec-row .rr-chev { color: var(--muted); font-size: 20px; }
+
+/* リスト詳細型 */
+#regibase-root .rec-dlist { display: flex; flex-direction: column; gap: 8px; }
+#regibase-root .rec-drow { display: block; width: 100%; text-align: left; padding: 12px 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); }
+#regibase-root .rec-drow:hover { border-color: var(--primary); }
+#regibase-root .rec-drow .rr-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+#regibase-root .rec-drow .rr-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+#regibase-root .rec-drow .rr-field { font-size: 12.5px; color: var(--muted); }
+#regibase-root .rec-drow .rr-field b { color: var(--text); font-weight: 600; }
+
+/* 画像リスト型 */
+#regibase-root .rec-imggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+#regibase-root .rec-imgcard { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; color: var(--text); padding-bottom: 10px; }
+#regibase-root .rec-imgcard:hover { border-color: var(--primary); }
+#regibase-root .rec-imgcard .thumb { aspect-ratio: 4 / 3; background: var(--surface-2); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#regibase-root .rec-imgcard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+#regibase-root .rec-imgcard .thumb .noimg { font-size: 40px; opacity: .5; }
+#regibase-root .rec-imgcard .rr-title { font-weight: 700; font-size: 14px; margin: 8px 12px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .rec-imgcard .rr-sub { font-size: 12px; color: var(--muted); margin: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* image field */
+#regibase-root .imgfield { display: flex; flex-direction: column; gap: 8px; }
+#regibase-root .dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; background: var(--surface-2); transition: border-color .12s, background .12s; }
+#regibase-root .dropzone.over { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface-2)); }
+#regibase-root .dropzone-hint { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.6; pointer-events: none; }
+#regibase-root .dropzone-hint .dz-ic { display: block; font-size: 30px; opacity: .6; margin-bottom: 2px; }
+#regibase-root .dropzone .imgpreview { margin: 0; }
+
+/* image field config in schema editor */
+#regibase-root .imgcfg { grid-column: 1 / -1; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+#regibase-root .imgcfg .cfg { display: inline-flex; align-items: center; gap: 6px; }
+#regibase-root .imgcfg input[type='number'] { width: 84px; }
+#regibase-root .imgcfg select { min-width: 150px; }
+
+/* cropper */
+#regibase-root .cropper-mask { z-index: 10002; }
+#regibase-root .crop-stage { position: relative; user-select: none; touch-action: none; background: var(--surface-2); border-radius: 8px; overflow: hidden; max-width: 100%; }
+#regibase-root .crop-img { display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+#regibase-root .crop-box { position: absolute; border: 2px solid var(--primary); box-shadow: 0 0 0 100vmax rgba(0,0,0,.45); cursor: move; box-sizing: border-box; }
+#regibase-root .crop-h { position: absolute; width: 14px; height: 14px; background: var(--primary); border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; touch-action: none; }
+#regibase-root .crop-h.tl { left: -8px; top: -8px; cursor: nwse-resize; }
+#regibase-root .crop-h.tr { right: -8px; top: -8px; cursor: nesw-resize; }
+#regibase-root .crop-h.bl { left: -8px; bottom: -8px; cursor: nesw-resize; }
+#regibase-root .crop-h.br { right: -8px; bottom: -8px; cursor: nwse-resize; }
+
+/* file / notes attachment field */
+#regibase-root .filefield { display: flex; flex-direction: column; gap: 8px; }
+#regibase-root .fileattach { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+#regibase-root .fileattach .fa-ic { font-size: 22px; }
+#regibase-root .fileattach .fa-name { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+#regibase-root .detail-row .dv .fa-ic { font-size: 20px; }
+#regibase-root .note-list { display: flex; flex-direction: column; gap: 6px; }
+#regibase-root .note-item { display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+#regibase-root .note-item:hover { border-color: var(--primary); }
+#regibase-root .note-item .ni-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+#regibase-root .note-item .ni-cat { font-size: 11px; color: var(--muted); background: var(--surface-2); padding: 1px 8px; border-radius: 999px; }
+#regibase-root .fp-path { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#regibase-root .fp-cur { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); direction: rtl; text-align: left; }
+#regibase-root .fp-list { max-height: 46vh; overflow-y: auto; }
+#regibase-root .fp-item { cursor: pointer; }
+#regibase-root .fp-item.sel { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, var(--surface)); box-shadow: inset 0 0 0 1px var(--primary); }
+#regibase-root .imgpreview { max-width: 100%; max-height: 180px; border-radius: 10px; border: 1px solid var(--border); object-fit: contain; background: var(--surface-2); align-self: flex-start; }
+#regibase-root .imgpreview.lg { max-height: 320px; }
+#regibase-root .imgactions { display: flex; gap: 8px; }
+#regibase-root .imgactions label { cursor: pointer; }
+
+/* home (collection chooser) */
+#regibase-root .home-title { font-size: 20px; font-weight: 800; margin: 4px 4px 16px; }
+#regibase-root .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+#regibase-root .home-card { display: flex; align-items: center; gap: 14px; text-align: left; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); width: 100%; }
+#regibase-root .home-card:hover { border-color: var(--primary); transform: translateY(-1px); transition: transform .12s; }
+#regibase-root .home-card .hc-icon { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+#regibase-root .home-card .hc-body { min-width: 0; flex: 1; }
+#regibase-root .home-card .hc-name { font-weight: 800; font-size: 16px; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .home-card .hc-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#regibase-root .home-card .hc-count { font-size: 12px; color: var(--muted); background: var(--surface-2); display: inline-block; padding: 1px 9px; border-radius: 999px; }
+
+/* empty state */
+#regibase-root .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+#regibase-root .empty .big { font-size: 52px; margin-bottom: 10px; }
+
+/* ---------- Modal ---------- */
+#regibase-root .modal-mask { position: fixed; inset: 0; background: rgba(8,12,22,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10000; }
+#regibase-root .modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  width: 560px; max-width: 100%; max-height: 92dvh; display: flex; flex-direction: column; box-shadow: var(--shadow); color: var(--text);
+}
+#regibase-root .modal.wide { width: 720px; }
+#regibase-root .modal-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+#regibase-root .modal-head h3 { margin: 0; font-size: 17px; flex: 1; }
+#regibase-root .modal-body { padding: 16px 18px; overflow-y: auto; }
+#regibase-root .modal-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+#regibase-root .icon-btn { border: none; background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; border-radius: 8px; }
+#regibase-root .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+
+/* form */
+#regibase-root .field { margin-bottom: 14px; }
+#regibase-root .field > label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
+#regibase-root .field .req { color: var(--danger); }
+#regibase-root .rule-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+#regibase-root .control { display: flex; gap: 6px; align-items: stretch; }
+#regibase-root .control input, #regibase-root .control select, #regibase-root .control textarea, #regibase-root .field > input, #regibase-root .field > select, #regibase-root .field > textarea {
+  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); outline: none;
+}
+#regibase-root .control input:focus, #regibase-root .field input:focus, #regibase-root .field select:focus, #regibase-root .field textarea:focus { border-color: var(--primary); }
+#regibase-root .field textarea { min-height: 76px; resize: vertical; }
+#regibase-root .control .icon-btn { border: 1px solid var(--border); background: var(--surface-2); }
+
+/* emoji icon picker */
+#regibase-root .iconpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; max-height: 190px; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+#regibase-root .iconpick-btn { font-size: 21px; line-height: 1; padding: 5px 0; border: 1px solid transparent; border-radius: 8px; background: transparent; }
+#regibase-root .iconpick-btn:hover { background: var(--surface); }
+#regibase-root .iconpick-btn.sel { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+#regibase-root .iconpick-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+#regibase-root .iconpick-foot input { width: 84px; text-align: center; }
+#regibase-root .iconpick-cur { font-size: 22px; }
+
+/* styled file picker (import) */
+#regibase-root .filepick { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; max-width: 100%; }
+#regibase-root .filepick input[type='file'] { display: none; }
+#regibase-root .filepick .btn { pointer-events: none; }
+#regibase-root .filepick-name { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* detail view */
+#regibase-root .detail-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+#regibase-root .detail-row:last-child { border-bottom: none; }
+#regibase-root .detail-row .dk { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+#regibase-root .detail-row .dv { font-size: 15px; word-break: break-word; display: flex; align-items: center; gap: 8px; }
+#regibase-root .detail-row .dv .val { flex: 1; white-space: pre-wrap; }
+#regibase-root .detail-row .dv a.val.link { color: var(--primary); text-decoration: none; word-break: break-all; }
+#regibase-root .detail-row .dv a.val.link:hover { text-decoration: underline; }
+#regibase-root .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* template picker */
+#regibase-root .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#regibase-root .tpl-card { text-align: left; border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 12px; color: var(--text); }
+#regibase-root .tpl-card:hover { border-color: var(--primary); }
+#regibase-root .tpl-card .th { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 4px; }
+#regibase-root .tpl-card .th .ic { font-size: 20px; }
+#regibase-root .tpl-card .td { font-size: 12px; color: var(--muted); }
+
+/* schema editor rows */
+#regibase-root .schema-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; background: var(--surface-2); }
+#regibase-root .schema-row.sortable { grid-template-columns: auto 1fr 1fr auto; }
+#regibase-root .schema-row .drag-handle { cursor: grab; color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 2px; user-select: none; text-align: center; }
+#regibase-root .schema-row .drag-handle:active { cursor: grabbing; }
+#regibase-root .schema-row.dragging { opacity: .45; }
+#regibase-root .schema-row.dragover { outline: 2px dashed var(--primary); outline-offset: 1px; }
+#regibase-root .schema-row .flags { display: flex; gap: 10px; grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+#regibase-root .schema-row .flags label { display: inline-flex; align-items: center; gap: 4px; }
+#regibase-root .schema-row input:not([type=checkbox]):not([type=radio]),
+#regibase-root .schema-row select,
+#regibase-root .schema-row textarea {
+  width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); outline: none; font-size: 14px;
+}
+#regibase-root .schema-row input:focus, #regibase-root .schema-row select:focus, #regibase-root .schema-row textarea:focus { border-color: var(--primary); }
+#regibase-root .schema-row textarea { min-height: 52px; resize: vertical; }
+#regibase-root .chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+/* transfer mapping */
+#regibase-root .radios { display: flex; gap: 16px; flex-wrap: wrap; }
+#regibase-root .radios label { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+#regibase-root .map-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-bottom: 8px; }
+#regibase-root .map-row .map-src { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 7px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
+#regibase-root .map-row .map-src .ms-label { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .map-row .map-src .ms-sample { font-size: 11.5px; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#regibase-root .map-row .map-src .ms-empty { font-size: 11.5px; color: var(--muted); }
+#regibase-root .map-row .map-arrow { color: var(--muted); }
+#regibase-root .map-row select { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+#regibase-root .map-row select.isnew { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* toast */
+#regibase-root .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 14px; z-index: 10001; box-shadow: var(--shadow); }
+
+/* loading */
+#regibase-root .login-wrap { display: flex; align-items: center; justify-content: center; height: calc(100dvh - var(--header-height, 50px)); padding: 20px; }
+#regibase-root .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 30px; width: 380px; max-width: 100%; box-shadow: var(--shadow); text-align: center; }
+#regibase-root .login-card .logo { font-size: 46px; }
+#regibase-root .login-card p { color: var(--muted); margin: 8px 0 0; font-size: 13px; }
+
+#regibase-root .backdrop { display: none; }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 780px) {
+  #regibase-root .sidebar {
+    position: fixed; z-index: 40; top: 0; left: 0; height: 100dvh;
+    transform: translateX(-100%); transition: transform .22s ease; box-shadow: var(--shadow);
+  }
+  #regibase-root .sidebar.open { transform: translateX(0); }
+  #regibase-root .backdrop.show { display: block; position: fixed; inset: 0; background: rgba(8,12,22,.45); z-index: 35; }
+  #regibase-root .hamburger { display: inline-flex; }
+  #regibase-root .rec-grid { grid-template-columns: 1fr; }
+  #regibase-root .tpl-grid { grid-template-columns: 1fr; }
+  #regibase-root .modal { width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  #regibase-root .modal.wide { width: 100%; }
+  #regibase-root .content { padding: 14px 14px 40px; }
+  #regibase-root .topbar { padding: 12px 14px; }
+  #regibase-root .schema-row { grid-template-columns: 1fr; }
+  #regibase-root .schema-row.sortable { grid-template-columns: auto 1fr; }
+}
+
+/* 表計算型 (spreadsheet-style table; leftmost column frozen, rest scroll) */
+/* Single scroll region: for the table view, .content becomes a flex column that
+   does NOT scroll; only the table wrap scrolls (both axes), so the topbar/toolbar
+   stay fixed and scrolling the table never moves the header. */
+#regibase-root .content-table { display: flex; flex-direction: column; overflow: hidden; }
+#regibase-root .content-table .listtoolbar { flex: 0 0 auto; }
+#regibase-root .content-table .rec-table-wrap { flex: 1 1 auto; min-height: 0; }
+#regibase-root .rec-table-wrap { overflow: auto; overscroll-behavior: contain; max-width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+#regibase-root .rec-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; white-space: nowrap; }
+#regibase-root .rec-table th, #regibase-root .rec-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+#regibase-root .rec-table thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-weight: 600; z-index: 1; }
+/* 2nd+ columns: grab-to-scroll cursor (on the cells directly, so hover shows it);
+   frozen 1st column + actions stay clickable. */
+#regibase-root .rec-table td, #regibase-root .rec-table th { cursor: -webkit-grab; cursor: grab; }
+#regibase-root .rec-table .rt-frozen, #regibase-root .rec-table .rt-frozen *, #regibase-root .rec-table .rt-actions, #regibase-root .rec-table .rt-actions * { cursor: pointer; }
+#regibase-root .rec-table-wrap.dragging, #regibase-root .rec-table-wrap.dragging * { cursor: -webkit-grabbing !important; cursor: grabbing !important; }
+#regibase-root .rec-table .rt-thumb { pointer-events: none; -webkit-user-drag: none; }
+#regibase-root .rec-table tbody tr:hover td { background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+#regibase-root .rec-table tbody tr.sel td { background: color-mix(in srgb, var(--primary) 15%, var(--surface)); }
+#regibase-root .rec-table td.mono { font-family: ui-monospace, monospace; letter-spacing: 1px; }
+#regibase-root .rec-table .rt-actions { width: 1px; text-align: center; }
+#regibase-root .rec-table .rt-thumb { width: 30px; height: 30px; object-fit: cover; border-radius: 4px; vertical-align: middle; }
+/* frozen first column (checkbox + title), stays put while columns 2+ scroll */
+#regibase-root .rec-table .rt-frozen { position: sticky; left: 0; z-index: 2; border-right: 1px solid var(--border); font-weight: 600; }
+#regibase-root .rec-table thead th.rt-frozen { z-index: 3; }
+#regibase-root .rec-table tbody td.rt-frozen { background: var(--surface); }
+#regibase-root .rec-table thead th.rt-frozen { background: var(--surface-2); }
+#regibase-root .rec-table tbody tr:hover td.rt-frozen { background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+#regibase-root .rec-table tbody tr.sel td.rt-frozen { background: color-mix(in srgb, var(--primary) 15%, var(--surface)); }
+#regibase-root .rec-table .rt-fhead { display: inline-flex; align-items: center; gap: 8px; }
+#regibase-root .rec-table .rt-fcell { display: inline-flex; vertical-align: middle; margin-right: 8px; }
+#regibase-root .rec-table .rt-fval { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }

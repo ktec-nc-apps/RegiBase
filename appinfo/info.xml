@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>regibase</id>
+	<name>RegiBase</name>
+	<summary>Personal database with custom form templates, encryption and multiple views</summary>
+	<description><![CDATA[RegiBase is a lightweight personal database for the information you want to keep — credit cards, bank accounts, online accounts, memberships, licenses, contacts and anything else.
+
+Design your own fields from templates, then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
+
+Features:
+- Custom form fields with per-field input rules
+- Optional client-side encryption (AES-GCM) for secret fields — the server never sees the key or plaintext
+- Password-protected full backup & restore (AES-256 ZIP)
+- Import from CSV / JSON (e.g. Google Password Manager) or from your Nextcloud Contacts (including photos)
+- Attach images and files from Nextcloud Files or Notes
+- Move / copy / merge records between collections
+- Available in 12 languages]]></description>
+	<version>0.9.5</version>
+	<licence>agpl</licence>
+	<author>ktec-jp</author>
+	<namespace>RegiBase</namespace>
+	<category>organization</category>
+	<category>tools</category>
+	<website>https://github.com/ktec-nc-apps/regibase</website>
+	<bugs>https://github.com/ktec-nc-apps/regibase/issues</bugs>
+	<repository>https://github.com/ktec-nc-apps/regibase</repository>
+	<dependencies>
+		<nextcloud min-version="30" max-version="32"/>
+	</dependencies>
+	<navigations>
+		<navigation>
+			<name>RegiBase</name>
+			<route>regibase.page.index</route>
+			<icon>app.svg</icon>
+			<order>80</order>
+		</navigation>
+	</navigations>
+</info>
