@@ -131,16 +131,19 @@
       <div class="title" v-else><span class="nm">{{ t('All collections') }}</span></div>
       <div class="spacer"></div>
       <template v-if="current">
-        <div class="viewswitch">
-          <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: current.view===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
+        <div class="topbar-actions">
+          <div class="viewswitch">
+            <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: current.view===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
+          </div>
+          <button class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
+          <button class="btn sm" @click="openCollSettings" :title="t('Collection name, description, color, etc.')">{{ t('⚙️ Collection settings') }}</button>
+          <button class="btn accent sm" @click="openNewRecord">{{ t('＋ New record') }}</button>
+          <div class="ta-break" aria-hidden="true"></div>
         </div>
-        <button class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
-        <button class="btn sm" @click="openCollSettings" :title="t('Collection name, description, color, etc.')">{{ t('⚙️ Collection settings') }}</button>
-        <button class="btn accent sm" @click="openNewRecord">{{ t('＋ New record') }}</button>
       </template>
     </div>
 
-    <div class="content" :class="{'content-table': current && current.view==='table' && records.length}">
+    <div class="content" :class="{'content-table': current && current.view==='table' && records.length}" @scroll="onScrollNearBottom">
       <div v-if="!current" class="home">
         <div v-if="collections.length" class="home-grid">
           <button v-for="c in collections" :key="c.id" class="home-card" @click="selectCollection(c.id)">
@@ -160,6 +163,12 @@
 
       <template v-else>
         <div class="listtoolbar">
+          <div class="lt-top">
+            <button type="button" class="lt-toggle" :class="{on: selectionMode}" @click="toggleSelectionMode" :title="t('Search, sort & bulk actions')">☰</button>
+            <span class="lt-collname"><span class="ic">{{ current.icon }}</span>{{ current.name }}</span>
+            <span class="lt-count" v-if="records.length">{{ t('{shown} / {total} items', {shown: visibleRecords.length, total: records.length}) }}</span>
+          </div>
+          <div class="lt-tools" v-show="selectionMode">
           <div class="lt-search">
             <input class="searchinput" v-model="search" @input="onSearchInput" :placeholder="t('🔍 Search in this collection')" />
             <select class="sortselect" :value="normSort(current.record_sort)" @change="setSort($event.target.value)" :title="t('Sort')">
@@ -178,6 +187,7 @@
             <button class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
             <button class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
             <button class="btn sm danger" :disabled="!selectedIds.length" @click="openBulkDelete">{{ t('Delete') }}</button>
+          </div>
           </div>
         </div>
         <div v-if="!records.length" class="empty">
@@ -226,6 +236,7 @@
           </div>
           <!-- 表計算型（左端の項目を固定／2列目以降はドラッグで横スクロール） -->
           <div v-else-if="current.view==='table'" class="rec-table-wrap" :class="{dragging: tableDrag.active}"
+               @scroll="onScrollNearBottom"
                @pointerdown="tableDown" @pointermove="tableMove" @pointerup="tableUp" @pointercancel="tableUp">
             <table class="rec-table">
               <thead>
@@ -265,10 +276,6 @@
               </button>
             </div>
           </div>
-          <div v-if="records.length > visibleRecords.length" class="loadmore">
-            <button class="btn" @click="showMore">{{ t('Show more ({n} remaining)', {n: records.length - visibleRecords.length}) }}</button>
-            <span class="loadmore-info">{{ t('{shown} / {total} items', {shown: visibleRecords.length, total: records.length}) }}</span>
-          </div>
         </template>
       </template>
     </div>
@@ -293,6 +300,7 @@
           </button>
         </div>
       </div>
+      <div class="modal-foot"><button class="btn" @click="modal=null">{{ t('Cancel') }}</button></div>
     </div>
   </div>
 
@@ -937,6 +945,7 @@
         selectedIds: [], delConfirm: false,
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
+        selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
         iconChoices: [
           { e: '🗂️', t: 'Card organizer' }, { e: '📁', t: 'Folder' }, { e: '📂', t: 'Folder (open)' }, { e: '🗄️', t: 'Cabinet' }, { e: '📇', t: 'Business card / index' },
           { e: '🔑', t: 'Key' }, { e: '🔐', t: 'Locked (key)' }, { e: '🗝️', t: 'Old key' }, { e: '💳', t: 'Credit card' }, { e: '🏦', t: 'Bank' },
@@ -1104,7 +1113,20 @@
         this.records = await api('collections/' + this.current.id + '/records' + q);
         this.renderLimit = 200;
       },
-      showMore() { this.renderLimit += 300; },
+      toggleSelectionMode() {
+        this.selectionMode = !this.selectionMode;
+        try { localStorage.setItem('rb-selmode', this.selectionMode ? '1' : '0'); } catch (e) {}
+        if (!this.selectionMode) { this.clearSelection(); }
+      },
+      // Infinite scroll: when the scroll container nears its bottom, reveal 50
+      // more rows (no need to press "Show more"). Self-limiting because each
+      // batch grows the content well past the trigger threshold.
+      onScrollNearBottom(e) {
+        const el = e.target;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 260 && this.renderLimit < this.records.length) {
+          this.renderLimit += 50;
+        }
+      },
       contentEl() { return document.querySelector('#regibase-root .content'); },
       scrollToTop() { const el = this.contentEl(); if (el) el.scrollTo({ top: 0, behavior: 'smooth' }); },
       scrollToBottom() {
@@ -1844,8 +1866,9 @@
         const i = this.selectedIds.indexOf(id);
         if (i >= 0) this.selectedIds.splice(i, 1);
         else this.selectedIds.push(id);
+        if (this.selectedIds.length) this.selectionMode = true; // checking opens the menu
       },
-      selectAll() { this.selectedIds = this.records.map((r) => r.id); },
+      selectAll() { this.selectedIds = this.records.map((r) => r.id); if (this.selectedIds.length) this.selectionMode = true; },
       clearSelection() { this.selectedIds = []; },
 
       // ---- bulk actions ----

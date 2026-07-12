@@ -503,6 +503,7 @@ OC.L10N.register(
     "No contacts found": "連絡先が見つかりません",
     "Import": "インポート",
     "The Contacts app is not enabled": "連絡先アプリが有効ではありません",
-    "Table": "表計算型"
+    "Table": "表計算型",
+    "Search, sort & bulk actions": "検索・並べ替え・一括操作"
 },
 "nplurals=2; plural=(n != 1);");
