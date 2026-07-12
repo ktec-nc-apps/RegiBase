@@ -153,7 +153,7 @@ const _hoisted_30 = {
 const _hoisted_31 = { class: "nm" }
 const _hoisted_32 = /*#__PURE__*/_createElementVNode("div", { class: "spacer" }, null, -1 /* HOISTED */)
 const _hoisted_33 = { class: "viewswitch" }
-const _hoisted_34 = ["title", "onClick"]
+const _hoisted_34 = ["title", "onClick", "innerHTML"]
 const _hoisted_35 = ["title"]
 const _hoisted_36 = ["title"]
 const _hoisted_37 = {
@@ -892,8 +892,9 @@ return function render(_ctx, _cache) {
                           key: v.key,
                           class: _normalizeClass(["vbtn", {on: _ctx.current.view===v.key}]),
                           title: _ctx.t(v.label),
-                          onClick: $event => (_ctx.setView(v.key))
-                        }, _toDisplayString(v.icon), 11 /* TEXT, CLASS, PROPS */, _hoisted_34))
+                          onClick: $event => (_ctx.setView(v.key)),
+                          innerHTML: v.icon
+                        }, null, 10 /* CLASS, PROPS */, _hoisted_34))
                       }), 128 /* KEYED_FRAGMENT */))
                     ]),
                     _createElementVNode("button", {
@@ -3158,11 +3159,11 @@ return function render(_ctx, _cache) {
         importStep: 1, importCsv: '', importFileName: '', importAnalysis: null,
         importColl: { name: '', icon: '', color: '' }, importCols: [], importBusy: false,
         views: [
-          { key: 'list', icon: '☰', label: 'List' },
-          { key: 'detail', icon: '▤', label: 'Detailed list' },
-          { key: 'table', icon: '⊞', label: 'Table' },
-          { key: 'card', icon: '▦', label: 'Cards' },
-          { key: 'image', icon: '🖼', label: 'Cards with thumbnails' },
+          { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
+          { key: 'detail', label: 'Detailed list', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
+          { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17"/><path d="M12 3.5v17M3.5 12h17"/></svg>' },
+          { key: 'card', label: 'Cards', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7.4" height="7.4"/><rect x="13.1" y="3.5" width="7.4" height="7.4"/><rect x="3.5" y="13.1" width="7.4" height="7.4"/><rect x="13.1" y="13.1" width="7.4" height="7.4"/></svg>' },
+          { key: 'image', label: 'Cards with thumbnails', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17"/><rect x="6" y="6" width="6.4" height="6.4" fill="currentColor" stroke="none"/><path stroke-width="1.6" stroke-linecap="round" d="M14.6 7h3.9M14.6 10h3.9M6 15h12.5M6 18h12.5"/></svg>' },
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
