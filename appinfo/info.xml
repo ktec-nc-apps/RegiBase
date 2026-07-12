@@ -24,6 +24,14 @@ Features:
 	<website>https://github.com/ktec-nc-apps/RegiBase</website>
 	<bugs>https://github.com/ktec-nc-apps/RegiBase/issues</bugs>
 	<repository>https://github.com/ktec-nc-apps/RegiBase</repository>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/01-collections-home.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/02-table-view.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/03-design-fields.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/04-record-detail.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/05-settings.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/06-templates.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/07-card-view.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/ktec-nc-apps/RegiBase/main/screenshots/08-collection-settings.png</screenshot>
 	<dependencies>
 		<nextcloud min-version="30" max-version="32"/>
 	</dependencies>
