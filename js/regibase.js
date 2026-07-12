@@ -342,7 +342,7 @@
             </template>
           </div>
           <div v-else class="control">
-            <input :type="inputType(f)" v-model="form[f.key]" :placeholder="f.placeholder||''" :autocomplete="f.secret?'off':''" :maxlength="ruleMax(f)" />
+            <input :type="inputType(f)" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="f.placeholder||''" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
             <button v-if="f.secret" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
           </div>
           <div v-if="ruleHint(f)" class="rule-hint">📏 {{ ruleHint(f) }}</div>
@@ -1966,7 +1966,10 @@
         finally { this.xfer.busy = false; }
       },
       inputType(f) {
-        if (f.secret) return this.reveal[f.key] ? 'text' : 'password';
+        // Secret fields are plain text masked with CSS (.secret-mask) rather than
+        // type="password", so the browser never treats the record form as a login
+        // and won't offer to save/autofill credentials. Reveal toggles the mask class.
+        if (f.secret) return 'text';
         return { number: 'number', date: 'date', month: 'month', email: 'email', url: 'url', tel: 'tel' }[f.type] || 'text';
       },
       fieldRule(f) {

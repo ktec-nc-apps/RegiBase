@@ -329,6 +329,9 @@
 #regibase-root .control input:focus, #regibase-root .field input:focus, #regibase-root .field select:focus, #regibase-root .field textarea:focus { border-color: var(--primary); }
 #regibase-root .field textarea { min-height: 76px; resize: vertical; }
 #regibase-root .control .icon-btn { border: 1px solid var(--border); background: var(--surface-2); }
+/* Mask secret fields without using type="password" (keeps the browser from
+   offering to save/autofill credentials). Reveal removes .secret-mask. */
+#regibase-root .control input.secret-mask { -webkit-text-security: disc; text-security: disc; }
 
 /* emoji icon picker */
 #regibase-root .iconpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; max-height: 190px; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }

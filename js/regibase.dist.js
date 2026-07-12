@@ -1516,11 +1516,19 @@ return function render(_ctx, _cache) {
                                 : (_openBlock(), _createElementBlock("div", _hoisted_158, [
                                     _withDirectives(_createElementVNode("input", {
                                       type: _ctx.inputType(f),
+                                      class: _normalizeClass({'secret-mask': f.secret && !_ctx.reveal[f.key]}),
                                       "onUpdate:modelValue": $event => ((_ctx.form[f.key]) = $event),
                                       placeholder: f.placeholder||'',
                                       autocomplete: f.secret?'off':'',
+                                      autocorrect: "off",
+                                      autocapitalize: "off",
+                                      spellcheck: "false",
+                                      "data-1p-ignore": "",
+                                      "data-lpignore": "true",
+                                      "data-bwignore": "",
+                                      "data-form-type": "other",
                                       maxlength: _ctx.ruleMax(f)
-                                    }, null, 8 /* PROPS */, _hoisted_159), [
+                                    }, null, 10 /* CLASS, PROPS */, _hoisted_159), [
                                       [_vModelDynamic, _ctx.form[f.key]]
                                     ]),
                                     (f.secret)
@@ -4198,7 +4206,10 @@ return function render(_ctx, _cache) {
         finally { this.xfer.busy = false; }
       },
       inputType(f) {
-        if (f.secret) return this.reveal[f.key] ? 'text' : 'password';
+        // Secret fields are plain text masked with CSS (.secret-mask) rather than
+        // type="password", so the browser never treats the record form as a login
+        // and won't offer to save/autofill credentials. Reveal toggles the mask class.
+        if (f.secret) return 'text';
         return { number: 'number', date: 'date', month: 'month', email: 'email', url: 'url', tel: 'tel' }[f.type] || 'text';
       },
       fieldRule(f) {
