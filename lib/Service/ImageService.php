@@ -53,7 +53,7 @@ class ImageService {
 		$name = str_replace(['/', '\\', "\0"], '-', $name);
 		$name = trim($name, " \t.");
 		if ($name === '' || $name === '.' || $name === '..') {
-			return 'コレクション';
+			return 'Collection';
 		}
 		return mb_substr($name, 0, 120);
 	}
@@ -86,19 +86,19 @@ class ImageService {
 	 */
 	public function saveDataUrl(string $userId, string $collectionName, string $dataUrl): int {
 		if (!preg_match('/^data:([^;]+);base64,(.+)$/s', $dataUrl, $m)) {
-			throw new \RuntimeException('画像データが不正です');
+			throw new \RuntimeException('The image data is invalid');
 		}
 		$mime = strtolower($m[1]);
 		if (!isset(self::MIME_EXT[$mime])) {
-			throw new \RuntimeException('対応していない画像形式です（PNG/JPEG/WebP/GIF）');
+			throw new \RuntimeException('Unsupported image format (PNG/JPEG/WebP/GIF)');
 		}
 		$ext = self::MIME_EXT[$mime];
 		$buf = base64_decode($m[2], true);
 		if ($buf === false) {
-			throw new \RuntimeException('画像データが不正です');
+			throw new \RuntimeException('The image data is invalid');
 		}
 		if (strlen($buf) > 15 * 1024 * 1024) {
-			throw new \RuntimeException('画像が大きすぎます');
+			throw new \RuntimeException('The image is too large');
 		}
 
 		try {
@@ -107,7 +107,7 @@ class ImageService {
 			foreach (explode('/', $this->getBaseFolder($userId)) as $seg) {
 				$base = $this->ensureFolder($base, $seg);
 			}
-			$dir = $this->ensureFolder($base, $collectionName !== '' ? $collectionName : '未分類');
+			$dir = $this->ensureFolder($base, $collectionName !== '' ? $collectionName : 'Uncategorized');
 
 			$name = 'image-' . bin2hex(random_bytes(4)) . '.' . $ext;
 			while ($dir->nodeExists($name)) {
@@ -116,7 +116,7 @@ class ImageService {
 			$file = $dir->newFile($name, $buf);
 			return $file->getId();
 		} catch (NotPermittedException $e) {
-			throw new \RuntimeException('保存先フォルダに書き込めません');
+			throw new \RuntimeException('Cannot write to the destination folder');
 		}
 	}
 
@@ -181,21 +181,21 @@ class ImageService {
 		$name = $this->safeFilename($filename);
 		$ext = $this->extOf($name);
 		if (!isset(self::DOC_EXT[$ext])) {
-			throw new \RuntimeException('対応していないファイル形式です（PDF / Word / Excel / ODF のみ）');
+			throw new \RuntimeException('Unsupported file format (PDF / Word / Excel / ODF only)');
 		}
 		$buf = base64_decode($base64, true);
 		if ($buf === false) {
-			throw new \RuntimeException('ファイルデータが不正です');
+			throw new \RuntimeException('The file data is invalid');
 		}
 		if (strlen($buf) > 50 * 1024 * 1024) {
-			throw new \RuntimeException('ファイルが大きすぎます（最大50MB）');
+			throw new \RuntimeException('The file is too large (max 50MB)');
 		}
 		try {
 			$dir = $this->rootFolder->getUserFolder($userId);
 			foreach (explode('/', $this->getBaseFolder($userId)) as $seg) {
 				$dir = $this->ensureFolder($dir, $seg);
 			}
-			$dir = $this->ensureFolder($dir, $collectionName !== '' ? $collectionName : '未分類');
+			$dir = $this->ensureFolder($dir, $collectionName !== '' ? $collectionName : 'Uncategorized');
 			$stem = substr($name, 0, strlen($name) - strlen($ext) - 1);
 			$fname = $name;
 			$n = 2;
@@ -205,7 +205,7 @@ class ImageService {
 			$file = $dir->newFile($fname, $buf);
 			return ['id' => $file->getId(), 'name' => $fname];
 		} catch (NotPermittedException $e) {
-			throw new \RuntimeException('保存先フォルダに書き込めません');
+			throw new \RuntimeException('Cannot write to the destination folder');
 		}
 	}
 
@@ -243,7 +243,7 @@ class ImageService {
 			}
 			return $dir->newFile($fname, $content)->getId();
 		} catch (NotPermittedException $e) {
-			throw new \RuntimeException('保存先フォルダに書き込めません');
+			throw new \RuntimeException('Cannot write to the destination folder');
 		}
 	}
 

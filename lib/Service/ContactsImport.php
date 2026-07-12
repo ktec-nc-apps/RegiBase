@@ -14,16 +14,16 @@ class ContactsImport {
 	/** Field schema for a contacts collection (labels reuse existing i18n keys). */
 	public static function fields(IL10N $l): array {
 		return [
-			['key' => 'name', 'label' => $l->t('氏名'), 'type' => 'text', 'is_title' => true, 'required' => true],
-			['key' => 'reading', 'label' => $l->t('ふりがな'), 'type' => 'text'],
-			['key' => 'photo', 'label' => $l->t('顔写真'), 'type' => 'image'],
-			['key' => 'company', 'label' => $l->t('会社名'), 'type' => 'text'],
-			['key' => 'mobile', 'label' => $l->t('携帯電話'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
-			['key' => 'phone', 'label' => $l->t('電話'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
-			['key' => 'email', 'label' => $l->t('メール'), 'type' => 'email'],
-			['key' => 'address', 'label' => $l->t('住所'), 'type' => 'textarea'],
-			['key' => 'birthday', 'label' => $l->t('誕生日'), 'type' => 'date'],
-			['key' => 'memo', 'label' => $l->t('メモ'), 'type' => 'textarea'],
+			['key' => 'name', 'label' => $l->t('Full name'), 'type' => 'text', 'is_title' => true, 'required' => true],
+			['key' => 'reading', 'label' => $l->t('Reading (furigana)'), 'type' => 'text'],
+			['key' => 'photo', 'label' => $l->t('Photo'), 'type' => 'image'],
+			['key' => 'company', 'label' => $l->t('Company name'), 'type' => 'text'],
+			['key' => 'mobile', 'label' => $l->t('Mobile phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
+			['key' => 'phone', 'label' => $l->t('Phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
+			['key' => 'email', 'label' => $l->t('Email'), 'type' => 'email'],
+			['key' => 'address', 'label' => $l->t('Address'), 'type' => 'textarea'],
+			['key' => 'birthday', 'label' => $l->t('Birthday'), 'type' => 'date'],
+			['key' => 'memo', 'label' => $l->t('Memo'), 'type' => 'textarea'],
 		];
 	}
 

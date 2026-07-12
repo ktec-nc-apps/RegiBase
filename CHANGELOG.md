@@ -2,6 +2,13 @@
 
 All notable changes to RegiBase.
 
+## 0.9.6
+
+- Internationalization now uses **English as the source language** (the Nextcloud /
+  Transifex convention). Japanese and the 10 other languages are translations, so
+  community translators can contribute. No user-facing change; all 12 languages work
+  as before.
+
 ## 0.9.5 — initial public release
 
 Personal database app for Nextcloud with:

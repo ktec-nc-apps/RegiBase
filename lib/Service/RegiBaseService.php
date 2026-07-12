@@ -70,7 +70,7 @@ class RegiBaseService {
 		$tpl = isset($input['template_key']) ? Templates::byKey($l, (string)$input['template_key']) : null;
 		$c = new CollectionEntity();
 		$c->setUserId($userId);
-		$c->setName($input['name'] ?? ($tpl['name'] ?? $l->t('新しいコレクション')));
+		$c->setName($input['name'] ?? ($tpl['name'] ?? $l->t('New collection')));
 		$c->setIcon($input['icon'] ?? ($tpl['icon'] ?? '📁'));
 		$c->setColor($input['color'] ?? ($tpl['color'] ?? '#3b82f6'));
 		$c->setDescription($input['description'] ?? ($tpl['description'] ?? ''));
@@ -169,7 +169,7 @@ class RegiBaseService {
 				return (string)$data[$f['key']];
 			}
 		}
-		return $this->l->t('(無題)');
+		return $this->l->t('(untitled)');
 	}
 
 	private function computeReading(string $title): string {
@@ -397,7 +397,7 @@ class RegiBaseService {
 		$mode = ($opts['mode'] ?? 'copy') === 'move' ? 'move' : 'copy';
 		$recordIds = $opts['recordIds'] ?? [];
 		if (!is_array($recordIds) || count($recordIds) === 0) {
-			throw new \RuntimeException('recordIds が必要です');
+			throw new \RuntimeException('recordIds is required');
 		}
 
 		$source = $this->getCollection($userId, $sourceId); // ownership + fields
@@ -456,7 +456,7 @@ class RegiBaseService {
 		$l = $l ?? $this->l;
 		$built = DataImport::buildRecords($csv, $columns);
 		$c = $this->createCollection($userId, [
-			'name' => $collectionMeta['name'] ?? $l->t('取り込みデータ'),
+			'name' => $collectionMeta['name'] ?? $l->t('Imported data'),
 			'icon' => $collectionMeta['icon'] ?? '📥',
 			'color' => $collectionMeta['color'] ?? '#0ea5e9',
 			'fields' => $built['fields'],

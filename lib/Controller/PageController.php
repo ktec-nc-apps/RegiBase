@@ -43,7 +43,7 @@ class PageController extends Controller {
 
 		$response = new TemplateResponse(Application::APP_ID, 'main', [
 			'version' => $this->appManager->getAppVersion(Application::APP_ID),
-			'loading' => $l->t('読み込み中…'),
+			'loading' => $l->t('Loading…'),
 		]);
 		// The buildless Vue global build uses a runtime template compiler (eval).
 		$csp = new ContentSecurityPolicy();

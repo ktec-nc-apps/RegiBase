@@ -93,7 +93,7 @@ class ApiController extends Controller {
 		$uid = $this->uid();
 		$l = $this->appL10n();
 		if (!$this->contactsManager->isEnabled()) {
-			return new JSONResponse(['error' => $l->t('連絡先アプリが有効ではありません')], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $l->t('The Contacts app is not enabled')], Http::STATUS_BAD_REQUEST);
 		}
 		$bookKey = (string)$this->request->getParam('addressbook', 'all');
 		$name = trim((string)$this->request->getParam('name', ''));
@@ -123,7 +123,7 @@ class ApiController extends Controller {
 			}
 		}
 		if ($name === '') {
-			$name = $l->t('連絡先');
+			$name = $l->t('Contacts');
 		}
 		$created = $this->service->createCollection($uid, [
 			'name' => $name,
@@ -318,9 +318,9 @@ class ApiController extends Controller {
 		$dataUrl = (string)$this->request->getParam('dataUrl', '');
 		$collectionId = (int)$this->request->getParam('collection_id', 0);
 		try {
-			$name = $this->l->t('未分類');
+			$name = $this->l->t('Uncategorized');
 			if ($collectionId > 0) {
-				$name = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? $this->l->t('未分類'));
+				$name = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? $this->l->t('Uncategorized'));
 			}
 			return new JSONResponse(['id' => (string)$this->images->saveDataUrl($this->uid(), $name, $dataUrl)]);
 		} catch (DoesNotExistException $e) {
@@ -443,7 +443,7 @@ class ApiController extends Controller {
 		$l = $this->appL10n();
 		$password = (string)$this->request->getParam('password', '');
 		if ($password === '' || $this->userManager->checkPassword($uid, $password) === false) {
-			return new JSONResponse(['error' => $l->t('パスワードが違います')], Http::STATUS_FORBIDDEN);
+			return new JSONResponse(['error' => $l->t('Incorrect password')], Http::STATUS_FORBIDDEN);
 		}
 		$export = $this->service->exportAll($uid);
 		$struct = $export['struct'];
@@ -470,7 +470,7 @@ class ApiController extends Controller {
 		$tmp = $this->tempManager->getTemporaryFile('.zip');
 		$zip = new \ZipArchive();
 		if ($zip->open($tmp, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-			return new JSONResponse(['error' => $l->t('バックアップの作成に失敗しました')], Http::STATUS_INTERNAL_SERVER_ERROR);
+			return new JSONResponse(['error' => $l->t('Failed to create the backup')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 		$zip->setPassword($password);
 		$zip->addFromString('data.json', (string)json_encode($struct, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
@@ -504,7 +504,7 @@ class ApiController extends Controller {
 			$mode = 'overwrite';
 		}
 		if ($password === '') {
-			return new JSONResponse(['error' => $l->t('パスワードを入力してください')], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $l->t('Please enter your password')], Http::STATUS_BAD_REQUEST);
 		}
 		$b64 = $dataUrl;
 		if (($p = strpos($b64, 'base64,')) !== false) {
@@ -512,27 +512,27 @@ class ApiController extends Controller {
 		}
 		$bin = base64_decode($b64, true);
 		if ($bin === false || $bin === '') {
-			return new JSONResponse(['error' => $l->t('アーカイブが不正です')], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $l->t('The archive is invalid')], Http::STATUS_BAD_REQUEST);
 		}
 		$tmp = $this->tempManager->getTemporaryFile('.zip');
 		file_put_contents($tmp, $bin);
 		$zip = new \ZipArchive();
 		if ($zip->open($tmp) !== true) {
 			@unlink($tmp);
-			return new JSONResponse(['error' => $l->t('アーカイブを開けません')], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $l->t('Cannot open the archive')], Http::STATUS_BAD_REQUEST);
 		}
 		$zip->setPassword($password);
 		$json = $zip->getFromName('data.json');
 		if ($json === false) {
 			$zip->close();
 			@unlink($tmp);
-			return new JSONResponse(['error' => $l->t('パスワードが違うか、アーカイブが壊れています')], Http::STATUS_FORBIDDEN);
+			return new JSONResponse(['error' => $l->t('Wrong password or corrupted archive')], Http::STATUS_FORBIDDEN);
 		}
 		$struct = json_decode($json, true);
 		if (!is_array($struct) || !isset($struct['collections'])) {
 			$zip->close();
 			@unlink($tmp);
-			return new JSONResponse(['error' => $l->t('アーカイブの内容が不正です')], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $l->t('The archive contents are invalid')], Http::STATUS_BAD_REQUEST);
 		}
 
 		// settings are only restored for a full overwrite; merge/add keep current settings
@@ -582,9 +582,9 @@ class ApiController extends Controller {
 			$base64 = substr($dataUrl, $p + 7);
 		}
 		try {
-			$collName = '未分類';
+			$collName = 'Uncategorized';
 			if ($collectionId > 0) {
-				$collName = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? '未分類');
+				$collName = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? 'Uncategorized');
 			}
 			$out = $this->images->saveDocument($this->uid(), $collName, $name, $base64);
 			return new JSONResponse(['id' => (string)$out['id'], 'name' => $out['name']]);
@@ -600,7 +600,7 @@ class ApiController extends Controller {
 		$path = (string)$this->request->getParam('path', '');
 		$listing = $this->images->browse($this->uid(), $path);
 		if ($listing === null) {
-			return new JSONResponse(['error' => $this->l->t('フォルダを開けません')], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->l->t('Cannot open the folder')], Http::STATUS_NOT_FOUND);
 		}
 		return new JSONResponse($listing);
 	}
@@ -610,7 +610,7 @@ class ApiController extends Controller {
 		$path = (string)$this->request->getParam('path', '');
 		$meta = $this->images->resolveByPath($this->uid(), $path);
 		if ($meta === null) {
-			return new JSONResponse(['error' => $this->l->t('ファイルが見つかりません')], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->l->t('File not found')], Http::STATUS_NOT_FOUND);
 		}
 		return new JSONResponse($meta);
 	}

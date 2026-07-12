@@ -83,17 +83,17 @@ class CsvImport {
 		return [
 			[
 				'format' => 'google_passwords',
-				'formatLabel' => 'Google パスワード マネージャー',
-				'name' => 'パスワード（Googleインポート）',
+				'formatLabel' => 'Google Password Manager',
+				'name' => 'Passwords (Google import)',
 				'icon' => '🔐',
 				'color' => '#2563eb',
 				'signature' => ['name', 'url', 'username', 'password'],
 				'map' => [
-					'name' => ['label' => 'サービス名', 'type' => 'text', 'title' => true],
+					'name' => ['label' => 'Service name', 'type' => 'text', 'title' => true],
 					'url' => ['label' => 'URL', 'type' => 'url'],
-					'username' => ['label' => 'ユーザー名', 'type' => 'text'],
-					'password' => ['label' => 'パスワード', 'type' => 'password', 'secret' => true],
-					'note' => ['label' => 'メモ', 'type' => 'textarea'],
+					'username' => ['label' => 'Username', 'type' => 'text'],
+					'password' => ['label' => 'Password', 'type' => 'password', 'secret' => true],
+					'note' => ['label' => 'Memo', 'type' => 'textarea'],
 				],
 			],
 		];
@@ -102,7 +102,7 @@ class CsvImport {
 	public static function analyze(string $csv, \OCP\IL10N $l): array {
 		$rows = self::nonEmptyRows(self::parseCsv($csv));
 		if (count($rows) === 0) {
-			throw new \RuntimeException('CSVが空です');
+			throw new \RuntimeException('The CSV is empty');
 		}
 		$headers = array_map('trim', $rows[0]);
 		$dataRows = array_slice($rows, 1);
@@ -126,7 +126,7 @@ class CsvImport {
 				'index' => $index,
 				'header' => $header,
 				'key' => self::slugKey($header, $index),
-				'label' => isset($override['label']) ? $l->t($override['label']) : ($header !== '' ? $header : ($l->t('カラム') . ($index + 1))),
+				'label' => isset($override['label']) ? $l->t($override['label']) : ($header !== '' ? $header : ($l->t('Column') . ($index + 1))),
 				'type' => $override['type'] ?? self::inferType($header, $secret),
 				'secret' => $secret,
 				'is_title' => $override['title'] ?? false,
@@ -143,8 +143,8 @@ class CsvImport {
 
 		return [
 			'format' => $rec['format'] ?? 'generic',
-			'formatLabel' => $l->t($rec['formatLabel'] ?? '汎用CSV'),
-			'suggestedName' => $l->t($rec['name'] ?? '取り込みデータ'),
+			'formatLabel' => $l->t($rec['formatLabel'] ?? 'Generic CSV'),
+			'suggestedName' => $l->t($rec['name'] ?? 'Imported data'),
 			'suggestedIcon' => $rec['icon'] ?? '📥',
 			'suggestedColor' => $rec['color'] ?? '#0ea5e9',
 			'columns' => $columns,

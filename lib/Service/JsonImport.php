@@ -20,7 +20,7 @@ class JsonImport {
 	private static function decode(string $text) {
 		$data = json_decode($text, true);
 		if ($data === null && trim($text) !== 'null') {
-			throw new \RuntimeException('JSONの解析に失敗しました');
+			throw new \RuntimeException('Failed to parse JSON');
 		}
 		return $data;
 	}
@@ -41,13 +41,13 @@ class JsonImport {
 		}
 		if (is_array($data) && self::isList($data)) {
 			$rows = array_values(array_filter($data, 'is_array'));
-			return [null, $rows, 'JSON（配列）', null];
+			return [null, $rows, 'JSON (array)', null];
 		}
 		if (is_array($data)) {
 			// single object -> one record
-			return [null, [$data], 'JSON（単一オブジェクト）', null];
+			return [null, [$data], 'JSON (single object)', null];
 		}
-		throw new \RuntimeException('対応していないJSON形式です');
+		throw new \RuntimeException('Unsupported JSON format');
 	}
 
 	private static function scalar($v): string {
@@ -126,7 +126,7 @@ class JsonImport {
 		return [
 			'format' => 'json',
 			'formatLabel' => $l->t($label),
-			'suggestedName' => is_array($coll) ? (string)($coll['name'] ?? $l->t('取り込みデータ')) : $l->t('取り込みデータ（JSON）'),
+			'suggestedName' => is_array($coll) ? (string)($coll['name'] ?? $l->t('Imported data')) : $l->t('Imported data (JSON)'),
 			'suggestedIcon' => is_array($coll) ? (string)($coll['icon'] ?? '📥') : '📥',
 			'suggestedColor' => is_array($coll) ? (string)($coll['color'] ?? '#0ea5e9') : '#0ea5e9',
 			'columns' => $columns,
