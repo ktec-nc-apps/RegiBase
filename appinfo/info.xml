@@ -21,9 +21,9 @@ Features:
 	<namespace>RegiBase</namespace>
 	<category>organization</category>
 	<category>tools</category>
-	<website>https://github.com/ktec-nc-apps/regibase</website>
-	<bugs>https://github.com/ktec-nc-apps/regibase/issues</bugs>
-	<repository>https://github.com/ktec-nc-apps/regibase</repository>
+	<website>https://github.com/ktec-nc-apps/RegiBase</website>
+	<bugs>https://github.com/ktec-nc-apps/RegiBase/issues</bugs>
+	<repository>https://github.com/ktec-nc-apps/RegiBase</repository>
 	<dependencies>
 		<nextcloud min-version="30" max-version="32"/>
 	</dependencies>
