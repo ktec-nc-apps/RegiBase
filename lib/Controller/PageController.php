@@ -9,7 +9,6 @@ use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
-use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -32,8 +31,9 @@ class PageController extends Controller {
 	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
 		Util::addStyle(Application::APP_ID, 'regibase');
-		Util::addScript(Application::APP_ID, 'vue.global.prod');
-		Util::addScript(Application::APP_ID, 'regibase');
+		// Runtime-only Vue + precompiled render function (no template compiler → no eval).
+		Util::addScript(Application::APP_ID, 'vue.runtime.global.prod');
+		Util::addScript(Application::APP_ID, 'regibase.dist');
 
 		// Translate the pre-Vue loading text using the RegiBase language setting
 		// ('auto' = follow Nextcloud) so it matches the in-app language.
@@ -41,14 +41,9 @@ class PageController extends Controller {
 		$lang = $user ? $this->config->getUserValue($user->getUID(), Application::APP_ID, 'language', 'auto') : 'auto';
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang === 'auto' ? null : $lang);
 
-		$response = new TemplateResponse(Application::APP_ID, 'main', [
+		return new TemplateResponse(Application::APP_ID, 'main', [
 			'version' => $this->appManager->getAppVersion(Application::APP_ID),
 			'loading' => $l->t('Loading…'),
 		]);
-		// The buildless Vue global build uses a runtime template compiler (eval).
-		$csp = new ContentSecurityPolicy();
-		$csp->allowEvalScript(true);
-		$response->setContentSecurityPolicy($csp);
-		return $response;
 	}
 }

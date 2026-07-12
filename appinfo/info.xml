@@ -15,7 +15,7 @@ Features:
 - Attach images and files from Nextcloud Files or Notes
 - Move / copy / merge records between collections
 - Available in 12 languages]]></description>
-	<version>0.9.6</version>
+	<version>0.9.7</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>
