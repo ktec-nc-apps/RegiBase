@@ -93,14 +93,21 @@
   // Precompiled render function (eval-free). Source template lives in regibase.js;
   // regenerate with regibase-build/build.mjs after editing the template.
   const render = (function () {
-const { createElementVNode: _createElementVNode, toDisplayString: _toDisplayString, openBlock: _openBlock, createElementBlock: _createElementBlock, createCommentVNode: _createCommentVNode, vModelText: _vModelText, withDirectives: _withDirectives, vModelCheckbox: _vModelCheckbox, createTextVNode: _createTextVNode, withModifiers: _withModifiers, normalizeClass: _normalizeClass, renderList: _renderList, Fragment: _Fragment, normalizeStyle: _normalizeStyle, vShow: _vShow, vModelSelect: _vModelSelect, vModelDynamic: _vModelDynamic, vModelRadio: _vModelRadio } = Vue
+const { createElementVNode: _createElementVNode, openBlock: _openBlock, createElementBlock: _createElementBlock, toDisplayString: _toDisplayString, createCommentVNode: _createCommentVNode, vModelText: _vModelText, withDirectives: _withDirectives, vModelCheckbox: _vModelCheckbox, createTextVNode: _createTextVNode, withModifiers: _withModifiers, normalizeClass: _normalizeClass, renderList: _renderList, Fragment: _Fragment, normalizeStyle: _normalizeStyle, vShow: _vShow, vModelSelect: _vModelSelect, vModelDynamic: _vModelDynamic, vModelRadio: _vModelRadio } = Vue
 
 const _hoisted_1 = {
   key: 0,
   class: "login-wrap"
 }
 const _hoisted_2 = { class: "login-card" }
-const _hoisted_3 = /*#__PURE__*/_createElementVNode("div", { class: "logo" }, "🗂️", -1 /* HOISTED */)
+const _hoisted_3 = /*#__PURE__*/_createElementVNode("div", { class: "logo" }, [
+  /*#__PURE__*/_createElementVNode("svg", {
+    viewBox: "0 0 16 16",
+    fill: "currentColor"
+  }, [
+    /*#__PURE__*/_createElementVNode("path", { d: "M8 1C5.2 1 3 1.9 3 3v10c0 1.1 2.2 2 5 2s5-.9 5-2V3c0-1.1-2.2-2-5-2zm0 1c2.5 0 4 .8 4 1s-1.5 1-4 1-4-.8-4-1 1.5-1 4-1zM4 4.6c1 .5 2.4.7 4 .7s3-.2 4-.7V8c0 .2-1.5 1-4 1s-4-.8-4-1V4.6zm0 4.9c1 .5 2.4.7 4 .7s3-.2 4-.7V13c0 .2-1.5 1-4 1s-4-.8-4-1V9.5z" })
+  ])
+], -1 /* HOISTED */)
 const _hoisted_4 = {
   key: 1,
   class: "login-wrap"
@@ -120,7 +127,14 @@ const _hoisted_12 = {
   class: "layout"
 }
 const _hoisted_13 = { class: "brand" }
-const _hoisted_14 = /*#__PURE__*/_createElementVNode("span", { class: "logo" }, "🗂️", -1 /* HOISTED */)
+const _hoisted_14 = /*#__PURE__*/_createElementVNode("span", { class: "logo" }, [
+  /*#__PURE__*/_createElementVNode("svg", {
+    viewBox: "0 0 16 16",
+    fill: "currentColor"
+  }, [
+    /*#__PURE__*/_createElementVNode("path", { d: "M8 1C5.2 1 3 1.9 3 3v10c0 1.1 2.2 2 5 2s5-.9 5-2V3c0-1.1-2.2-2-5-2zm0 1c2.5 0 4 .8 4 1s-1.5 1-4 1-4-.8-4-1 1.5-1 4-1zM4 4.6c1 .5 2.4.7 4 .7s3-.2 4-.7V8c0 .2-1.5 1-4 1s-4-.8-4-1V4.6zm0 4.9c1 .5 2.4.7 4 .7s3-.2 4-.7V13c0 .2-1.5 1-4 1s-4-.8-4-1V9.5z" })
+  ])
+], -1 /* HOISTED */)
 const _hoisted_15 = /*#__PURE__*/_createElementVNode("span", null, "RegiBase", -1 /* HOISTED */)
 const _hoisted_16 = {
   key: 0,

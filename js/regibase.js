@@ -91,7 +91,7 @@
   }
 
   const TEMPLATE = `
-<div v-if="authenticated === null" class="login-wrap"><div class="login-card"><div class="logo">🗂️</div><p>{{ t('Loading…') }}</p></div></div>
+<div v-if="authenticated === null" class="login-wrap"><div class="login-card"><div class="logo"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C5.2 1 3 1.9 3 3v10c0 1.1 2.2 2 5 2s5-.9 5-2V3c0-1.1-2.2-2-5-2zm0 1c2.5 0 4 .8 4 1s-1.5 1-4 1-4-.8-4-1 1.5-1 4-1zM4 4.6c1 .5 2.4.7 4 .7s3-.2 4-.7V8c0 .2-1.5 1-4 1s-4-.8-4-1V4.6zm0 4.9c1 .5 2.4.7 4 .7s3-.2 4-.7V13c0 .2-1.5 1-4 1s-4-.8-4-1V9.5z"/></svg></div><p>{{ t('Loading…') }}</p></div></div>
 
 <div v-else-if="enc.enabled && !enc.unlocked" class="login-wrap">
   <form class="login-card" @submit.prevent="doUnlock">
@@ -108,7 +108,7 @@
 <div v-else class="layout">
   <div class="backdrop" :class="{show: sidebarOpen}" @click="sidebarOpen=false"></div>
   <aside class="sidebar" :class="{open: sidebarOpen}">
-    <div class="brand"><span class="logo">🗂️</span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
+    <div class="brand"><span class="logo"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C5.2 1 3 1.9 3 3v10c0 1.1 2.2 2 5 2s5-.9 5-2V3c0-1.1-2.2-2-5-2zm0 1c2.5 0 4 .8 4 1s-1.5 1-4 1-4-.8-4-1 1.5-1 4-1zM4 4.6c1 .5 2.4.7 4 .7s3-.2 4-.7V8c0 .2-1.5 1-4 1s-4-.8-4-1V4.6zm0 4.9c1 .5 2.4.7 4 .7s3-.2 4-.7V13c0 .2-1.5 1-4 1s-4-.8-4-1V9.5z"/></svg></span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
       <button v-for="c in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id}" @click="selectCollection(c.id)">
