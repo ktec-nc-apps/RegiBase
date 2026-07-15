@@ -302,10 +302,17 @@
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Or create from a template:') }}</div>
         <div v-if="templatesLoading && !templates.length" class="empty"><p>{{ t('Loading…') }}</p></div>
         <div v-else class="tpl-grid">
-          <button v-for="tpl in templates" :key="tpl.key" class="tpl-card" :disabled="busy" @click="createFromTemplate(tpl.key)">
-            <div class="th"><span class="ic">{{ tpl.icon }}</span><span>{{ tpl.name }}</span></div>
-            <div class="td">{{ tpl.description }}</div>
-          </button>
+          <div v-for="tpl in templates" :key="tpl.key" class="tpl-card" :class="{disabled: busy}">
+            <button type="button" class="tpl-main" :disabled="busy" @click="createFromTemplate(tpl)">
+              <div class="th"><span class="ic">{{ tpl.icon }}</span><span class="tpl-name">{{ tpl.name }}</span><span v-if="tpl.custom" class="tpl-tag">{{ t('Custom') }}</span><span v-else-if="tpl.overridden" class="tpl-tag edited">{{ t('Edited') }}</span></div>
+              <div class="td">{{ tpl.description }}</div>
+            </button>
+            <div class="tpl-actions">
+              <button type="button" class="icon-btn" :title="t('Edit template')" @click.stop="openTemplateEditor(tpl)">✏️</button>
+              <button v-if="tpl.custom" type="button" class="icon-btn" :title="t('Delete template')" @click.stop="deleteTemplate(tpl)">🗑</button>
+              <button v-else-if="tpl.overridden" type="button" class="icon-btn" :title="t('Reset to default')" @click.stop="resetTemplate(tpl)">↺</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-foot"><button class="btn" @click="modal=null">{{ t('Cancel') }}</button></div>
@@ -406,8 +413,18 @@
   <!-- Schema editor -->
   <div v-if="modal && modal.type==='schema'" class="modal-mask" @click.self="modal=null">
     <div class="modal wide">
-      <div class="modal-head"><h3>{{ t('🧩 Design fields (form)') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-head"><h3>{{ schemaMode==='template' ? (tplEdit.row_id || tplEdit.builtin_key ? t('✏️ Edit template') : t('⭐ New template')) : t('🧩 Design fields (form)') }}</h3><button class="icon-btn" @click="closeSchemaEditor">✕</button></div>
       <div class="modal-body">
+        <div v-if="schemaMode==='template'" class="tpl-meta">
+          <div class="field-row">
+            <div class="field"><label>🏷️ {{ t('Template name') }}</label><input v-model="tplEdit.name" /></div>
+            <div class="field" style="max-width:120px"><label>🎨 {{ t('Color') }}</label><input type="color" v-model="tplEdit.color" style="height:44px;padding:4px;width:100%" /></div>
+          </div>
+          <div class="field-row">
+            <div class="field" style="max-width:140px"><label>😀 {{ t('Icon') }}</label><input v-model="tplEdit.icon" maxlength="8" :placeholder="t('Emoji')" /></div>
+            <div class="field"><label>📝 {{ t('Description') }}</label><input v-model="tplEdit.description" /></div>
+          </div>
+        </div>
         <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('The fields you create here become the input form. ★ = the field used as the list title.') }}</p>
         <div v-for="(f,i) in schemaFields" :key="f._uid" class="schema-row sortable" :class="{dragover: dragOverIndex===i, dragging: dragIndex===i}" @dragover.prevent="onFieldDragOver(i)" @drop.prevent="onFieldDrop(i)" @dragleave="onFieldDragLeave(i)">
           <span class="drag-handle" draggable="true" @dragstart="onFieldDragStart(i, $event)" @dragend="onFieldDragEnd" :title="t('Drag to reorder')">⠿</span>
@@ -487,8 +504,25 @@
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
       </div>
       <div class="modal-foot">
-        <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
-        <button class="btn primary" @click="saveSchema">{{ t('Save fields') }}</button>
+        <button class="btn" @click="closeSchemaEditor">{{ t('Cancel') }}</button>
+        <button v-if="schemaMode==='template'" class="btn primary" @click="saveTemplate">{{ t('Save template') }}</button>
+        <button v-else class="btn primary" @click="saveSchema">{{ t('Save fields') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Duplicate collection -->
+  <div v-if="modal && modal.type==='duplicate'" class="modal-mask" @click.self="modal=null">
+    <div class="modal sm">
+      <div class="modal-head"><h3>{{ t('📄 Duplicate collection') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <div class="field"><label>🏷️ {{ t('New name') }}</label><input v-model="dupForm.name" /></div>
+        <label class="dup-check"><input type="checkbox" v-model="dupForm.withRecords" /> {{ t('Also duplicate the records (data)') }}</label>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">{{ t('Unchecked: an empty copy with the same fields. Checked: also copies every record and its attachments.') }}</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button type="button" class="btn primary" :disabled="dupForm.busy || !dupForm.name.trim()" @click="commitDuplicate">{{ t('Duplicate') }}</button>
       </div>
     </div>
   </div>
@@ -583,6 +617,15 @@
             <button type="button" class="btn sm primary" :disabled="!sharePanel.recipient || sharePanel.busy" @click="addShare">{{ t('Share') }}</button>
           </div>
           </div>
+        </div>
+
+        <div v-if="isOwner" class="field">
+          <label>📄 {{ t('Duplicate / template') }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn sm" @click="openDuplicate">{{ t('📄 Duplicate collection') }}</button>
+            <button type="button" class="btn sm" @click="saveAsTemplate">{{ t('⭐ Save as template') }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Duplicate copies the fields (optionally the records). Save as template adds it to the New collection picker.') }}</div>
         </div>
 
         <div class="field">
@@ -1044,6 +1087,9 @@
         sidebarOpen: false, modal: null,
         form: {}, editingRecordId: null, reveal: {},
         templates: [], templatesLoading: false, schemaFields: [],
+        schemaMode: 'collection',
+        tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
+        dupForm: { name: '', withRecords: false, busy: false },
         collForm: { name: '', icon: '', color: '', description: '' },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto' },
         languages: [],
@@ -1895,13 +1941,102 @@
           finally { this.templatesLoading = false; }
         }
       },
-      async createFromTemplate(tplKey) {
+      async createFromTemplate(tpl) {
         this.busy = true;
         try {
-          const c = await api('collections', { method: 'POST', body: JSON.stringify({ template_key: tplKey }) });
+          const body = { name: tpl.name, icon: tpl.icon, color: tpl.color, description: tpl.description, fields: tpl.fields };
+          const c = await api('collections', { method: 'POST', body: JSON.stringify(body) });
           this.modal = null; await this.loadCollections(); await this.selectCollection(c.id);
           this.showToast(T('Collection created'));
         } finally { this.busy = false; }
+      },
+      async refreshTemplates() {
+        this.templatesLoading = true;
+        try { this.templates = await api('templates'); }
+        catch (e) { /* keep previous */ }
+        finally { this.templatesLoading = false; }
+      },
+      // ---- collection duplication ----
+      openDuplicate() {
+        if (!this.current) return;
+        this.dupForm = { name: (this.current.name + ' ' + T('(copy)')).trim(), withRecords: false, busy: false };
+        this.modal = { type: 'duplicate' };
+      },
+      async commitDuplicate() {
+        if (!this.current || !this.dupForm.name.trim()) return;
+        this.dupForm.busy = true;
+        try {
+          const c = await api('collections/' + this.current.id + '/duplicate', {
+            method: 'POST',
+            body: JSON.stringify({ with_records: this.dupForm.withRecords, name: this.dupForm.name.trim() }),
+          });
+          this.modal = null; await this.loadCollections(); await this.selectCollection(c.id);
+          this.showToast(T('Collection duplicated'));
+        } catch (e) { this.showToast(e.message || String(e)); }
+        finally { this.dupForm.busy = false; }
+      },
+      // ---- templates: save-as / edit / delete / reset ----
+      async saveAsTemplate() {
+        if (!this.current) return;
+        try {
+          await api('templates', { method: 'POST', body: JSON.stringify({ from_collection: this.current.id }) });
+          this.templates = [];
+          this.showToast(T('Saved as template'));
+        } catch (e) { this.showToast(e.message || String(e)); }
+      },
+      openTemplateEditor(tpl) {
+        this.schemaMode = 'template';
+        this.tplEdit = {
+          row_id: tpl.row_id || null,
+          key: tpl.key,
+          builtin_key: tpl.builtin ? tpl.key : null,
+          name: tpl.name || '', icon: tpl.icon || '📁', color: tpl.color || '#3b82f6',
+          description: tpl.description || '', busy: false,
+        };
+        this.schemaFields = this.fieldsToSchemaRows(tpl.fields || []);
+        this.modal = { type: 'schema' };
+      },
+      closeSchemaEditor() {
+        const wasTemplate = this.schemaMode === 'template';
+        this.schemaMode = 'collection';
+        this.modal = wasTemplate ? { type: 'template' } : null;
+      },
+      async saveTemplate() {
+        const fields = this.serializeSchemaFields();
+        if (!fields.length) { alert(T('Keep at least one field')); return; }
+        if (!fields.some((f) => f.is_title)) fields[0].is_title = true;
+        const name = (this.tplEdit.name || '').trim();
+        if (!name) { alert(T('Enter a template name')); return; }
+        const body = { name, icon: this.tplEdit.icon || '📁', color: this.tplEdit.color || '#3b82f6', description: this.tplEdit.description || '', fields };
+        try {
+          if (this.tplEdit.row_id) {
+            await api('templates/' + this.tplEdit.row_id, { method: 'PUT', body: JSON.stringify(body) });
+          } else if (this.tplEdit.builtin_key) {
+            await api('templates/builtin/' + encodeURIComponent(this.tplEdit.builtin_key), { method: 'POST', body: JSON.stringify(body) });
+          } else {
+            await api('templates', { method: 'POST', body: JSON.stringify(body) });
+          }
+          this.schemaMode = 'collection'; this.templates = [];
+          this.showToast(T('Template saved'));
+          await this.openTemplatePicker();
+        } catch (e) { this.showToast(e.message || String(e)); }
+      },
+      async deleteTemplate(tpl) {
+        if (!tpl.row_id) return;
+        if (!confirm(T('Delete the template “{name}”?', { name: tpl.name }))) return;
+        try {
+          await api('templates/' + tpl.row_id, { method: 'DELETE' });
+          this.templates = []; await this.openTemplatePicker();
+          this.showToast(T('Template deleted'));
+        } catch (e) { this.showToast(e.message || String(e)); }
+      },
+      async resetTemplate(tpl) {
+        if (!confirm(T('Reset “{name}” to the built-in default?', { name: tpl.name }))) return;
+        try {
+          await api('templates/builtin/' + encodeURIComponent(tpl.key), { method: 'DELETE' });
+          this.templates = []; await this.openTemplatePicker();
+          this.showToast(T('Reset to default'));
+        } catch (e) { this.showToast(e.message || String(e)); }
       },
       goHome(push = true) {
         this.current = null; this.records = []; this.search = ''; this.sidebarOpen = false; this.selectedIds = [];
@@ -2018,8 +2153,8 @@
         await api('collections/' + this.current.id, { method: 'DELETE' });
         this.modal = null; this.current = null; this.records = []; await this.loadCollections(); this.showToast(T('Deleted'));
       },
-      openSchemaEditor() {
-        this.schemaFields = this.current.fields.map((f) => {
+      fieldsToSchemaRows(fields) {
+        return (fields || []).map((f) => {
           const o = (f.options && typeof f.options === 'object' && !Array.isArray(f.options)) ? f.options : {};
           return {
             ...f,
@@ -2036,6 +2171,31 @@
             _uid: this.uidCounter++,
           };
         });
+      },
+      serializeSchemaFields() {
+        return this.schemaFields.filter((f) => (f.label || '').trim()).map((f) => {
+          let options;
+          if (f.type === 'select') options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
+          else if (f.type === 'image') options = { max: f._orig ? 0 : (Number(f._max) || 1600), format: f._format || 'jpeg' };
+          else if (f.type === 'image_crop') options = { ratio: f._ratio || '1:1', out: Number(f._out) || 600, format: f._format || 'jpeg' };
+          else if (RULE_TYPES.includes(f.type)) {
+            const rule = {};
+            if (f._charset && f._charset !== 'none') rule.charset = f._charset;
+            if (f._charset === 'custom' && f._pattern) rule.pattern = f._pattern;
+            if (Number(f._rmin) > 0) rule.min = Number(f._rmin);
+            if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
+            options = Object.keys(rule).length ? rule : undefined;
+          }
+          return {
+            key: (f.key || '').trim() || slug(f.label),
+            label: f.label.trim(), type: f.type, options,
+            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
+          };
+        });
+      },
+      openSchemaEditor() {
+        this.schemaMode = 'collection';
+        this.schemaFields = this.fieldsToSchemaRows(this.current.fields);
         this.modal = { type: 'schema' };
       },
       addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
@@ -2062,25 +2222,7 @@
       },
       setTitleField(i) { this.schemaFields.forEach((f, k) => (f.is_title = k === i)); },
       async saveSchema() {
-        const fields = this.schemaFields.filter((f) => (f.label || '').trim()).map((f) => {
-          let options;
-          if (f.type === 'select') options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
-          else if (f.type === 'image') options = { max: f._orig ? 0 : (Number(f._max) || 1600), format: f._format || 'jpeg' };
-          else if (f.type === 'image_crop') options = { ratio: f._ratio || '1:1', out: Number(f._out) || 600, format: f._format || 'jpeg' };
-          else if (RULE_TYPES.includes(f.type)) {
-            const rule = {};
-            if (f._charset && f._charset !== 'none') rule.charset = f._charset;
-            if (f._charset === 'custom' && f._pattern) rule.pattern = f._pattern;
-            if (Number(f._rmin) > 0) rule.min = Number(f._rmin);
-            if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
-            options = Object.keys(rule).length ? rule : undefined;
-          }
-          return {
-            key: (f.key || '').trim() || slug(f.label),
-            label: f.label.trim(), type: f.type, options,
-            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
-          };
-        });
+        const fields = this.serializeSchemaFields();
         if (!fields.length) { alert(T('Keep at least one field')); return; }
         if (!fields.some((f) => f.is_title)) fields[0].is_title = true;
         const c = await api('collections/' + this.current.id + '/fields', { method: 'PUT', body: JSON.stringify({ fields }) });

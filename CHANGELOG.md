@@ -2,6 +2,23 @@
 
 All notable changes to RegiBase.
 
+## 0.11.0 — 2026-07-15
+
+### Duplicate a collection
+- **Duplicate** a collection from its settings. A dialog lets you rename the copy
+  and, with a checkbox, **also duplicate every record** (data) — attachment files
+  are copied too, so the duplicate is fully independent. Left unchecked, you get an
+  empty copy with the same fields.
+
+### Custom templates & editable built-in templates
+- **Save as template**: turn any collection's field design into a reusable template
+  that appears in the New-collection picker.
+- **Edit templates**: every template in the picker (built-in or custom) has an edit
+  button that opens the field designer plus name / icon / colour / description.
+- **Editable built-in templates**: editing a shipped template stores a *personal
+  override* — the shipped default is never lost, and **↺ Reset to default** restores it.
+- Custom templates can be deleted; each picker card is tagged **Custom** or **Edited**.
+
 ## 0.10.13 — 2026-07-15
 
 ### Collection sharing (0.10.0)

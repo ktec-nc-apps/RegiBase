@@ -189,6 +189,70 @@ class RegiBaseService {
 		return $this->getCollection($userId, (int)$c->getId());
 	}
 
+	/**
+	 * Duplicate a collection (owner only). Copies fields + settings; when
+	 * $withRecords is true also copies every record, duplicating any attachment
+	 * files so the copy is fully independent of the original.
+	 */
+	public function duplicateCollection(string $userId, int $id, bool $withRecords, ?string $name = null): array {
+		$src = $this->collections->findForUser($id, $userId); // owner only
+		$srcFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
+
+		$c = new CollectionEntity();
+		$c->setUserId($userId);
+		$c->setName(($name !== null && trim($name) !== '') ? trim($name) : trim($src->getName() . ' ' . $this->l->t('(copy)')));
+		$c->setIcon($src->getIcon());
+		$c->setColor($src->getColor());
+		$c->setDescription($src->getDescription() ?? '');
+		$c->setView($src->getView());
+		$c->setRecordSort($src->getRecordSort());
+		$c->setSort($this->collections->maxSort($userId) + 1);
+		$c->setCreatedAt($this->now());
+		$c->setUpdatedAt($this->now());
+		$c = $this->collections->insert($c);
+		$newId = (int)$c->getId();
+		$this->insertFields($newId, $srcFields);
+
+		if ($withRecords) {
+			$attach = $this->attachmentFields($id);
+			$newName = $c->getName();
+			$dataArray = [];
+			foreach ($this->records->findForCollection($id) as $r) {
+				$data = json_decode($r->getData() ?: '{}', true);
+				$data = is_array($data) ? $data : [];
+				if (count($attach) > 0) {
+					$data = $this->copyDataAttachments($userId, $attach, $data, $newName);
+				}
+				$dataArray[] = $data;
+			}
+			if (count($dataArray) > 0) {
+				$this->bulkInsertRecords($newId, $dataArray);
+			}
+		}
+		return $this->getCollection($userId, $newId);
+	}
+
+	/** Duplicate any RegiBase-owned attachment files referenced in $data; returns updated $data. */
+	private function copyDataAttachments(string $userId, array $attachFields, array $data, string $collectionName): array {
+		foreach ($attachFields as $f) {
+			$v = $data[$f['key']] ?? '';
+			if ($v === '' || $v === null) {
+				continue;
+			}
+			try {
+				$file = $this->images->fileContentById($userId, (string)$v);
+				if ($file === null) {
+					continue; // not RegiBase-owned or missing: keep original reference
+				}
+				$newId = $this->images->saveRaw($userId, $file['name'] ?? 'file', $file['content']);
+				$data[$f['key']] = (string)$newId;
+			} catch (\Throwable $e) {
+				// on failure, leave the original reference in place
+			}
+		}
+		return $data;
+	}
+
 	public function updateCollection(string $userId, int $id, array $patch): array {
 		// editing collection settings (name/icon/color/description/view/sort) needs
 		// ownership or the highest recipient level ('delete'); 'edit'/'view' cannot.

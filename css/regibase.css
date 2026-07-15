@@ -389,11 +389,22 @@
 
 /* template picker */
 #regibase-root .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-#regibase-root .tpl-card { text-align: left; border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 12px; color: var(--text); }
+#regibase-root .tpl-card { position: relative; text-align: left; border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; color: var(--text); overflow: hidden; }
 #regibase-root .tpl-card:hover { border-color: var(--primary); }
+#regibase-root .tpl-card.disabled { opacity: .6; }
+#regibase-root .tpl-main { display: block; width: 100%; text-align: left; background: none; border: none; color: inherit; padding: 12px; padding-right: 44px; cursor: pointer; }
 #regibase-root .tpl-card .th { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 4px; }
-#regibase-root .tpl-card .th .ic { font-size: 20px; }
+#regibase-root .tpl-card .th .ic { font-size: 20px; flex: 0 0 auto; }
+#regibase-root .tpl-card .th .tpl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #regibase-root .tpl-card .td { font-size: 12px; color: var(--muted); }
+#regibase-root .tpl-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--primary); color: #fff; }
+#regibase-root .tpl-tag.edited { background: var(--muted); }
+#regibase-root .tpl-actions { position: absolute; top: 6px; right: 6px; display: flex; flex-direction: column; gap: 2px; }
+#regibase-root .tpl-actions .icon-btn { font-size: 14px; padding: 2px 5px; line-height: 1.1; }
+#regibase-root .tpl-meta { border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+#regibase-root .tpl-meta .field { margin-bottom: 8px; }
+#regibase-root .dup-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-weight: 600; cursor: pointer; }
+#regibase-root .dup-check input { width: 18px; height: 18px; }
 
 /* schema editor rows */
 #regibase-root .schema-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; background: var(--surface-2); }

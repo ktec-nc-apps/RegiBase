@@ -8,6 +8,11 @@ return [
 
 		// templates
 		['name' => 'api#templates', 'url' => '/api/templates', 'verb' => 'GET'],
+		['name' => 'api#createTemplate', 'url' => '/api/templates', 'verb' => 'POST'],
+		['name' => 'api#updateTemplate', 'url' => '/api/templates/{id}', 'verb' => 'PUT'],
+		['name' => 'api#deleteTemplate', 'url' => '/api/templates/{id}', 'verb' => 'DELETE'],
+		['name' => 'api#editBuiltinTemplate', 'url' => '/api/templates/builtin/{key}', 'verb' => 'POST'],
+		['name' => 'api#resetBuiltinTemplate', 'url' => '/api/templates/builtin/{key}', 'verb' => 'DELETE'],
 		['name' => 'api#getI18n', 'url' => '/api/i18n/{lang}', 'verb' => 'GET'],
 
 		// collections
@@ -16,6 +21,7 @@ return [
 		['name' => 'api#createCollection', 'url' => '/api/collections', 'verb' => 'POST'],
 		['name' => 'api#updateCollection', 'url' => '/api/collections/{id}', 'verb' => 'PATCH'],
 		['name' => 'api#deleteCollection', 'url' => '/api/collections/{id}', 'verb' => 'DELETE'],
+		['name' => 'api#duplicateCollection', 'url' => '/api/collections/{id}/duplicate', 'verb' => 'POST'],
 		['name' => 'api#putFields', 'url' => '/api/collections/{id}/fields', 'verb' => 'PUT'],
 		['name' => 'api#exportCollection', 'url' => '/api/collections/{id}/export', 'verb' => 'GET'],
 

@@ -13,6 +13,7 @@ use OCA\RegiBase\Service\ImageService;
 use OCA\RegiBase\Service\RegiBaseService;
 use OCA\RegiBase\Service\TablesBridge;
 use OCA\RegiBase\Service\Templates;
+use OCA\RegiBase\Service\TemplateService;
 use OCA\DAV\CardDAV\CardDavBackend;
 use OCP\Contacts\IManager as IContactsManager;
 use OCP\AppFramework\Controller;
@@ -47,6 +48,7 @@ class ApiController extends Controller {
 		private IContactsManager $contactsManager,
 		private CardDavBackend $cardDavBackend,
 		private TablesBridge $tablesBridge,
+		private TemplateService $tplService,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -241,7 +243,73 @@ class ApiController extends Controller {
 
 	#[NoAdminRequired]
 	public function templates(): JSONResponse {
-		return new JSONResponse(Templates::all($this->appL10n()));
+		return new JSONResponse($this->tplService->merged($this->appL10n(), $this->uid()));
+	}
+
+	#[NoAdminRequired]
+	public function createTemplate(): JSONResponse {
+		$body = $this->request->getParams();
+		try {
+			if (isset($body['from_collection'])) {
+				$t = $this->tplService->fromCollection($this->uid(), (int)$body['from_collection'], $body['name'] ?? null);
+			} else {
+				$t = $this->tplService->create($this->uid(), $body);
+			}
+			return new JSONResponse($t, Http::STATUS_CREATED);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function updateTemplate(int $id): JSONResponse {
+		try {
+			return new JSONResponse($this->tplService->update($this->uid(), $id, $this->request->getParams()));
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function deleteTemplate(int $id): JSONResponse {
+		try {
+			$this->tplService->delete($this->uid(), $id);
+			return new JSONResponse(['ok' => true]);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
+	public function editBuiltinTemplate(string $key): JSONResponse {
+		try {
+			return new JSONResponse($this->tplService->editBuiltin($this->uid(), $key, $this->request->getParams(), $this->appL10n()), Http::STATUS_CREATED);
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function resetBuiltinTemplate(string $key): JSONResponse {
+		$this->tplService->resetBuiltin($this->uid(), $key);
+		return new JSONResponse(['ok' => true]);
+	}
+
+	#[NoAdminRequired]
+	public function duplicateCollection(int $id): JSONResponse {
+		$withRecords = filter_var($this->request->getParam('with_records', false), FILTER_VALIDATE_BOOLEAN);
+		$name = $this->request->getParam('name', null);
+		try {
+			return new JSONResponse($this->service->duplicateCollection($this->uid(), $id, $withRecords, $name !== null ? (string)$name : null), Http::STATUS_CREATED);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
 	}
 
 	#[NoAdminRequired]
