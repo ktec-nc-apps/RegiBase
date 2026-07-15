@@ -2,6 +2,12 @@
 
 All notable changes to RegiBase.
 
+## 0.11.1 — 2026-07-15
+
+- New **app icon** (database "RB" mark) — monochrome, themable in the app menu and
+  as the in-app / sidebar logo (light & dark).
+- Packaging: the app-store signature now covers only shipped files.
+
 ## 0.11.0 — 2026-07-15
 
 ### Duplicate a collection
