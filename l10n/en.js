@@ -1,6 +1,7 @@
 OC.L10N.register(
     "regibase",
     {
+    "Click to choose an icon" : "Click to choose an icon",
     "Custom" : "Custom",
     "Edited" : "Edited",
     "Edit template" : "Edit template",

@@ -12,7 +12,6 @@ use OCA\RegiBase\Service\LockedException;
 use OCA\RegiBase\Service\ImageService;
 use OCA\RegiBase\Service\RegiBaseService;
 use OCA\RegiBase\Service\TablesBridge;
-use OCA\RegiBase\Service\Templates;
 use OCA\RegiBase\Service\TemplateService;
 use OCA\DAV\CardDAV\CardDavBackend;
 use OCP\Contacts\IManager as IContactsManager;

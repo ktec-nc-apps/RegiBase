@@ -19,7 +19,7 @@ Features:
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
 - Available in 12 languages]]></description>
-	<version>0.11.3</version>
+	<version>0.11.4</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>

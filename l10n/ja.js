@@ -1,6 +1,7 @@
 OC.L10N.register(
     "regibase",
     {
+    "Click to choose an icon" : "クリックしてアイコンを選択",
     "Custom" : "カスタム",
     "Edited" : "編集済み",
     "Edit template" : "テンプレートを編集",

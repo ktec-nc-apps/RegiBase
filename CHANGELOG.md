@@ -2,6 +2,13 @@
 
 All notable changes to RegiBase.
 
+## 0.11.4 — 2026-07-16
+
+- App Store **screenshots refreshed** to 0.11.3 — new app icon, colour bands,
+  collection sharing, Tables integration, duplication and custom/editable templates.
+- Full **Japanese** strings for the icon-picker tooltip and the import example.
+- Minor code cleanup (removed an unused import).
+
 ## 0.11.3 — 2026-07-16
 
 - Updated the App Store description to cover collection sharing, custom/editable
