@@ -2,6 +2,48 @@
 
 All notable changes to RegiBase.
 
+## 0.10.13 — 2026-07-15
+
+### Collection sharing (0.10.0)
+- Share a collection with other Nextcloud users at three levels: **view / edit / delete**.
+  Edit-only cannot rename the collection or delete records; delete adds record deletion;
+  field definitions, collection deletion, transfer and re-sharing stay owner-only.
+- Optional **access password** for a share (hashed, enforced per session with an unlock prompt).
+- Optional **secret-field sharing**: the owner enters their master password once in the share
+  panel; the encryption key is wrapped with the share password and stored, so recipients can
+  decrypt secret fields — while the server never sees the key or plaintext. Without a master
+  password, recipients see secrets masked and cannot reveal or copy them.
+- **Share badges** before the title icon on home cards and the sidebar (shared by you /
+  shared with you).
+- Collection-settings **share panel is collapsible** (▶ / ▼, "click to expand") with a badge
+  showing the number of existing shares.
+
+### Nextcloud Tables integration (0.10.3)
+- **Import from Tables**: turn a Tables table into a new collection — column types are mapped
+  to RegiBase field types (text / number / date / selection …) and rows imported as records.
+  Tables is not modified.
+- **Export to Tables**: write a collection into a new Tables table. Secret and attachment
+  fields are skipped (their stored values are ciphertext / file ids).
+- In-process bridge to the Tables app services; the feature is hidden when Tables is absent.
+
+### Imports
+- **JSON import** surfaced in the file button ("Import from CSV / JSON file") — already
+  supported by the importer, now discoverable.
+- **Contacts / Tables** import & export buttons **grey out** when the required app is not installed.
+
+### UI / UX
+- Collection **colour band** down the left edge of home cards and before the sidebar icon,
+  so the colour is meaningful for identification.
+- "Color" renamed to **カラー**; **Color and Icon laid out side by side** (50 / 50).
+- **Icon picker is a popup** opened by pressing the icon mark (was an always-open palette).
+- **Custom permission dropdown** replacing the native `<select>` for reliable centred rendering
+  across browsers.
+- **Icons on every section title** in Settings and Collection settings; section bodies
+  **indented** so titles stand out.
+- **Export section icon**, **Cancel button** on the collection-settings modal, and the New
+  collection window title matches the button.
+- **Lazy template loading** for a faster home screen.
+
 ## 0.9.6
 
 - Internationalization now uses **English as the source language** (the Nextcloud /

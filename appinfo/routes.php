@@ -19,6 +19,14 @@ return [
 		['name' => 'api#putFields', 'url' => '/api/collections/{id}/fields', 'verb' => 'PUT'],
 		['name' => 'api#exportCollection', 'url' => '/api/collections/{id}/export', 'verb' => 'GET'],
 
+		// internal sharing
+		['name' => 'api#collectionShares', 'url' => '/api/collections/{id}/shares', 'verb' => 'GET'],
+		['name' => 'api#addShare', 'url' => '/api/collections/{id}/shares', 'verb' => 'POST'],
+		['name' => 'api#updateShare', 'url' => '/api/collections/{id}/shares/{uid}', 'verb' => 'PATCH'],
+		['name' => 'api#removeShare', 'url' => '/api/collections/{id}/shares/{uid}', 'verb' => 'DELETE'],
+		['name' => 'api#unlockShare', 'url' => '/api/collections/{id}/unlock', 'verb' => 'POST'],
+		['name' => 'api#searchUsers', 'url' => '/api/users/search', 'verb' => 'GET'],
+
 		// records
 		['name' => 'api#records', 'url' => '/api/collections/{id}/records', 'verb' => 'GET'],
 		['name' => 'api#createRecord', 'url' => '/api/collections/{id}/records', 'verb' => 'POST'],
@@ -52,5 +60,10 @@ return [
 		['name' => 'api#restore', 'url' => '/api/restore', 'verb' => 'POST'],
 		['name' => 'api#contactsAddressbooks', 'url' => '/api/contacts/addressbooks', 'verb' => 'GET'],
 		['name' => 'api#contactsImport', 'url' => '/api/contacts/import', 'verb' => 'POST'],
+
+		// Tables integration
+		['name' => 'api#tablesList', 'url' => '/api/tables/list', 'verb' => 'GET'],
+		['name' => 'api#tablesImport', 'url' => '/api/tables/import', 'verb' => 'POST'],
+		['name' => 'api#tablesExport', 'url' => '/api/collections/{id}/tables-export', 'verb' => 'POST'],
 	],
 ];

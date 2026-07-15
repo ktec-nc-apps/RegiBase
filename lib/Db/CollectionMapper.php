@@ -25,6 +25,13 @@ class CollectionMapper extends QBMapper {
 		return $this->findEntities($qb);
 	}
 
+	public function findById(int $id): CollectionEntity {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
+		return $this->findEntity($qb);
+	}
+
 	public function findForUser(int $id, string $userId): CollectionEntity {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())

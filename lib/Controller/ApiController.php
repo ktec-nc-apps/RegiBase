@@ -7,8 +7,11 @@ namespace OCA\RegiBase\Controller;
 use OCA\RegiBase\AppInfo\Application;
 use OCA\RegiBase\Service\ContactsImport;
 use OCA\RegiBase\Service\DataImport;
+use OCA\RegiBase\Service\ForbiddenException;
+use OCA\RegiBase\Service\LockedException;
 use OCA\RegiBase\Service\ImageService;
 use OCA\RegiBase\Service\RegiBaseService;
+use OCA\RegiBase\Service\TablesBridge;
 use OCA\RegiBase\Service\Templates;
 use OCA\DAV\CardDAV\CardDavBackend;
 use OCP\Contacts\IManager as IContactsManager;
@@ -43,6 +46,7 @@ class ApiController extends Controller {
 		private ITempManager $tempManager,
 		private IContactsManager $contactsManager,
 		private CardDavBackend $cardDavBackend,
+		private TablesBridge $tablesBridge,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -137,6 +141,75 @@ class ApiController extends Controller {
 		return new JSONResponse(['collectionId' => $cid, 'imported' => $imported]);
 	}
 
+	#[NoAdminRequired]
+	public function tablesList(): JSONResponse {
+		$uid = $this->uid();
+		if (!$this->tablesBridge->available()) {
+			return new JSONResponse(['available' => false, 'tables' => []]);
+		}
+		try {
+			return new JSONResponse(['available' => true, 'tables' => $this->tablesBridge->listTables($uid)]);
+		} catch (\Throwable $e) {
+			return new JSONResponse(['available' => true, 'tables' => [], 'error' => $e->getMessage()]);
+		}
+	}
+
+	#[NoAdminRequired]
+	public function tablesImport(): JSONResponse {
+		$uid = $this->uid();
+		$l = $this->appL10n();
+		if (!$this->tablesBridge->available()) {
+			return new JSONResponse(['error' => $l->t('The Tables app is not enabled')], Http::STATUS_BAD_REQUEST);
+		}
+		$tableId = (int)$this->request->getParam('tableId', 0);
+		if ($tableId <= 0) {
+			return new JSONResponse(['error' => $l->t('No table selected')], Http::STATUS_BAD_REQUEST);
+		}
+		$name = trim((string)$this->request->getParam('name', ''));
+		try {
+			$payload = $this->tablesBridge->buildImport($uid, $tableId);
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
+		if ($name !== '') {
+			$payload['name'] = $name;
+		}
+		$records = $payload['records'];
+		unset($payload['records']);
+		$created = $this->service->createCollection($uid, $payload);
+		$cid = (int)$created['id'];
+		$imported = $this->service->bulkAddRecords($uid, $cid, $records);
+		return new JSONResponse(['collectionId' => $cid, 'imported' => $imported]);
+	}
+
+	#[NoAdminRequired]
+	public function tablesExport(int $id): JSONResponse {
+		$uid = $this->uid();
+		$l = $this->appL10n();
+		if (!$this->tablesBridge->available()) {
+			return new JSONResponse(['error' => $l->t('The Tables app is not enabled')], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$coll = $this->service->getCollection($uid, $id);
+			$records = $this->service->listRecords($uid, $id, null, null);
+			$res = $this->tablesBridge->exportCollection(
+				$uid,
+				(string)$coll['name'],
+				(string)($coll['icon'] ?? ''),
+				(string)($coll['description'] ?? ''),
+				$coll['fields'] ?? [],
+				$records
+			);
+			return new JSONResponse($res);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (\Throwable $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
 	/**
 	 * IL10N for the user's RegiBase language setting ('auto' = follow Nextcloud).
 	 * Used so built-in templates match the in-app language, not just the NC language.
@@ -158,6 +231,14 @@ class ApiController extends Controller {
 		return new JSONResponse(['error' => 'not found'], Http::STATUS_NOT_FOUND);
 	}
 
+	private function forbidden(): JSONResponse {
+		return new JSONResponse(['error' => $this->appL10n()->t('You do not have permission to do that')], Http::STATUS_FORBIDDEN);
+	}
+
+	private function locked(): JSONResponse {
+		return new JSONResponse(['error' => $this->appL10n()->t('This shared collection is locked'), 'code' => 'locked'], Http::STATUS_FORBIDDEN);
+	}
+
 	#[NoAdminRequired]
 	public function templates(): JSONResponse {
 		return new JSONResponse(Templates::all($this->appL10n()));
@@ -172,6 +253,8 @@ class ApiController extends Controller {
 	public function getCollection(int $id): JSONResponse {
 		try {
 			return new JSONResponse($this->service->getCollection($this->uid(), $id));
+		} catch (LockedException $e) {
+			return $this->locked();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -188,6 +271,10 @@ class ApiController extends Controller {
 	public function updateCollection(int $id): JSONResponse {
 		try {
 			return new JSONResponse($this->service->updateCollection($this->uid(), $id, $this->request->getParams()));
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -222,6 +309,8 @@ class ApiController extends Controller {
 			$q = $this->request->getParam('q');
 			$sort = $this->request->getParam('sort');
 			return new JSONResponse($this->service->listRecords($this->uid(), $id, $q, $sort));
+		} catch (LockedException $e) {
+			return $this->locked();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -232,6 +321,10 @@ class ApiController extends Controller {
 		try {
 			$data = $this->request->getParam('data', []);
 			return new JSONResponse($this->service->createRecord($this->uid(), $id, is_array($data) ? $data : []), Http::STATUS_CREATED);
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -251,6 +344,10 @@ class ApiController extends Controller {
 		try {
 			$data = $this->request->getParam('data', []);
 			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : []));
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -261,6 +358,10 @@ class ApiController extends Controller {
 		try {
 			$this->service->deleteRecord($this->uid(), $id);
 			return new JSONResponse(['ok' => true]);
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -363,6 +464,11 @@ class ApiController extends Controller {
 			'enc_enabled' => $c->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1',
 			'enc_salt' => $c->getUserValue($uid, Application::APP_ID, 'enc_salt', ''),
 			'enc_verifier' => $c->getUserValue($uid, Application::APP_ID, 'enc_verifier', ''),
+			// External-app availability, so the UI can disable import/export that needs them.
+			'apps' => [
+				'contacts' => $this->contactsManager->isEnabled(),
+				'tables' => $this->tablesBridge->available(),
+			],
 		];
 	}
 
@@ -644,5 +750,124 @@ class ApiController extends Controller {
 		$resp = new DataDisplayResponse($img['content'], Http::STATUS_OK, ['Content-Type' => $img['mime']]);
 		$resp->cacheFor(3600, false, true);
 		return $resp;
+	}
+
+	// ---- internal sharing ----
+
+	/** Display name for a uid, falling back to the uid itself. */
+	private function displayName(string $uid): string {
+		$u = $this->userManager->get($uid);
+		return $u ? $u->getDisplayName() : $uid;
+	}
+
+	/** Search users to share with (by uid or display name), excluding self. */
+	#[NoAdminRequired]
+	public function searchUsers(): JSONResponse {
+		$q = trim((string)$this->request->getParam('q', ''));
+		$me = $this->uid();
+		if (mb_strlen($q) < 1) {
+			return new JSONResponse(['users' => []]);
+		}
+		$found = [];
+		foreach ($this->userManager->searchDisplayName($q, 25) as $u) {
+			$found[$u->getUID()] = $u->getDisplayName();
+		}
+		foreach ($this->userManager->search($q, 25) as $u) {
+			$found[$u->getUID()] = $u->getDisplayName();
+		}
+		$users = [];
+		foreach ($found as $uid => $name) {
+			if ($uid === $me) {
+				continue;
+			}
+			$users[] = ['uid' => $uid, 'name' => $name];
+			if (count($users) >= 20) {
+				break;
+			}
+		}
+		return new JSONResponse(['users' => $users]);
+	}
+
+	/** List a collection's shares (owner only). */
+	#[NoAdminRequired]
+	public function collectionShares(int $id): JSONResponse {
+		try {
+			$shares = $this->service->listShares($this->uid(), $id);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+		foreach ($shares as &$s) {
+			$s['recipient_name'] = $this->displayName((string)$s['recipient_uid']);
+		}
+		return new JSONResponse(['shares' => $shares]);
+	}
+
+	/** Share a collection with a user (owner only). */
+	#[NoAdminRequired]
+	public function addShare(int $id): JSONResponse {
+		$recipient = trim((string)$this->request->getParam('recipient', ''));
+		$perm = (string)$this->request->getParam('perm', 'view');
+		$password = $this->request->getParam('password');
+		$encKey = $this->request->getParam('enc_key');
+		$encSalt = $this->request->getParam('enc_salt');
+		$l = $this->appL10n();
+		if ($recipient === '' || $this->userManager->get($recipient) === null) {
+			return new JSONResponse(['error' => $l->t('No such user')], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$s = $this->service->addShare($this->uid(), $id, $recipient,
+				$perm,
+				is_string($password) ? $password : null,
+				is_string($encKey) ? $encKey : null,
+				is_string($encSalt) ? $encSalt : null);
+			$s['recipient_name'] = $this->displayName($recipient);
+			return new JSONResponse($s, Http::STATUS_CREATED);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		} catch (\RuntimeException $e) {
+			return new JSONResponse(['error' => $l->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
+	/** Update a share (owner only). */
+	#[NoAdminRequired]
+	public function updateShare(int $id, string $uid): JSONResponse {
+		$patch = [];
+		foreach (['perm', 'password', 'enc_key', 'enc_salt'] as $k) {
+			if ($this->request->getParam($k) !== null) {
+				$patch[$k] = $this->request->getParam($k);
+			}
+		}
+		try {
+			$s = $this->service->updateShare($this->uid(), $id, $uid, $patch);
+			$s['recipient_name'] = $this->displayName($uid);
+			return new JSONResponse($s);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	/** Remove a share (owner only). */
+	#[NoAdminRequired]
+	public function removeShare(int $id, string $uid): JSONResponse {
+		try {
+			$this->service->removeShare($this->uid(), $id, $uid);
+			return new JSONResponse(['ok' => true]);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	/** Recipient unlocks a shared collection (verify share password, get wrapped key). */
+	#[NoAdminRequired]
+	public function unlockShare(int $id): JSONResponse {
+		$password = (string)$this->request->getParam('password', '');
+		try {
+			return new JSONResponse($this->service->unlockShare($this->uid(), $id, $password));
+		} catch (ForbiddenException $e) {
+			return new JSONResponse(['error' => $this->appL10n()->t('Incorrect share password')], Http::STATUS_FORBIDDEN);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
 	}
 }

@@ -26,6 +26,11 @@
     return subst(text, vars);
   }
   let encKey = null; // AES key held in memory only (never reactive, never persisted)
+  // Per-shared-collection decryption keys (owner's key, unwrapped with the share
+  // password). Held in memory only, keyed by collection id. Never reactive/persisted.
+  let sharedKeys = {};
+  // Collection ids whose share password has been unlocked this session.
+  let sharedUnlocked = {};
 
   async function api(path, opts = {}) {
     const res = await fetch(BASE + 'api/' + path, {
@@ -112,7 +117,7 @@
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
       <button v-for="c in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id}" @click="selectCollection(c.id)">
-        <span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span class="ct">{{ c.record_count }}</span>
+        <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
         <div>{{ t('No collections yet') }}</div>
@@ -127,7 +132,7 @@
   <main class="main">
     <div class="topbar">
       <button class="btn ghost hamburger" @click="sidebarOpen=true">☰</button>
-      <div class="title" v-if="current"><span class="ic">{{ current.icon }}</span><span class="nm">{{ current.name }}</span></div>
+      <div class="title" v-if="current"><span v-if="shareBadge(current)" class="share-badge" :title="shareBadgeTitle(current)">{{ shareBadge(current) }}</span><span class="ic">{{ current.icon }}</span><span class="nm">{{ current.name }}</span></div>
       <div class="title" v-else><span class="nm">{{ t('All collections') }}</span></div>
       <div class="spacer"></div>
       <template v-if="current">
@@ -135,9 +140,9 @@
           <div class="viewswitch">
             <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: current.view===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
           </div>
-          <button class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
+          <button v-if="isOwner" class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
           <button class="btn sm" @click="openCollSettings" :title="t('Collection name, description, color, etc.')">{{ t('⚙️ Collection settings') }}</button>
-          <button class="btn accent sm" @click="openNewRecord">{{ t('＋ New record') }}</button>
+          <button v-if="canEdit" class="btn accent sm" @click="openNewRecord">{{ t('＋ New record') }}</button>
           <div class="ta-break" aria-hidden="true"></div>
         </div>
       </template>
@@ -147,7 +152,8 @@
       <div v-if="!current" class="home">
         <div v-if="collections.length" class="home-grid">
           <button v-for="c in collections" :key="c.id" class="home-card" @click="selectCollection(c.id)">
-            <div class="hc-icon" :style="{background: c.color + '22', color: c.color}">{{ c.icon }}</div>
+            <span class="hc-bar" :style="{background: c.color}"></span>
+            <div class="hc-icon" :style="{background: c.color + '22', color: c.color}">{{ c.icon }}<span v-if="shareBadge(c)" class="hc-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span></div>
             <div class="hc-body">
               <div class="hc-name">{{ c.name }}</div>
               <div class="hc-desc">{{ c.description || t('(no description)') }}</div>
@@ -165,7 +171,7 @@
         <div class="listtoolbar">
           <div class="lt-top">
             <button type="button" class="lt-toggle" :class="{on: selectionMode}" @click="toggleSelectionMode" :title="t('Search, sort & bulk actions')">☰</button>
-            <span class="lt-collname"><span class="ic">{{ current.icon }}</span>{{ current.name }}</span>
+            <span class="lt-collname"><span v-if="shareBadge(current)" class="share-badge" :title="shareBadgeTitle(current)">{{ shareBadge(current) }}</span><span class="ic">{{ current.icon }}</span>{{ current.name }}</span>
             <span class="lt-count" v-if="records.length">{{ t('{shown} / {total} items', {shown: visibleRecords.length, total: records.length}) }}</span>
           </div>
           <div class="lt-tools" v-show="selectionMode">
@@ -183,10 +189,10 @@
             <button class="btn sm ghost" @click="selectAll" :disabled="!records.length">{{ t('Select all') }}</button>
             <button class="btn sm ghost" :disabled="!selectedIds.length" @click="clearSelection">{{ t('Clear') }}</button>
             <span class="selspacer"></span>
-            <button class="btn sm" :disabled="!selectedIds.length" @click="duplicateInPlace" :title="t('Duplicate within this collection')">{{ t('Duplicate') }}</button>
-            <button class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
-            <button class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
-            <button class="btn sm danger" :disabled="!selectedIds.length" @click="openBulkDelete">{{ t('Delete') }}</button>
+            <button v-if="canEdit" class="btn sm" :disabled="!selectedIds.length" @click="duplicateInPlace" :title="t('Duplicate within this collection')">{{ t('Duplicate') }}</button>
+            <button v-if="isOwner" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
+            <button v-if="isOwner" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
+            <button v-if="canDelete" class="btn sm danger" :disabled="!selectedIds.length" @click="openBulkDelete">{{ t('Delete') }}</button>
           </div>
           </div>
         </div>
@@ -290,10 +296,12 @@
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('New collection') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
-        <button class="btn block" style="margin-bottom:8px" @click="openImport">{{ t('📥 Import from CSV file (auto-create fields)') }}</button>
-        <button class="btn block" style="margin-bottom:14px" @click="openContactsImport">{{ t('📇 Import from Contacts') }}</button>
+        <button class="btn block" style="margin-bottom:8px" @click="openImport">{{ t('📥 Import from CSV / JSON file (auto-create fields)') }}</button>
+        <button class="btn block" style="margin-bottom:8px" :disabled="!apps.contacts" :title="apps.contacts ? '' : t('The Contacts app is not enabled')" @click="openContactsImport">{{ t('📇 Import from Contacts') }}</button>
+        <button class="btn block" style="margin-bottom:14px" :disabled="!apps.tables" :title="apps.tables ? '' : t('The Tables app is not enabled')" @click="openTablesImport">{{ t('📊 Import from Tables') }}</button>
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Or create from a template:') }}</div>
-        <div class="tpl-grid">
+        <div v-if="templatesLoading && !templates.length" class="empty"><p>{{ t('Loading…') }}</p></div>
+        <div v-else class="tpl-grid">
           <button v-for="tpl in templates" :key="tpl.key" class="tpl-card" :disabled="busy" @click="createFromTemplate(tpl.key)">
             <div class="th"><span class="ic">{{ tpl.icon }}</span><span>{{ tpl.name }}</span></div>
             <div class="td">{{ tpl.description }}</div>
@@ -350,8 +358,8 @@
             </template>
           </div>
           <div v-else class="control">
-            <input :type="inputType(f)" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="f.placeholder||''" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
-            <button v-if="f.secret" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
+            <input :type="inputType(f)" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
+            <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
           </div>
           <div v-if="ruleHint(f)" class="rule-hint">📏 {{ ruleHint(f) }}</div>
         </div>
@@ -381,16 +389,16 @@
           <div class="dv" v-else>
             <a v-if="linkFor(f, modal.rec.data[f.key])" class="val link" :href="linkFor(f, modal.rec.data[f.key])" target="_blank" rel="noopener noreferrer">{{ displayVal(modal.rec, f) }}</a>
             <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(modal.rec, f) }}</span>
-            <button v-if="f.secret" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
-            <button class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
+            <button v-if="f.secret && !secretsMasked" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
+            <button v-if="!(f.secret && secretsMasked)" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
           </div>
         </div>
       </div>
       <div class="modal-foot">
-        <button class="btn danger" @click="deleteRecord(modal.rec)">{{ t('Delete') }}</button>
+        <button v-if="canDelete" class="btn danger" @click="deleteRecord(modal.rec)">{{ t('Delete') }}</button>
         <button class="btn" @click="copyRecord(modal.rec)">{{ t('⧉ Copy all') }}</button>
-        <button class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
-        <button class="btn primary" @click="editRecord(modal.rec)">{{ t('Edit') }}</button>
+        <button v-if="isOwner" class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
+        <button v-if="canEdit" class="btn primary" @click="editRecord(modal.rec)">{{ t('Edit') }}</button>
       </div>
     </div>
   </div>
@@ -489,33 +497,127 @@
   <div v-if="modal && modal.type==='collSettings'" class="modal-mask" @click.self="modal=null">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('⚙️ Collection settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
-      <div class="modal-body">
-        <div class="field"><label>{{ t('Name') }}</label><input v-model="collForm.name" /></div>
-        <div class="field"><label>{{ t('Description') }}</label><textarea v-model="collForm.description" :placeholder="t('Description of this collection (shown on the home screen card)')"></textarea></div>
+      <div class="modal-body settings-body">
+        <div v-if="!isOwner" class="share-note">{{ shareAccessNote }}</div>
+
+        <template v-if="canSettings">
+        <div class="field"><label>🏷️ {{ t('Name') }}</label><input v-model="collForm.name" /></div>
+        <div class="field"><label>📝 {{ t('Description') }}</label><textarea v-model="collForm.description" :placeholder="t('Description of this collection (shown on the home screen card)')"></textarea></div>
+        <div class="field-row">
+        <div class="field"><label>🎨 {{ t('Color') }}</label><input type="color" v-model="collForm.color" style="height:44px;padding:4px;width:100%" /></div>
         <div class="field">
-          <label>{{ t('Icon') }}</label>
-          <div class="iconpick">
-            <button v-for="ic in iconChoices" :key="ic.e" type="button" class="iconpick-btn" :class="{sel: collForm.icon===ic.e}" :title="t(ic.t)" @click="collForm.icon=ic.e">{{ ic.e }}</button>
+          <label>😀 {{ t('Icon') }}</label>
+          <div class="iconpick-head">
+            <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen}" @click.stop="iconPickerOpen = !iconPickerOpen" :title="t('Click to choose an icon')">{{ collForm.icon || '🗂️' }}</button>
+            <input v-model="collForm.icon" maxlength="8" :placeholder="t('Emoji')" />
+            <div v-if="iconPickerOpen" class="emoji-popup" @click.stop>
+              <div class="emoji-palette">
+                <div class="emoji-group" v-for="g in iconGroupsAll" :key="g.key">
+                  <div class="emoji-cat">{{ t(g.key) }}</div>
+                  <div class="emoji-grid">
+                    <button type="button" class="emoji-btn" v-for="em in g.emojis" :key="em"
+                            :class="{sel: collForm.icon===em}" @click="collForm.icon = em; iconPickerOpen = false" :title="em">{{ em }}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="iconpick-foot">
-            <span>{{ t('Other:') }}</span>
-            <input v-model="collForm.icon" maxlength="4" :placeholder="t('Emoji')" />
-            <span>{{ t('Selected:') }}</span><span class="iconpick-cur">{{ collForm.icon }}</span>
+          <div v-if="iconPickerOpen" class="perm-backdrop" @click="iconPickerOpen = false"></div>
+        </div>
+        </div>
+        </template>
+
+        <div v-if="isOwner" class="field share-section" :class="{open: shareExpanded}">
+          <button type="button" class="share-toggle" :aria-expanded="shareExpanded ? 'true' : 'false'" @click="shareExpanded = !shareExpanded">
+            <span class="share-toggle-label">👥 {{ t('Share settings') }}</span>
+            <span class="share-hint"><span class="share-caret">{{ shareExpanded ? '▼' : '▶' }}</span><span v-if="!shareExpanded" class="share-hint-text">{{ t('Click to expand') }}</span></span>
+            <span v-if="sharePanel.shares.length" class="share-count">{{ sharePanel.shares.length }}</span>
+          </button>
+          <div v-show="shareExpanded" class="share-body">
+          <div v-if="sharePanel.shares.length" class="share-list">
+            <div v-for="s in sharePanel.shares" :key="s.recipient_uid" class="share-row">
+              <span class="share-user">{{ s.recipient_name || s.recipient_uid }}</span>
+              <select class="share-perm" :value="s.perm" @change="changeSharePerm(s, $event.target.value)">
+                <option value="view">{{ t('View') }}</option>
+                <option value="edit">{{ t('Edit') }}</option>
+                <option value="delete">{{ t('Delete') }}</option>
+              </select>
+              <span v-if="s.has_password" class="share-flag" :title="t('Password protected')">🔑</span>
+              <span v-if="s.shares_secrets" class="share-flag" :title="t('Secret fields shared')">🔓</span>
+              <button type="button" class="icon-btn" @click="removeShare(s)" :title="t('Remove share')">🗑</button>
+            </div>
+          </div>
+          <div class="share-add">
+            <div class="share-top">
+              <div v-if="!sharePanel.recipient" class="share-search">
+                <input v-model="sharePanel.q" @input="searchShareUsers" :placeholder="t('Search users to share with…')" autocomplete="off" />
+                <div v-if="sharePanel.results.length" class="share-results">
+                  <button type="button" v-for="u in sharePanel.results" :key="u.uid" class="share-result" @click="pickShareUser(u)">{{ u.name }} <span class="muted">({{ u.uid }})</span></button>
+                </div>
+              </div>
+              <div v-else class="share-picked">
+                <span class="share-user">{{ sharePanel.recipientName }} <span class="muted">({{ sharePanel.recipient }})</span></span>
+                <button type="button" class="icon-btn" @click="clearShareRecipient">✕</button>
+              </div>
+              <div class="perm-wrap" :class="{open: permOpen}" :title="t('Permission')" @click.stop="permOpen = !permOpen">
+                <span class="perm-label">{{ permLabel }}</span>
+                <span class="perm-arrow" aria-hidden="true">⌄</span>
+                <div v-if="permOpen" class="perm-menu" @click.stop>
+                  <button type="button" v-for="o in permOptions" :key="o.v" class="perm-opt" :class="{sel: sharePanel.perm === o.v}" @click="sharePanel.perm = o.v; permOpen = false">{{ o.label }}</button>
+                </div>
+              </div>
+              <div v-if="permOpen" class="perm-backdrop" @click="permOpen = false"></div>
+            </div>
+            <div class="share-opts">
+              <div class="so-row">
+                <span class="sub">{{ t('Share password (optional)') }}</span>
+                <input v-model="sharePanel.password" type="text" :placeholder="t('Blank = no password')" autocomplete="off" data-1p-ignore data-lpignore="true" />
+              </div>
+              <div v-if="collectionHasSecret && enc.enabled" class="so-row so-secret">
+                <span class="sub">{{ t('Show secret fields to the recipient') }}</span>
+                <input v-model="sharePanel.master" type="password" :placeholder="t('Your master password (blank = keep secrets hidden)')" autocomplete="off" data-1p-ignore data-lpignore="true" />
+                <div class="muted so-hint">{{ t('Requires a share password (used to protect the key). Secrets stay masked without it.') }}</div>
+              </div>
+            </div>
+            <div v-if="sharePanel.err" class="share-err">{{ sharePanel.err }}</div>
+            <button type="button" class="btn sm primary" :disabled="!sharePanel.recipient || sharePanel.busy" @click="addShare">{{ t('Share') }}</button>
+          </div>
           </div>
         </div>
-        <div class="field"><label>{{ t('Color') }}</label><input type="color" v-model="collForm.color" style="height:44px;padding:4px" /></div>
+
         <div class="field">
-          <label>{{ t('Export (all records in this collection)') }}</label>
-          <div style="display:flex;gap:8px">
+          <label>📤 {{ t('Export (all records in this collection)') }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="btn sm" @click="exportCollection('csv')">{{ t('⬇ Export as CSV') }}</button>
             <button type="button" class="btn sm" @click="exportCollection('json')">{{ t('⬇ Export as JSON') }}</button>
+            <button type="button" class="btn sm" :disabled="tablesExportBusy || !apps.tables" :title="apps.tables ? '' : t('The Tables app is not enabled')" @click="exportToTables">{{ t('📊 Export to Tables') }}</button>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('JSON includes field definitions and can be re-imported into RegiBase directly.') }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">{{ t('Export to Tables creates a new table. Secret and attachment fields are skipped.') }}</div>
         </div>
       </div>
       <div class="modal-foot">
-        <button class="btn danger" @click="deleteCollection">{{ t('Delete collection') }}</button>
-        <button class="btn primary" @click="saveCollSettings">{{ t('Save') }}</button>
+        <button v-if="isOwner" class="btn danger" @click="deleteCollection">{{ t('Delete collection') }}</button>
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button v-if="canSettings" class="btn primary" @click="saveCollSettings">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared collection unlock (share password) -->
+  <div v-if="shareUnlock.open" class="modal-mask" @click.self="cancelShareUnlock">
+    <div class="modal sm">
+      <div class="modal-head"><h3>{{ t('🔒 Enter share password') }}</h3><button class="icon-btn" @click="cancelShareUnlock">✕</button></div>
+      <div class="modal-body">
+        <p style="margin-top:0;color:var(--muted)">{{ t('“{name}” is password-protected.', {name: shareUnlock.name}) }}</p>
+        <div class="field"><label>{{ t('Share password') }}</label>
+          <input v-model="shareUnlock.password" type="password" @keyup.enter="doShareUnlock" autocomplete="off" data-1p-ignore data-lpignore="true" />
+        </div>
+        <div v-if="shareUnlock.err" class="share-err">{{ shareUnlock.err }}</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="cancelShareUnlock">{{ t('Cancel') }}</button>
+        <button class="btn primary" :disabled="shareUnlock.busy" @click="doShareUnlock">{{ t('Unlock') }}</button>
       </div>
     </div>
   </div>
@@ -597,6 +699,33 @@
     </div>
   </div>
 
+  <!-- Tables からインポート -->
+  <div v-if="modal && modal.type==='tablesImport'" class="modal-mask" @click.self="!tablesImport.busy && (modal=null)">
+    <div class="modal">
+      <div class="modal-head"><h3>{{ t('📊 Import from Tables') }}</h3><button class="icon-btn" :disabled="tablesImport.busy" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <div v-if="tablesImport.loading" class="empty"><p>{{ t('Loading…') }}</p></div>
+        <div v-else-if="!tablesImport.available" class="empty"><p>{{ t('The Tables app is not enabled') }}</p></div>
+        <div v-else-if="!tablesImport.tables.length" class="empty"><p>{{ t('No tables found') }}</p></div>
+        <template v-else>
+          <p style="margin-top:0;font-size:13px;color:var(--muted)">{{ t('Import a table as a new collection. Tables is not modified.') }}</p>
+          <div class="field">
+            <label>{{ t('Source table') }}</label>
+            <select v-model="tablesImport.selected">
+              <option v-for="tb in tablesImport.tables" :key="tb.id" :value="tb.id">{{ (tb.emoji ? tb.emoji + ' ' : '') + tb.title }}（{{ t('{n} columns', {n: tb.columns}) }}）</option>
+            </select>
+          </div>
+          <div class="field"><label>{{ t('Collection name') }}</label><input v-model="tablesImport.name" :placeholder="tablesSelectedTitle" /></div>
+          <div v-if="tablesImport.err" style="color:var(--danger);font-size:13px">{{ tablesImport.err }}</div>
+        </template>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" :disabled="tablesImport.busy" @click="modal=null">{{ t('Cancel') }}</button>
+        <button v-if="tablesImport.available && tablesImport.tables.length" class="btn primary" :disabled="tablesImport.busy || !tablesImport.selected" @click="commitTablesImport">{{ t('Import') }}</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 移動 / 複製 -->
   <div v-if="modal && modal.type==='transfer'" class="modal-mask" @click.self="modal=null">
     <div class="modal wide">
@@ -663,9 +792,9 @@
   <div v-if="modal && modal.type==='settings'" class="modal-mask" @click.self="modal=null">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('⚙️ Settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
-      <div class="modal-body">
+      <div class="modal-body settings-body">
         <div class="field">
-          <label>{{ t('Theme') }}</label>
+          <label>🌗 {{ t('Theme') }}</label>
           <div class="radios">
             <label><input type="radio" value="auto" v-model="settingsForm.theme" @change="previewTheme" /> {{ t('Default (match Nextcloud)') }}</label>
             <label><input type="radio" value="light" v-model="settingsForm.theme" @change="previewTheme" /> {{ t('Light') }}</label>
@@ -673,7 +802,7 @@
           </div>
         </div>
         <div class="field" style="margin-top:16px">
-          <label>{{ t('Language') }}</label>
+          <label>🌐 {{ t('Language') }}</label>
           <select v-model="settingsForm.language">
             <option value="auto">{{ t('System default (match Nextcloud)') }}</option>
             <option v-for="lg in languages" :key="lg.code" :value="lg.code">{{ lg.name }}</option>
@@ -681,7 +810,7 @@
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The display language switches when you press “Save”.') }}</div>
         </div>
         <div class="field" style="margin-top:16px">
-          <label>{{ t('Folder for images and files (path relative to your Files root)') }}</label>
+          <label>📁 {{ t('Folder for images and files (path relative to your Files root)') }}</label>
           <input v-model="settingsForm.files_folder" placeholder="RegiBase" />
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A subfolder is created per collection and files are stored in plain text. You can also view them in the Files app.') }}<br><code>{{ (settingsForm.files_folder || 'RegiBase') }}/…/</code></div>
         </div>
@@ -700,7 +829,7 @@
           </div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>{{ t('Backup / Restore') }}</label>
+          <label>💾 {{ t('Backup / Restore') }}</label>
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Save all collections, records, settings and attachments to a ZIP encrypted with your login password.') }}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="btn sm" @click="openBackup">{{ t('🔒 Download all data') }}</button>
@@ -914,7 +1043,7 @@
         collections: [], current: null, records: [], search: '',
         sidebarOpen: false, modal: null,
         form: {}, editingRecordId: null, reveal: {},
-        templates: [], schemaFields: [],
+        templates: [], templatesLoading: false, schemaFields: [],
         collForm: { name: '', icon: '', color: '', description: '' },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto' },
         languages: [],
@@ -922,10 +1051,23 @@
         backupForm: { password: '', busy: false, err: '' },
         restoreForm: { password: '', busy: false, err: '', fileName: '', dataUrl: '', confirm: false, mode: 'overwrite' },
         contactsImport: { books: [], selected: 'all', name: '', busy: false, err: '', loading: false, enabled: true },
+        tablesImport: { tables: [], selected: 0, name: '', busy: false, err: '', loading: false, available: true },
+        tablesExportBusy: false,
+        apps: { contacts: true, tables: true },
         tableDrag: { active: false, startX: 0, startScroll: 0, el: null, pid: null },
         theme: 'auto',
         enc: { enabled: false, unlocked: false, salt: '', verifier: '' },
         openDecrypted: {},
+        // internal sharing (owner-side panel inside collection settings)
+        sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false },
+        // recipient-side unlock prompt for a password-protected shared collection
+        shareUnlock: { open: false, cid: null, name: '', hasSecrets: false, password: '', err: '', busy: false, next: null },
+        // reactive mirror of sharedKeys presence (cid -> true) so the UI reacts to unlock
+        secretUnlocked: {},
+        editingOrig: null,
+        permOpen: false,
+        iconPickerOpen: false,
+        shareExpanded: false,
         unlockKey: '', unlockErr: '', unlockRemember: true,
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
         cropper: { open: false, key: '', src: '', imgW: 0, imgH: 0, dispW: 0, dispH: 0, ratio: null, ratioLabel: 'free', out: 600, box: { x: 0, y: 0, w: 0, h: 0 }, drag: null, busy: false },
@@ -962,10 +1104,50 @@
           { e: '⚙️', t: 'Settings / gear' }, { e: '🧩', t: 'Puzzle' }, { e: '💡', t: 'Idea / bulb' }, { e: '🔧', t: 'Tools' }, { e: '📦', t: 'Package / box' },
           { e: '🎯', t: 'Goal' }, { e: '🐶', t: 'Dog' }, { e: '🐱', t: 'Cat' }, { e: '🌱', t: 'Plant / sprout' }, { e: '💊', t: 'Medicine' }, { e: '⚡', t: 'Electricity' },
         ],
+        iconGroups: [
+          { key: 'Faces & emotion', emojis: '😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫡 🤭 🫢 🤫 😴 😷 🤒 🤕 🤢 🤮 🥴 😵 🤠'.split(' ') },
+          { key: 'Hands', emojis: '👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ ✋ 🤚 🖐️ 🖖 👋 🤝 🙏 ✍️ 💪 👏 🙌 👐 🤲 🫶'.split(' ') },
+          { key: 'People', emojis: '👶 🧒 👦 👧 🧑 👨 👩 🧓 👴 👵 👮 🕵️ 💂 👷 🤴 👸 👰 🤵 🧕 🎅 🤶 🦸 🦹 🧙 🧚 🧛 🧜 🧝 👤 👥 🚶 🏃'.split(' ') },
+          { key: 'Animals & nature', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🐢 🐍 🦖 🐙 🦑 🦀 🐠 🐟 🐬 🐳 🐋 🦈 🌸 🌷 🌹 🌻 🌼 🌵 🌲 🌳 🍀 🍁 🍂 🌾 ⭐ 🌙 ☀️ ⛅ ☁️ 🌈 ⚡ ❄️ 🔥 💧 🌊'.split(' ') },
+          { key: 'Food & drink', emojis: '🍎 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥝 🍅 🥑 🥦 🌽 🥕 🥔 🍞 🥐 🥯 🧀 🥚 🍳 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🍜 🍝 🍣 🍱 🍚 🍙 🍘 🍢 🍡 🍧 🍨 🍦 🍰 🎂 🧁 🍩 🍪 🍫 🍬 🍭 ☕ 🍵 🍶 🍺 🍻 🍷 🥂 🍸 🍹 🥤'.split(' ') },
+          { key: 'Travel & places', emojis: '🚗 🚕 🚙 🚌 🚑 🚒 🚓 🏎️ 🚄 🚅 🚆 🚇 🚉 ✈️ 🚀 🛸 🚁 ⛵ 🚤 🚢 🏠 🏡 🏢 🏥 🏦 🏨 🏫 🏪 🗼 🗽 ⛩️ 🏰 🎡 🎢 🗻 🏔️ 🌋 🏖️ 🏝️'.split(' ') },
+          { key: 'Objects', emojis: '📱 💻 ⌨️ 🖥️ 🖨️ 📷 📸 🎥 📺 ⏰ ⌚ 📚 📖 ✏️ 📝 📌 📎 🔒 🔑 💡 🔦 🔧 🔨 ⚙️ 🎁 🎈 🎉 🎊 🎀 💰 💳 💎 🔔 🎵 🎶 ⚽ 🏀 ⚾ 🎾 🏐 🏈 🎯 🎮 🎲 ♠️ ♥️ ♦️ ♣️'.split(' ') },
+          { key: 'Symbols', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 ✅ ❌ ⭕ ❗ ❓ ⚠️ 💯 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ ✨ ⭐ 🌟'.split(' ') },
+        ],
         toast: '', busy: false,
       };
     },
     computed: {
+      // Localised label for the compact permission picker (shown via an overlaid
+      // span so centering never depends on native <select> value alignment).
+      permOptions() {
+        return [{ v: 'view', label: this.t('View') }, { v: 'edit', label: this.t('Edit') }, { v: 'delete', label: this.t('Delete') }];
+      },
+      permLabel() {
+        const o = this.permOptions.find(x => x.v === this.sharePanel.perm);
+        return o ? o.label : this.t('View');
+      },
+      // ---- sharing permissions for the current collection ----
+      curPerm() { return this.current ? (this.current.perm || 'owner') : 'owner'; },
+      isOwner() { return this.current ? this.current.is_owner !== false : true; },
+      canEdit() { return ['owner', 'edit', 'delete'].includes(this.curPerm); },
+      canDelete() { return ['owner', 'delete'].includes(this.curPerm); },
+      // editing collection settings/title needs ownership or the 'delete' level
+      canSettings() { return ['owner', 'delete'].includes(this.curPerm); },
+      collectionHasSecret() { return !!(this.current && this.current.fields && this.current.fields.some((f) => f.secret)); },
+      // recipient viewing a shared collection whose secrets were not shared/unlocked
+      secretsMasked() { return !!(this.current && this.current.is_owner === false && !this.secretUnlocked[this.current.id]); },
+      shareAccessNote() {
+        const map = { view: T('You have view-only access to this shared collection.'),
+          edit: T('You can view and edit records in this shared collection.'),
+          delete: T('You can view, edit and delete records in this shared collection.') };
+        return map[this.curPerm] || '';
+      },
+      iconGroupsAll() {
+        // Fold the curated recommended set in as the first palette category so nothing is lost,
+        // then the general themed groups — a single unified picker (same shape as FormulaBase).
+        return [{ key: 'Recommended', emojis: this.iconChoices.map((c) => c.e) }, ...this.iconGroups];
+      },
       listFields() {
         if (!this.current) return [];
         return this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file').slice(0, 4);
@@ -996,6 +1178,10 @@
       },
       contactsTotal() {
         return (this.contactsImport.books || []).reduce((s, b) => s + (b.count || 0), 0);
+      },
+      tablesSelectedTitle() {
+        const tb = (this.tablesImport.tables || []).find((x) => x.id === this.tablesImport.selected);
+        return tb ? tb.title : '';
       },
       importExamplePh() {
         return T('CSV example) name,url,username,password\nGitHub,https://github.com,ktec,...\n\nJSON example) [{"name":"GitHub","url":"https://github.com"}]');
@@ -1040,7 +1226,7 @@
         this.locale++;
         // built-in templates are translated server-side by the RegiBase language setting;
         // refresh the cached list so the picker matches the newly chosen language.
-        if (this.authenticated) { try { this.templates = await api('templates'); } catch (e) { /* keep previous */ } }
+        if (this.authenticated && this.templates.length) { try { this.templates = await api('templates'); } catch (e) { /* keep previous */ } }
       },
       newCollDesc() {
         const name = this.current ? this.current.name : '';
@@ -1058,6 +1244,7 @@
       async boot() {
         try {
           const s = await api('settings'); this.settingsForm = s; this.theme = s.theme || 'auto';
+          if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false };
           this.languages = s.languages || [];
           if (s.language && s.language !== 'auto') await this.applyLanguage(s.language);
           this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '' };
@@ -1071,7 +1258,8 @@
             mq.addEventListener ? mq.addEventListener('change', h) : mq.addListener(h);
           }
         } catch (e) { /* ignore */ }
-        this.templates = await api('templates');
+        // templates power only the "New collection" picker; fetch them lazily
+        // when that picker opens so the home screen appears as soon as collections load.
         await this.loadCollections();
       },
       // ---- theme (follow Nextcloud, or force dark/light) ----
@@ -1101,16 +1289,26 @@
       },
       async loadCollections() { this.collections = await api('collections'); },
       async selectCollection(id, push = true) {
+        // a password-protected share must be unlocked (once per session) before opening
+        const meta = this.collections.find((c) => c.id === id);
+        if (meta && meta.shared_with_me && meta.has_password && !sharedUnlocked[id]) {
+          this.promptShareUnlock(id, meta.name, () => this.selectCollection(id, push));
+          return;
+        }
         this.sidebarOpen = false; this.search = ''; this.selectedIds = [];
         this.current = await api('collections/' + id);
+        this.secretUnlocked = { ...this.secretUnlocked, [id]: !!sharedKeys[id] };
         await this.loadRecords();
         if (push) this.pushNav({ cid: id });
       },
       pushNav(state) { try { history.pushState(state, ''); } catch (e) { /* ignore */ } },
       async loadRecords() {
         if (!this.current) return;
-        const q = this.search ? '?q=' + encodeURIComponent(this.search) : '';
-        this.records = await api('collections/' + this.current.id + '/records' + q);
+        const params = [];
+        if (this.search) params.push('q=' + encodeURIComponent(this.search));
+        if (this.current.record_sort) params.push('sort=' + encodeURIComponent(this.normSort(this.current.record_sort)));
+        const qs = params.length ? '?' + params.join('&') : '';
+        this.records = await api('collections/' + this.current.id + '/records' + qs);
         this.renderLimit = 200;
       },
       toggleSelectionMode() {
@@ -1169,6 +1367,8 @@
       },
       async setView(v) {
         if (!this.current || this.current.view === v) return;
+        // recipients without settings rights change the view locally only (not persisted)
+        if (!this.canSettings) { this.current.view = v; return; }
         const c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify({ view: v }) });
         this.current.view = c.view;
         const inList = this.collections.find((x) => x.id === this.current.id);
@@ -1177,6 +1377,7 @@
       normSort(s) { return (s === 'kana_title' || s === 'kana_reading') ? 'title_asc' : s; },
       async setSort(v) {
         if (!this.current || this.normSort(this.current.record_sort) === v) return;
+        if (!this.canSettings) { this.current.record_sort = v; await this.loadRecords(); return; }
         const c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify({ record_sort: v }) });
         this.current.record_sort = c.record_sort;
         const inList = this.collections.find((x) => x.id === this.current.id);
@@ -1504,7 +1705,7 @@
         this.forgetKey();
         return false;
       },
-      lockNow() { this.forgetKey(); encKey = null; this.enc.unlocked = false; this.modal = null; this.openDecrypted = {}; },
+      lockNow() { this.forgetKey(); encKey = null; sharedKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.enc.unlocked = false; this.modal = null; this.openDecrypted = {}; },
       async doUnlock() {
         this.unlockErr = '';
         try {
@@ -1512,23 +1713,34 @@
           if (await rbcrypto.decrypt(key, this.enc.verifier) !== 'regibase-ok') throw new Error('bad');
           encKey = key; this.enc.unlocked = true; this.unlockKey = '';
           if (this.unlockRemember) await this.rememberKey(key); else this.forgetKey();
-          if (!this.templates.length) await this.boot2();
+          await this.loadCollections();
         } catch (e) { this.unlockErr = T('Incorrect master key'); }
       },
-      async boot2() { this.templates = await api('templates'); await this.loadCollections(); },
       async encryptData(data) {
-        if (!this.enc.enabled || !encKey || !this.current) return data;
+        if (!this.current) return data;
+        // shared-in collection: encrypt secrets with the OWNER's key (unwrapped at unlock),
+        // never the recipient's own key — otherwise the owner could not decrypt them.
+        const shared = this.current.is_owner === false;
+        const key = shared ? sharedKeys[this.current.id] : encKey;
+        if (shared ? !key : (!this.enc.enabled || !key)) return data;
         const out = { ...data };
         for (const f of this.current.fields) {
           if (f.secret && out[f.key] != null && out[f.key] !== '' && !rbcrypto.isEnc(out[f.key])) {
-            out[f.key] = await rbcrypto.encrypt(encKey, String(out[f.key]));
+            out[f.key] = await rbcrypto.encrypt(key, String(out[f.key]));
           }
         }
         return out;
       },
       async secretPlain(v) {
         if (v == null || v === '') return '';
-        if (this.enc.enabled && encKey && rbcrypto.isEnc(v)) {
+        if (!rbcrypto.isEnc(v)) return String(v);
+        // shared-in collection: decrypt only with the owner's unwrapped key; otherwise mask
+        if (this.current && this.current.is_owner === false) {
+          const k = sharedKeys[this.current.id];
+          if (!k) return '••••••••'; // secrets not shared / not unlocked
+          try { return await rbcrypto.decrypt(k, v); } catch (e) { return T('(decryption failed)'); }
+        }
+        if (this.enc.enabled && encKey) {
           try { return await rbcrypto.decrypt(encKey, v); } catch (e) { return T('(decryption failed)'); }
         }
         return String(v);
@@ -1670,11 +1882,19 @@
         await this.applyLanguage(s.language || 'auto');
         this.applyTheme();
         this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '' };
-        this.templates = await api('templates');
+        this.templates = []; // re-fetched lazily when the New collection picker next opens
         this.current = null; this.records = []; this.clearSelection();
         await this.loadCollections();
       },
-      openTemplatePicker() { this.modal = { type: 'template' }; },
+      async openTemplatePicker() {
+        this.modal = { type: 'template' };
+        if (!this.templates.length) {
+          this.templatesLoading = true;
+          try { this.templates = await api('templates'); }
+          catch (e) { /* keep empty; modal shows nothing to pick */ }
+          finally { this.templatesLoading = false; }
+        }
+      },
       async createFromTemplate(tplKey) {
         this.busy = true;
         try {
@@ -1688,7 +1908,98 @@
         if (this.modal) this.modal = null;
         if (push) this.pushNav({ cid: null });
       },
-      openCollSettings() { this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '' }; this.modal = { type: 'collSettings' }; },
+      openCollSettings() {
+        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '' };
+        this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
+        this.modal = { type: 'collSettings' };
+        this.permOpen = false;
+        this.iconPickerOpen = false;
+        this.shareExpanded = false;
+        if (this.isOwner) this.loadShares();
+      },
+      // ---- internal sharing (owner side) ----
+      shareBadge(c) { if (!c) return ''; if (c.shared_by_me) return '🔗'; if (c.shared_with_me) return '👥'; return ''; },
+      shareBadgeTitle(c) { if (!c) return ''; if (c.shared_by_me) return T('Shared by you'); if (c.shared_with_me) return T('Shared with you'); return ''; },
+      async loadShares() {
+        try { const r = await api('collections/' + this.current.id + '/shares'); this.sharePanel.shares = r.shares || []; }
+        catch (e) { /* not owner or none */ }
+      },
+      async searchShareUsers() {
+        const q = this.sharePanel.q.trim();
+        if (!q) { this.sharePanel.results = []; return; }
+        this.sharePanel.searching = true;
+        try {
+          const r = await api('users/search?q=' + encodeURIComponent(q));
+          const already = new Set(this.sharePanel.shares.map((s) => s.recipient_uid));
+          this.sharePanel.results = (r.users || []).filter((u) => !already.has(u.uid));
+        } catch (e) { this.sharePanel.results = []; }
+        finally { this.sharePanel.searching = false; }
+      },
+      pickShareUser(u) { this.sharePanel.recipient = u.uid; this.sharePanel.recipientName = u.name; this.sharePanel.results = []; this.sharePanel.q = ''; },
+      clearShareRecipient() { this.sharePanel.recipient = null; this.sharePanel.recipientName = ''; },
+      async addShare() {
+        const sp = this.sharePanel;
+        sp.err = '';
+        if (!sp.recipient) return;
+        let encKeyWrapped = null, encSalt = null;
+        if (sp.master) {
+          if (!sp.password) { sp.err = T('Set a share password to share secret fields.'); return; }
+          try {
+            const ownerKey = await rbcrypto.deriveKey(sp.master, this.enc.salt);
+            if (await rbcrypto.decrypt(ownerKey, this.enc.verifier) !== 'regibase-ok') { sp.err = T('Incorrect master password'); return; }
+            encSalt = rbcrypto.randSaltB64();
+            const wrapKey = await rbcrypto.deriveKey(sp.password, encSalt);
+            encKeyWrapped = await rbcrypto.encrypt(wrapKey, await rbcrypto.exportKeyB64(ownerKey));
+          } catch (e) { sp.err = T('Could not prepare secret sharing'); return; }
+        }
+        sp.busy = true;
+        try {
+          const body = { recipient: sp.recipient, perm: sp.perm, password: sp.password || '' };
+          if (encKeyWrapped) { body.enc_key = encKeyWrapped; body.enc_salt = encSalt; }
+          const s = await api('collections/' + this.current.id + '/shares', { method: 'POST', body: JSON.stringify(body) });
+          this.sharePanel.shares.push(s);
+          this.clearShareRecipient();
+          sp.perm = 'view'; sp.password = ''; sp.master = '';
+          await this.loadCollections();
+          this.showToast(T('Shared'));
+        } catch (e) { sp.err = e.message || String(e); }
+        finally { sp.busy = false; }
+      },
+      async changeSharePerm(s, perm) {
+        try { const r = await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid), { method: 'PATCH', body: JSON.stringify({ perm }) }); s.perm = r.perm; }
+        catch (e) { this.showToast(e.message || String(e)); }
+      },
+      async removeShare(s) {
+        if (!confirm(T('Stop sharing with {name}?', { name: s.recipient_name || s.recipient_uid }))) return;
+        try {
+          await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid), { method: 'DELETE' });
+          this.sharePanel.shares = this.sharePanel.shares.filter((x) => x.recipient_uid !== s.recipient_uid);
+          await this.loadCollections();
+        } catch (e) { this.showToast(e.message || String(e)); }
+      },
+      // ---- recipient unlock (share password) ----
+      promptShareUnlock(cid, name, next) {
+        this.shareUnlock = { open: true, cid, name: name || '', hasSecrets: false, password: '', err: '', busy: false, next };
+      },
+      cancelShareUnlock() { this.shareUnlock = { open: false, cid: null, name: '', hasSecrets: false, password: '', err: '', busy: false, next: null }; },
+      async doShareUnlock() {
+        const su = this.shareUnlock;
+        su.err = ''; su.busy = true;
+        try {
+          const res = await api('collections/' + su.cid + '/unlock', { method: 'POST', body: JSON.stringify({ password: su.password }) });
+          sharedUnlocked[su.cid] = true;
+          if (res.enc_key && res.enc_salt) {
+            try {
+              const wrapKey = await rbcrypto.deriveKey(su.password, res.enc_salt);
+              const raw = await rbcrypto.decrypt(wrapKey, res.enc_key);
+              sharedKeys[su.cid] = await rbcrypto.importKeyB64(raw);
+            } catch (e) { /* secrets stay masked if unwrap fails */ }
+          }
+          const next = su.next;
+          this.cancelShareUnlock();
+          if (next) await next();
+        } catch (e) { su.err = T('Incorrect share password'); su.busy = false; }
+      },
       exportCollection(format) {
         if (!this.current) return;
         const url = BASE + 'api/collections/' + this.current.id + '/export?format=' + format;
@@ -1702,6 +2013,7 @@
         this.current = { ...this.current, ...c }; await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
       },
       async deleteCollection() {
+        if (!this.isOwner) return;
         if (!confirm(T('Delete the collection “{name}” and all its records. Are you sure?', { name: this.current.name }))) return;
         await api('collections/' + this.current.id, { method: 'DELETE' });
         this.modal = null; this.current = null; this.records = []; await this.loadCollections(); this.showToast(T('Deleted'));
@@ -1775,14 +2087,21 @@
         this.current = c; this.modal = null; await this.loadRecords(); this.showToast(T('Fields updated'));
       },
       openNewRecord() {
-        this.form = {}; this.reveal = {}; this.editingRecordId = null;
+        if (!this.canEdit) return;
+        this.form = {}; this.reveal = {}; this.editingRecordId = null; this.editingOrig = null;
         this.current.fields.forEach((f) => (this.form[f.key] = ''));
         this.modal = { type: 'record' };
       },
       openRecord(rec) { this.reveal = {}; this.openDecrypted = {}; this.preloadFileMetas(this.current.fields, rec.data); this.modal = { type: 'detail', rec }; this.decryptSecretsOf(rec); },
       async editRecord(rec) {
-        this.form = {}; this.reveal = {}; this.editingRecordId = rec.id;
-        for (const f of this.current.fields) { this.form[f.key] = f.secret ? await this.secretPlain(rec.data[f.key]) : (rec.data[f.key] ?? ''); }
+        if (!this.canEdit) return;
+        this.form = {}; this.reveal = {}; this.editingRecordId = rec.id; this.editingOrig = rec.data;
+        for (const f of this.current.fields) {
+          // masked secrets in a shared collection: leave the field blank & read-only,
+          // the original ciphertext is preserved on save (see saveRecord)
+          if (f.secret && this.secretsMasked) { this.form[f.key] = ''; continue; }
+          this.form[f.key] = f.secret ? await this.secretPlain(rec.data[f.key]) : (rec.data[f.key] ?? '');
+        }
         this.preloadFileMetas(this.current.fields, rec.data);
         this.modal = { type: 'record' };
       },
@@ -1791,6 +2110,14 @@
         for (const f of this.current.fields) { const err = this.validateField(f, this.form[f.key]); if (err) { alert(err); return; } }
         let data = {};
         for (const f of this.current.fields) { const v = this.form[f.key]; if (v !== '' && v != null) data[f.key] = v; }
+        // preserve masked secrets untouched (recipient can't see/change them)
+        if (this.secretsMasked) {
+          for (const f of this.current.fields) {
+            if (!f.secret) continue;
+            const orig = this.editingOrig ? this.editingOrig[f.key] : undefined;
+            if (orig != null && orig !== '') data[f.key] = orig; else delete data[f.key];
+          }
+        }
         data = await this.encryptData(data);
         if (this.editingRecordId) { await api('records/' + this.editingRecordId, { method: 'PUT', body: JSON.stringify({ data }) }); this.showToast(T('Updated')); }
         else { await api('collections/' + this.current.id + '/records', { method: 'POST', body: JSON.stringify({ data }) }); this.showToast(T('Registered')); }
@@ -1827,6 +2154,41 @@
           if (res.collectionId) this.selectCollection(res.collectionId);
         } catch (e) { this.contactsImport.err = e.message || String(e); }
         finally { this.contactsImport.busy = false; }
+      },
+      async openTablesImport() {
+        this.tablesImport = { tables: [], selected: 0, name: '', busy: false, err: '', loading: true, available: true };
+        this.modal = { type: 'tablesImport' };
+        try {
+          const r = await api('tables/list');
+          this.tablesImport.available = !!r.available;
+          this.tablesImport.tables = r.tables || [];
+          if (this.tablesImport.tables.length) this.tablesImport.selected = this.tablesImport.tables[0].id;
+          if (r.error) this.tablesImport.err = r.error;
+        } catch (e) { this.tablesImport.err = e.message || String(e); this.tablesImport.available = false; }
+        finally { this.tablesImport.loading = false; }
+      },
+      async commitTablesImport() {
+        if (!this.tablesImport.selected) return;
+        this.tablesImport.busy = true; this.tablesImport.err = '';
+        try {
+          const res = await api('tables/import', { method: 'POST', body: JSON.stringify({ tableId: this.tablesImport.selected, name: this.tablesImport.name || '' }) });
+          this.modal = null;
+          await this.loadCollections();
+          this.showToast(T('Imported {n} items', { n: res.imported }));
+          if (res.collectionId) this.selectCollection(res.collectionId);
+        } catch (e) { this.tablesImport.err = e.message || String(e); }
+        finally { this.tablesImport.busy = false; }
+      },
+      async exportToTables() {
+        if (!this.current) return;
+        this.tablesExportBusy = true;
+        try {
+          const res = await api('collections/' + this.current.id + '/tables-export', { method: 'POST', body: JSON.stringify({}) });
+          let msg = T('Exported {n} rows to Tables', { n: res.exported });
+          if (res.skippedFields) msg += ' ' + T('({n} fields skipped)', { n: res.skippedFields });
+          this.showToast(msg);
+        } catch (e) { alert((this.t ? this.t('Export to Tables failed') : 'Export to Tables failed') + ': ' + (e.message || String(e))); }
+        finally { this.tablesExportBusy = false; }
       },
       onImportFile(e) {
         const f = e.target.files && e.target.files[0];

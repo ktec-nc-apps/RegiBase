@@ -118,6 +118,7 @@
 }
 #regibase-root .coll-item:hover { background: var(--surface-2); }
 #regibase-root .coll-item.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); font-weight: 700; }
+#regibase-root .coll-item .ci-bar { flex: 0 0 auto; width: 4px; align-self: stretch; min-height: 20px; border-radius: 3px; }
 #regibase-root .coll-item .ic { font-size: 20px; width: 26px; text-align: center; }
 #regibase-root .coll-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #regibase-root .coll-item .ct { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 1px 8px; border-radius: 999px; }
@@ -307,7 +308,8 @@
 /* home (collection chooser) */
 #regibase-root .home-title { font-size: 20px; font-weight: 800; margin: 4px 4px 16px; }
 #regibase-root .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-#regibase-root .home-card { display: flex; align-items: center; gap: 14px; text-align: left; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); width: 100%; }
+#regibase-root .home-card { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; text-align: left; padding: 18px 18px 18px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); width: 100%; }
+#regibase-root .home-card .hc-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; border-radius: 0; }
 #regibase-root .home-card:hover { border-color: var(--primary); transform: translateY(-1px); transition: transform .12s; }
 #regibase-root .home-card .hc-icon { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
 #regibase-root .home-card .hc-body { min-width: 0; flex: 1; }
@@ -328,13 +330,23 @@
 #regibase-root .modal.wide { width: 720px; }
 #regibase-root .modal-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
 #regibase-root .modal-head h3 { margin: 0; font-size: 17px; flex: 1; }
-#regibase-root .modal-body { padding: 16px 18px; overflow-y: auto; }
+#regibase-root .modal-body { padding: 16px 18px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 #regibase-root .modal-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
 #regibase-root .icon-btn { border: none; background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; border-radius: 8px; }
 #regibase-root .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 
 /* form */
 #regibase-root .field { margin-bottom: 14px; }
+/* Settings modal: indent each section's content slightly so the titles (labels)
+   stand out at the flush-left edge. */
+#regibase-root .settings-body .field { padding-left: 16px; }
+#regibase-root .settings-body .field > label { margin-left: -16px; }
+/* Share section: keep its toggle title flush, indent only the expanded body. */
+#regibase-root .settings-body .share-section { padding-left: 0; }
+#regibase-root .settings-body .share-section .share-body { padding-left: 16px; }
+/* Two fields side by side, each 50% (e.g. Color + Icon). */
+#regibase-root .field-row { display: flex; gap: 12px; align-items: flex-start; }
+#regibase-root .field-row > .field { flex: 1 1 0; min-width: 0; margin-bottom: 14px; }
 #regibase-root .field > label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
 #regibase-root .field .req { color: var(--danger); }
 #regibase-root .rule-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
@@ -491,3 +503,88 @@
 #regibase-root .rec-table .rt-fhead { display: inline-flex; align-items: center; gap: 8px; }
 #regibase-root .rec-table .rt-fcell { display: inline-flex; vertical-align: middle; margin-right: 8px; }
 #regibase-root .rec-table .rt-fval { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Collection icon: full categorized emoji palette (expandable) */
+#regibase-root .iconpick-head { position: relative; display: flex; align-items: center; gap: 10px; }
+#regibase-root .iconpick-head .iconpick-cur { font-size: 26px; line-height: 1; width: 44px; height: 44px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; }
+#regibase-root .iconpick-head .iconpick-cur:hover, #regibase-root .iconpick-head .iconpick-cur.open { border-color: var(--primary); }
+#regibase-root .iconpick-head input { width: 90px; text-align: center; }
+/* Emoji picker opens as a popup when the icon mark is pressed (was always-open). */
+#regibase-root .emoji-popup { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(360px, 92vw); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.22); padding: 6px; }
+#regibase-root .emoji-popup .emoji-palette { max-height: 300px; border: 0; background: transparent; padding: 4px; }
+#regibase-root .emoji-palette { max-height: 260px; overflow-y: auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+#regibase-root .emoji-cat { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 4px; }
+#regibase-root .emoji-group:first-child .emoji-cat { margin-top: 0; }
+#regibase-root .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 2px; }
+#regibase-root .emoji-btn { font-size: 20px; line-height: 1; padding: 5px 0; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; }
+#regibase-root .emoji-btn:hover { background: var(--surface); }
+#regibase-root .emoji-btn.sel { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+
+/* ---- internal sharing ---- */
+#regibase-root .share-badge { font-size: 12px; margin-right: 4px; line-height: 1; flex: 0 0 auto; }
+#regibase-root .hc-badge { position: absolute; top: -6px; right: -6px; font-size: 13px; background: var(--surface); border-radius: 50%; padding: 1px 2px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+#regibase-root .hc-icon { position: relative; }
+#regibase-root .share-note { font-size: 13px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+#regibase-root .share-section { border-top: 1px dashed var(--border); padding-top: 12px; }
+/* Collapsible share panel: ▶ collapsed / ▼ expanded. */
+#regibase-root .share-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+#regibase-root .share-toggle:hover { color: var(--text); }
+#regibase-root .share-toggle .share-caret { font-size: 11px; flex: 0 0 auto; color: var(--muted); }
+#regibase-root .share-toggle .share-toggle-label { flex: 0 0 auto; }
+#regibase-root .share-toggle .share-hint { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 400; }
+#regibase-root .share-toggle:hover .share-hint { color: var(--primary); }
+#regibase-root .share-toggle .share-count { flex: 0 0 auto; margin-left: auto; min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 10px; background: var(--primary); color: #fff; font-size: 12px; }
+#regibase-root .share-body { padding-top: 10px; }
+#regibase-root .share-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+#regibase-root .share-row { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+#regibase-root .share-row .share-user { flex: 1 1 auto; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .share-perm { flex: 0 0 auto; }
+#regibase-root .share-flag { flex: 0 0 auto; font-size: 13px; }
+#regibase-root .share-add { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+#regibase-root .share-search { position: relative; }
+#regibase-root .share-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+#regibase-root .share-result { text-align: left; background: transparent; border: 0; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+#regibase-root .share-result:hover { background: var(--surface-2); }
+#regibase-root .share-picked { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+#regibase-root .share-opts { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+#regibase-root .share-opts .so-row { display: flex; flex-direction: column; gap: 3px; }
+#regibase-root .share-opts .sub { font-size: 12px; color: var(--muted); }
+#regibase-root .share-opts .so-hint { font-size: 11px; line-height: 1.4; }
+/* Nested inputs in the share panel don't match `.field > input` (direct-child
+   selector), so text inputs rendered as thin native boxes while selects got the
+   global 44px min-height — visibly uneven. Style them all like the main field
+   controls so input and select match. */
+#regibase-root .share-add input:not([type='checkbox']):not([type='radio']),
+#regibase-root .share-add select {
+  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); outline: none; min-height: 44px;
+}
+#regibase-root .share-add input:focus, #regibase-root .share-add select:focus { border-color: var(--primary); }
+/* Permission sits inline right after the user search, as a compact ~2-char box. */
+#regibase-root .share-top { display: flex; gap: 8px; align-items: flex-start; }
+#regibase-root .share-top .share-search, #regibase-root .share-top .share-picked { flex: 1 1 auto; min-width: 0; }
+/* Permission picker: a fully custom dropdown (no native <select>) so the value
+   is a plain centered element we control — native select values cannot be
+   reliably centered/hidden across browsers. */
+#regibase-root .share-top .perm-wrap {
+  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; min-width: 84px; padding: 0 26px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text);
+}
+#regibase-root .share-top .perm-wrap.open, #regibase-root .share-top .perm-wrap:hover { border-color: var(--primary); }
+#regibase-root .share-top .perm-label { font-size: 16px; line-height: 1; color: var(--text); pointer-events: none; }
+#regibase-root .share-top .perm-arrow { position: absolute; right: 9px; top: 50%; transform: translateY(-55%); font-size: 13px; color: var(--muted); pointer-events: none; }
+#regibase-root .share-top .perm-menu {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18); overflow: hidden; padding: 4px;
+}
+#regibase-root .share-top .perm-opt {
+  display: block; width: 100%; text-align: center; padding: 9px 14px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text); font-size: 15px; white-space: nowrap; cursor: pointer;
+}
+#regibase-root .share-top .perm-opt:hover { background: var(--surface-2); }
+#regibase-root .share-top .perm-opt.sel { background: var(--primary); color: #fff; }
+#regibase-root .perm-backdrop { position: fixed; inset: 0; z-index: 25; background: transparent; }
+#regibase-root .share-err { color: var(--danger, #e11d48); font-size: 12px; margin: 4px 0; }
+#regibase-root .muted { color: var(--muted); }
