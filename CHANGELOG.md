@@ -2,6 +2,11 @@
 
 All notable changes to RegiBase.
 
+## 0.11.5 — 2026-07-16
+
+- Fix: the collection-settings **icon picker** was clipped by the scrolling modal,
+  hiding the lower icons. It now opens as a centered, fully scrollable panel.
+
 ## 0.11.4 — 2026-07-16
 
 - App Store **screenshots refreshed** to 0.11.3 — new app icon, colour bands,
