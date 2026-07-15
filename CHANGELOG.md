@@ -2,6 +2,11 @@
 
 All notable changes to RegiBase.
 
+## 0.11.2 — 2026-07-16
+
+- App-menu icon now loads from a versioned filename so icon updates are picked up
+  immediately (no browser cache clearing needed).
+
 ## 0.11.1 — 2026-07-15
 
 - New **app icon** (database "RB" mark) — monochrome, themable in the app menu and

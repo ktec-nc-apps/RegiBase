@@ -15,7 +15,7 @@ Features:
 - Attach images and files from Nextcloud Files or Notes
 - Move / copy / merge records between collections
 - Available in 12 languages]]></description>
-	<version>0.11.1</version>
+	<version>0.11.2</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>
@@ -39,7 +39,7 @@ Features:
 		<navigation>
 			<name>RegiBase</name>
 			<route>regibase.page.index</route>
-			<icon>app.svg</icon>
+			<icon>app-rb2.svg</icon>
 			<order>80</order>
 		</navigation>
 	</navigations>
