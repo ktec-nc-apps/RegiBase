@@ -30,6 +30,7 @@ Nextcloud ネイティブアプリです。
 
 - **フォームテンプレート** — クレジットカード / 銀行口座 / オンラインアカウント /
   会員 / ライセンス / 連絡先… などのテンプレートから始めても、ゼロから項目を設計しても OK。
+  **自分のテンプレートを保存**したり、**初期テンプレートを編集**（自分用に上書き・既定に戻す）もできます。
 - **項目ごとの入力規則** — 文字種・最小/最大長・パターン（正規表現）を指定できます。
 - **複数の表示形式** — リスト / リスト詳細 / **表計算風テーブル**（先頭列を固定して
   掴んで横スクロール）/ カード / サムネイル付きカード。
@@ -42,6 +43,11 @@ Nextcloud ネイティブアプリです。
   **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
 - **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。
 - **整理** — レコードをコレクション間で移動・コピー・マージできます。
+- **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
+- **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
+  任意のアクセスパスワードや、秘密項目の共有にも対応します。
+- **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、
+  またはコレクションを Tables へ**書き出し**できます。
 - **12 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
   Русский · Português · العربية · हिन्दी · 한국어 · Italiano。
   Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
@@ -52,9 +58,12 @@ Nextcloud ネイティブアプリです。
 - PHP 8.1 以上
 - Nextcloud 対応データベース（MySQL/MariaDB, PostgreSQL, SQLite）
 
-### インストール（手動）
+### インストール
 
-RegiBase はまだ Nextcloud App Store には登録されていません。ソースから導入してください。
+**Nextcloud App Store** で公開しています。管理者の「アプリ」→「整理」または「ツール」で
+**RegiBase** を検索してインストールできます（[apps.nextcloud.com/apps/regibase](https://apps.nextcloud.com/apps/regibase)）。
+
+または、ソースから手動で導入する場合:
 
 ```bash
 cd /path/to/nextcloud/apps
@@ -78,6 +87,8 @@ anything else — in collections whose fields **you design yourself**.
 
 - **Form templates** — start from a template (credit card, bank account, online
   account, membership, license, contact, …) or design fields from scratch.
+  **Save your own templates**, and **edit the built-in ones** (a per-user override
+  you can reset to the shipped default).
 - **Per-field input rules** — character set, min/max length, patterns.
 - **Multiple views** — list, detailed list, **spreadsheet-style table** (with a
   frozen first column and grab-to-scroll), cards, and thumbnail cards.
@@ -92,6 +103,13 @@ anything else — in collections whose fields **you design yourself**.
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
 - **Attachments** — attach images and files from **Nextcloud Files** or **Notes**.
 - **Organise** — move, copy or merge records between collections.
+- **Duplicate a collection** — copy just the fields, or the whole thing **including
+  its records**.
+- **Collection sharing** — share with other Nextcloud users at three levels
+  (**view / edit / delete**), with an optional access password and optional
+  secret-field sharing.
+- **Nextcloud Tables integration** — **import** a Tables table into a new collection,
+  or **export** a collection to a new Tables table.
 - **12 languages** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
   Русский · Português · العربية · हिन्दी · 한국어 · Italiano. Pick a language in the
   app independently of your Nextcloud language.
@@ -102,9 +120,12 @@ anything else — in collections whose fields **you design yourself**.
 - PHP 8.1+
 - A Nextcloud-supported database (MySQL/MariaDB, PostgreSQL or SQLite)
 
-### Installation (manual)
+### Installation
 
-RegiBase is not on the Nextcloud App Store yet. Install from source:
+RegiBase is on the **Nextcloud App Store** — search for **RegiBase** under
+Apps → Organization or Tools ([apps.nextcloud.com/apps/regibase](https://apps.nextcloud.com/apps/regibase)).
+
+Or install manually from source:
 
 ```bash
 cd /path/to/nextcloud/apps
