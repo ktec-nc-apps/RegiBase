@@ -2,6 +2,11 @@
 
 All notable changes to RegiBase.
 
+## 0.11.3 — 2026-07-16
+
+- Updated the App Store description to cover collection sharing, custom/editable
+  templates, collection duplication and Nextcloud Tables integration.
+
 ## 0.11.2 — 2026-07-16
 
 - App-menu icon now loads from a versioned filename so icon updates are picked up

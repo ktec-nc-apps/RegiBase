@@ -2,20 +2,24 @@
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>regibase</id>
 	<name>RegiBase</name>
-	<summary>Personal database with custom form templates, encryption and multiple views</summary>
+	<summary>Personal database — templates, sharing, encryption, Tables integration and multiple views</summary>
 	<description><![CDATA[RegiBase is a lightweight personal database for the information you want to keep — credit cards, bank accounts, online accounts, memberships, licenses, contacts and anything else.
 
-Design your own fields from templates, then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
+Design your own fields (or start from a template), then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
 
 Features:
-- Custom form fields with per-field input rules
-- Optional client-side encryption (AES-GCM) for secret fields — the server never sees the key or plaintext
-- Password-protected full backup & restore (AES-256 ZIP)
-- Import from CSV / JSON (e.g. Google Password Manager) or from your Nextcloud Contacts (including photos)
+- Custom form fields with per-field input rules, built from reusable templates
+- Save your own templates, and edit the built-in ones (per-user override, resettable to default)
+- Duplicate a collection — optionally including all of its records
+- Share a collection with other Nextcloud users at three levels (view / edit / delete), with an optional access password and optional secret-field sharing
+- Optional client-side encryption (AES-GCM) for secret fields — the server never sees the key or the plaintext
+- Nextcloud Tables integration: import a table into a new collection, or export a collection to a new Tables table
+- Import from CSV / JSON (e.g. Google Password Manager), or from your Nextcloud Contacts (including photos)
 - Attach images and files from Nextcloud Files or Notes
 - Move / copy / merge records between collections
+- Password-protected full backup & restore (AES-256 ZIP)
 - Available in 12 languages]]></description>
-	<version>0.11.2</version>
+	<version>0.11.3</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>
