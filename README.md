@@ -1,11 +1,5 @@
 # RegiBase 🗄️
 
-<p>
-  <strong>🇯🇵 Made in Japan</strong> —
-  Crafted in Japan by Japanese developers ·
-  日本の開発者が丁寧に作っています
-</p>
-
 **A lightweight personal database for Nextcloud** — keep the information you care
 about in collections whose fields **you design yourself**.
 **Nextcloud 用の軽量パーソナルデータベース** — 大切な情報を、**自分で設計した項目**の
