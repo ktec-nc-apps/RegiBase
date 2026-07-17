@@ -129,6 +129,28 @@ sudo -u www-data php ../occ app:enable regibase
 
 Then open **RegiBase** from the Nextcloud app menu.
 
+### Command line (occ)
+
+RegiBase can be read from the server console — useful for scripts and backups:
+
+```bash
+occ regibase:collections [--user=UID]              # list collections
+occ regibase:records <collection> [--user=UID]     # list a collection's records
+occ regibase:get <collection> <record> [--field=KEY] [-o json]
+occ regibase:export <collection> [--format=json|csv]
+occ regibase:find <collection> <query>             # search by field value
+```
+
+`<collection>` is an id or a name. All commands are **read-only**. Secret fields
+are masked unless you pass `--reveal`, in which case the master password is read
+from the `REGIBASE_PASSWORD` environment variable or an interactive hidden prompt
+(the server-side decrypt mirrors the browser's PBKDF2 / AES-GCM and verifies the
+password first). Example — fetch one secret value for a script:
+
+```bash
+REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
+```
+
 ---
 
 ## Screenshots

@@ -25,6 +25,17 @@ class CollectionMapper extends QBMapper {
 		return $this->findEntities($qb);
 	}
 
+	/**
+	 * All collections across every user (occ CLI use).
+	 * @return CollectionEntity[]
+	 */
+	public function findAll(): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->orderBy('user_id', 'ASC')->addOrderBy('sort', 'ASC')->addOrderBy('id', 'ASC');
+		return $this->findEntities($qb);
+	}
+
 	public function findById(int $id): CollectionEntity {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())

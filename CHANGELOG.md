@@ -2,6 +2,24 @@
 
 All notable changes to RegiBase.
 
+## 0.12.0 — 2026-07-17
+
+### Command-line access (occ)
+
+- New **occ commands** to read RegiBase from the server console / scripts:
+  - `occ regibase:collections [--user=UID]` — list collections (with record counts)
+  - `occ regibase:records <collection> [--user=UID]` — list a collection's records
+  - `occ regibase:get <collection> <record> [--field=KEY] [-o json]` — show one record;
+    `--field` prints a single value raw (handy for scripts)
+  - `occ regibase:export <collection> [--format=json|csv]` — export a collection
+  - `occ regibase:find <collection> <query>` — search records by field value
+- All commands are **read-only**. `<collection>` accepts an id or a name.
+- **Secret fields** stay encrypted by default (shown masked). Add `--reveal` to
+  decrypt them; the master password comes from the `REGIBASE_PASSWORD` environment
+  variable or an interactive hidden prompt (or `--password`, discouraged). The
+  server-side decrypt mirrors the browser's PBKDF2/AES-GCM exactly and verifies the
+  password before revealing anything.
+
 ## 0.11.5 — 2026-07-16
 
 - Fix: the collection-settings **icon picker** was clipped by the scrolling modal,

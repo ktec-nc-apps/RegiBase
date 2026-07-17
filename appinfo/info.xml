@@ -18,8 +18,9 @@ Features:
 - Attach images and files from Nextcloud Files or Notes
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
+- Read-only command-line access via occ (list / get / export / find), with opt-in secret decryption
 - Available in 12 languages]]></description>
-	<version>0.11.5</version>
+	<version>0.12.0</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>
@@ -47,4 +48,11 @@ Features:
 			<order>80</order>
 		</navigation>
 	</navigations>
+	<commands>
+		<command>OCA\RegiBase\Command\Collections</command>
+		<command>OCA\RegiBase\Command\Records</command>
+		<command>OCA\RegiBase\Command\GetRecord</command>
+		<command>OCA\RegiBase\Command\ExportCollection</command>
+		<command>OCA\RegiBase\Command\FindRecords</command>
+	</commands>
 </info>
