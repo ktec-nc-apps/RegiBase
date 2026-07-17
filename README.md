@@ -67,6 +67,28 @@ sudo -u www-data php ../occ app:enable regibase
 
 その後、Nextcloud のアプリメニューから **RegiBase** を開きます。
 
+### コマンドライン（occ）
+
+RegiBase はサーバーのコンソールから読み取れます。スクリプトやバックアップに便利です:
+
+```bash
+occ regibase:collections [--user=UID]              # コレクション一覧
+occ regibase:records <collection> [--user=UID]     # コレクションのレコード一覧
+occ regibase:get <collection> <record> [--field=KEY] [-o json]
+occ regibase:export <collection> [--format=json|csv]
+occ regibase:find <collection> <query>             # 値で検索
+```
+
+`<collection>` は id か名前で指定します。すべて**読み取り専用**です。秘密フィールドは
+既定でマスクされ、`--reveal` を付けたときだけ復号します。その際のマスターパスワードは
+環境変数 `REGIBASE_PASSWORD` または対話式の隠し入力から読み取ります（サーバー側の復号は
+ブラウザと同じ PBKDF2 / AES-GCM を再現し、事前にパスワードを検証します）。例 —
+スクリプトから秘密の値を 1 つ取り出す:
+
+```bash
+REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
+```
+
 ---
 
 <a id="english"></a>
