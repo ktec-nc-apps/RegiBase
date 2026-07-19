@@ -297,13 +297,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div class="lt-tools" v-show="selectionMode">
           <div class="lt-search">
             <input class="searchinput" v-model="search" @input="onSearchInput" :placeholder="t('🔍 Search in this collection')" />
-            <select class="sortselect" :value="normSort(current.record_sort)" @change="setSort($event.target.value)" :title="t('Sort')">
-              <option value="created_asc">{{ t('Date added (oldest first)') }}</option>
-              <option value="created_desc">{{ t('Date added (newest first)') }}</option>
-              <option value="title_asc">{{ t('By name (character code, ascending)') }}</option>
-              <option value="title_desc">{{ t('By name (character code, descending)') }}</option>
-            </select>
-            <button v-if="canEdit && records.length>1" class="btn sm ghost" @click="openReorder" :title="t('Change the registration order (drag rows, or sort by a field)')">⇅ {{ t('Reorder') }}</button>
+            <span class="sortgroup" :title="t('Display order — only changes how records are shown here')">
+              <span class="sortgroup-lbl">👁 {{ t('View') }}</span>
+              <select class="sortselect" :value="normSort(current.record_sort)" @change="setSort($event.target.value)" :title="t('Display order — only changes how records are shown here')">
+                <option value="created_asc">{{ t('Registration order (oldest first)') }}</option>
+                <option value="created_desc">{{ t('Registration order (newest first)') }}</option>
+                <option value="title_asc">{{ t('By name (character code, ascending)') }}</option>
+                <option value="title_desc">{{ t('By name (character code, descending)') }}</option>
+              </select>
+            </span>
+            <button v-if="canEdit && records.length>1" class="btn sm reorder-open" @click="openReorder" :title="t('Edit the saved registration order of the records (drag, or sort by up to 5 fields)')">⇅ {{ t('Edit saved order') }}</button>
           </div>
           <div class="lt-actions">
             <span class="selcount">{{ selectedIds.length ? t('{n} selected', {n: selectedIds.length}) : t('Select records') }}</span>
@@ -650,28 +653,38 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
 
   <!-- Reorder records (registration order) -->
   <div v-if="modal && modal.type==='reorder'" class="modal-mask" @click.self="modal=null">
-    <div class="modal">
-      <div class="modal-head"><h3>{{ t('⇅ Reorder records') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+    <div class="modal wide">
+      <div class="modal-head"><h3>{{ t('⇅ Edit the saved record order') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
-        <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('This changes the stored registration order of the records — not just how they are shown. Drag rows to arrange them by hand, or sort them by a field below.') }}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('This rewrites the records’ saved registration order (not just the on-screen view). Sort by up to 5 fields, and/or drag rows by hand. The result is what you’ll see in “Registration order”.') }}</p>
         <div v-if="reorderFields.length" class="reorder-byfield">
-          <label style="font-size:13px;color:var(--muted)">{{ t('Sort by field') }}</label>
-          <div class="field-row" style="align-items:center;gap:8px;flex-wrap:wrap">
-            <select v-model="reorder.field" style="flex:1;min-width:140px">
+          <div class="reorder-byfield-head">{{ t('Sort by fields (top = highest priority)') }}</div>
+          <div v-for="(k,ki) in reorder.keys" :key="ki" class="reorder-keyrow">
+            <span class="reorder-keynum">{{ ki + 1 }}</span>
+            <select v-model="k.field" class="reorder-keysel">
+              <option value="">{{ t('— none —') }}</option>
               <option v-for="f in reorderFields" :key="f.key" :value="f.key">{{ f.label }}</option>
             </select>
-            <select v-model="reorder.dir" style="max-width:150px">
+            <select v-model="k.dir" class="reorder-keydir">
               <option value="asc">{{ t('Ascending') }}</option>
               <option value="desc">{{ t('Descending') }}</option>
             </select>
-            <button type="button" class="btn sm" :disabled="!reorder.field" @click="applyReorderByField">{{ t('Sort') }}</button>
+            <button type="button" class="icon-btn" v-if="reorder.keys.length>1" @click="removeReorderKey(ki)" :title="t('Remove')">✕</button>
+          </div>
+          <div class="reorder-byfield-actions">
+            <button type="button" class="btn sm ghost" v-if="reorder.keys.length<5" @click="addReorderKey">＋ {{ t('Add a sort key') }}</button>
+            <button type="button" class="btn sm" :disabled="!reorder.keys.some(k=>k.field)" @click="applyReorderSort">↕ {{ t('Sort now') }}</button>
           </div>
         </div>
+        <div class="reorder-listhead">{{ t('Order preview ({n} records) — drag to fine-tune', {n: reorder.list.length}) }}</div>
         <div class="reorder-list">
-          <div v-for="(r,i) in reorder.list" :key="r.id" class="schema-row sortable reorder-row" :class="{dragover: reorder.over===i, dragging: reorder.from===i}" @dragover.prevent="rDragOver(i)" @drop.prevent="rDrop(i)" @dragleave="rDragLeave(i)">
+          <div v-for="(r,i) in reorder.list" :key="r.id" class="reorder-row" :class="{dragover: reorder.over===i, dragging: reorder.from===i}" @dragover.prevent="rDragOver(i)" @drop.prevent="rDrop(i)" @dragleave="rDragLeave(i)">
             <span class="drag-handle" draggable="true" @dragstart="rDragStart(i, $event)" @dragend="rDragEnd" :title="t('Drag to reorder')">⠿</span>
             <span class="reorder-num">{{ i + 1 }}</span>
-            <span class="reorder-title">{{ r.title || t('(untitled)') }}</span>
+            <span class="reorder-cell">
+              <span class="reorder-title">{{ reorderTitle(r) }}</span>
+              <span class="reorder-sub" v-if="reorderRowSummary(r)">{{ reorderRowSummary(r) }}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -1286,7 +1299,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
-        reorder: { list: [], field: '', dir: 'asc', from: null, over: null, busy: false },
+        reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
         selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
@@ -2387,37 +2400,64 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!this.canEdit || this.records.length < 2) return;
         const fields = this.reorderFields;
         this.reorder = {
-          list: this.records.map((r) => ({ id: r.id, title: r.title })),
-          field: fields.length ? fields[0].key : '',
-          dir: 'asc',
+          list: this.records.map((r) => ({ id: r.id, title: r.title, data: r.data || {} })),
+          keys: [{ field: fields.length ? fields[0].key : '', dir: 'asc' }],
           from: null, over: null, busy: false,
         };
         this.modal = { type: 'reorder' };
       },
-      applyReorderByField() {
-        const key = this.reorder.field;
-        if (!key) return;
-        const by = this.recordsById;
-        const val = (id) => {
-          const r = by[id];
-          const v = r && r.data ? r.data[key] : '';
-          return v == null ? '' : String(v);
-        };
-        const dir = this.reorder.dir === 'desc' ? -1 : 1;
-        const isNum = (s) => s !== '' && /^-?[\d.,]+$/.test(s.trim()) && isFinite(parseFloat(s.replace(/,/g, '')));
+      addReorderKey() {
+        if (this.reorder.keys.length < 5) this.reorder.keys.push({ field: '', dir: 'asc' });
+      },
+      removeReorderKey(i) {
+        this.reorder.keys.splice(i, 1);
+        if (!this.reorder.keys.length) this.reorder.keys.push({ field: '', dir: 'asc' });
+      },
+      fieldLabel(key) {
+        const f = (this.current && this.current.fields || []).find((x) => x.key === key);
+        return f ? f.label : key;
+      },
+      reorderTitle(r) {
+        const t = (r.title == null ? '' : String(r.title)).trim();
+        if (t !== '' && !t.startsWith('rbenc1:')) return t;
+        // fall back to the first readable non-secret field value
+        for (const f of this.reorderFields) {
+          const v = r.data ? r.data[f.key] : '';
+          if (v != null && String(v).trim() !== '') return String(v);
+        }
+        return T('(untitled)');
+      },
+      // Secondary line: the values of the selected sort fields, so choosing a
+      // column immediately shows that column's content on every row.
+      reorderRowSummary(r) {
+        const keys = this.reorder.keys.filter((k) => k.field);
+        const parts = [];
+        for (const k of keys) {
+          const v = r.data ? r.data[k.field] : '';
+          const sv = (v == null ? '' : String(v)).trim();
+          parts.push(this.fieldLabel(k.field) + ': ' + (sv || '—'));
+        }
+        return parts.join('  ·  ');
+      },
+      _cmpVals(a, b) {
+        a = (a == null ? '' : String(a)).trim();
+        b = (b == null ? '' : String(b)).trim();
+        if (a === '' && b === '') return 0;
+        if (a === '') return 1;   // empties sink to the bottom
+        if (b === '') return -1;
+        const isNum = (s) => /^-?[\d.,]+$/.test(s) && isFinite(parseFloat(s.replace(/,/g, '')));
+        if (isNum(a) && isNum(b)) return parseFloat(a.replace(/,/g, '')) - parseFloat(b.replace(/,/g, ''));
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      },
+      applyReorderSort() {
+        const keys = this.reorder.keys.filter((k) => k.field);
+        if (!keys.length) return;
         this.reorder.list.sort((x, y) => {
-          const a = val(x.id), b = val(y.id);
-          // empty values always sink to the bottom regardless of direction
-          if (a === '' && b === '') return 0;
-          if (a === '') return 1;
-          if (b === '') return -1;
-          let c;
-          if (isNum(a) && isNum(b)) {
-            c = parseFloat(a.replace(/,/g, '')) - parseFloat(b.replace(/,/g, ''));
-          } else {
-            c = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+          for (const k of keys) {
+            const c = this._cmpVals(x.data ? x.data[k.field] : '', y.data ? y.data[k.field] : '');
+            if (c !== 0) return k.dir === 'desc' ? -c : c;
           }
-          return c * dir;
+          return 0;
         });
       },
       rDragStart(i, e) {

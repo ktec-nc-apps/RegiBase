@@ -2,6 +2,19 @@
 
 All notable changes to RegiBase.
 
+## 0.12.2 — 2026-07-19
+
+### Reorder UX improvements
+
+- **Clearer toolbar**: the view sort is now labelled **👁 View** (display order only),
+  visually separated from the outlined **⇅ Edit saved order** button (which rewrites the
+  stored registration order). The view options are renamed to “Registration order”.
+- **Sort by up to 5 fields**: the reorder dialog now takes multiple sort keys with a
+  priority order (add / remove keys), each ascending or descending.
+- **Readable preview rows**: each row in the reorder list now shows the record title in
+  bold plus the value of every selected sort field, so choosing a field immediately shows
+  that field’s content on every row (fixes rows appearing blank).
+
 ## 0.12.1 — 2026-07-19
 
 ### Reorder records (registration order)
