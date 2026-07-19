@@ -20,7 +20,7 @@ Features:
 - Password-protected full backup & restore (AES-256 ZIP)
 - Read-only command-line access via occ (list / get / export / find), with opt-in secret decryption
 - Available in 12 languages]]></description>
-	<version>0.12.3</version>
+	<version>0.12.5</version>
 	<licence>agpl</licence>
 	<author>ktec-jp</author>
 	<namespace>RegiBase</namespace>
