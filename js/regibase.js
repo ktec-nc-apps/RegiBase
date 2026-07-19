@@ -303,6 +303,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               <option value="title_asc">{{ t('By name (character code, ascending)') }}</option>
               <option value="title_desc">{{ t('By name (character code, descending)') }}</option>
             </select>
+            <button v-if="canEdit && records.length>1" class="btn sm ghost" @click="openReorder" :title="t('Change the registration order (drag rows, or sort by a field)')">⇅ {{ t('Reorder') }}</button>
           </div>
           <div class="lt-actions">
             <span class="selcount">{{ selectedIds.length ? t('{n} selected', {n: selectedIds.length}) : t('Select records') }}</span>
@@ -643,6 +644,40 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="modal-foot">
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button type="button" class="btn primary" :disabled="dupForm.busy || !dupForm.name.trim()" @click="commitDuplicate">{{ t('Duplicate') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reorder records (registration order) -->
+  <div v-if="modal && modal.type==='reorder'" class="modal-mask" @click.self="modal=null">
+    <div class="modal">
+      <div class="modal-head"><h3>{{ t('⇅ Reorder records') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('This changes the stored registration order of the records — not just how they are shown. Drag rows to arrange them by hand, or sort them by a field below.') }}</p>
+        <div v-if="reorderFields.length" class="reorder-byfield">
+          <label style="font-size:13px;color:var(--muted)">{{ t('Sort by field') }}</label>
+          <div class="field-row" style="align-items:center;gap:8px;flex-wrap:wrap">
+            <select v-model="reorder.field" style="flex:1;min-width:140px">
+              <option v-for="f in reorderFields" :key="f.key" :value="f.key">{{ f.label }}</option>
+            </select>
+            <select v-model="reorder.dir" style="max-width:150px">
+              <option value="asc">{{ t('Ascending') }}</option>
+              <option value="desc">{{ t('Descending') }}</option>
+            </select>
+            <button type="button" class="btn sm" :disabled="!reorder.field" @click="applyReorderByField">{{ t('Sort') }}</button>
+          </div>
+        </div>
+        <div class="reorder-list">
+          <div v-for="(r,i) in reorder.list" :key="r.id" class="schema-row sortable reorder-row" :class="{dragover: reorder.over===i, dragging: reorder.from===i}" @dragover.prevent="rDragOver(i)" @drop.prevent="rDrop(i)" @dragleave="rDragLeave(i)">
+            <span class="drag-handle" draggable="true" @dragstart="rDragStart(i, $event)" @dragend="rDragEnd" :title="t('Drag to reorder')">⠿</span>
+            <span class="reorder-num">{{ i + 1 }}</span>
+            <span class="reorder-title">{{ r.title || t('(untitled)') }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button type="button" class="btn primary" :disabled="reorder.busy" @click="saveReorder">{{ t('Save order') }}</button>
       </div>
     </div>
   </div>
@@ -1251,6 +1286,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
+        reorder: { list: [], field: '', dir: 'asc', from: null, over: null, busy: false },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
         selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
@@ -1317,6 +1353,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       listFields() {
         if (!this.current) return [];
         return this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file').slice(0, 4);
+      },
+      // Fields that can be used to sort the registration order (values must be
+      // readable/comparable: no encrypted secrets, no attachment references).
+      reorderFields() {
+        if (!this.current) return [];
+        return this.current.fields.filter((f) => !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file');
       },
       tableFields() {
         return this.current ? this.current.fields : [];
@@ -2339,6 +2381,93 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const a = this.schemaFields;
         const [it] = a.splice(from, 1);
         a.splice(to, 0, it);
+      },
+      // ---- record reorder (registration order) ----
+      openReorder() {
+        if (!this.canEdit || this.records.length < 2) return;
+        const fields = this.reorderFields;
+        this.reorder = {
+          list: this.records.map((r) => ({ id: r.id, title: r.title })),
+          field: fields.length ? fields[0].key : '',
+          dir: 'asc',
+          from: null, over: null, busy: false,
+        };
+        this.modal = { type: 'reorder' };
+      },
+      applyReorderByField() {
+        const key = this.reorder.field;
+        if (!key) return;
+        const by = this.recordsById;
+        const val = (id) => {
+          const r = by[id];
+          const v = r && r.data ? r.data[key] : '';
+          return v == null ? '' : String(v);
+        };
+        const dir = this.reorder.dir === 'desc' ? -1 : 1;
+        const isNum = (s) => s !== '' && /^-?[\d.,]+$/.test(s.trim()) && isFinite(parseFloat(s.replace(/,/g, '')));
+        this.reorder.list.sort((x, y) => {
+          const a = val(x.id), b = val(y.id);
+          // empty values always sink to the bottom regardless of direction
+          if (a === '' && b === '') return 0;
+          if (a === '') return 1;
+          if (b === '') return -1;
+          let c;
+          if (isNum(a) && isNum(b)) {
+            c = parseFloat(a.replace(/,/g, '')) - parseFloat(b.replace(/,/g, ''));
+          } else {
+            c = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+          }
+          return c * dir;
+        });
+      },
+      rDragStart(i, e) {
+        this.reorder.from = i;
+        try {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(i));
+          const row = e.target.closest && e.target.closest('.reorder-row');
+          if (row) e.dataTransfer.setDragImage(row, 12, 12);
+        } catch (_) { /* ignore */ }
+      },
+      rDragOver(i) { if (this.reorder.from !== null) this.reorder.over = i; },
+      rDragLeave(i) { if (this.reorder.over === i) this.reorder.over = null; },
+      rDrop(i) {
+        const from = this.reorder.from;
+        if (from !== null && i !== null && from !== i) {
+          const a = this.reorder.list;
+          const [it] = a.splice(from, 1);
+          a.splice(i, 0, it);
+        }
+        this.reorder.from = null; this.reorder.over = null;
+      },
+      rDragEnd() { this.reorder.from = null; this.reorder.over = null; },
+      async saveReorder() {
+        if (this.reorder.busy) return;
+        this.reorder.busy = true;
+        try {
+          const ids = this.reorder.list.map((r) => r.id);
+          await api('collections/' + this.current.id + '/record-order', { method: 'PUT', body: JSON.stringify({ ids }) });
+          // Show the result: registration order, oldest (position 1) first.
+          if (this.normSort(this.current.record_sort) !== 'created_asc') {
+            if (this.canSettings) {
+              try {
+                const c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify({ record_sort: 'created_asc' }) });
+                this.current.record_sort = c.record_sort;
+                const inList = this.collections.find((x) => x.id === this.current.id);
+                if (inList) inList.record_sort = c.record_sort;
+              } catch (e) { this.current.record_sort = 'created_asc'; }
+            } else {
+              this.current.record_sort = 'created_asc';
+            }
+          }
+          this.modal = null;
+          await this.loadRecords();
+          this.showToast(T('Order updated'));
+        } catch (e) {
+          alert(T('Could not save the new order'));
+        } finally {
+          this.reorder.busy = false;
+        }
       },
       setTitleField(i) { this.schemaFields.forEach((f, k) => (f.is_title = k === i)); },
       async saveSchema() {

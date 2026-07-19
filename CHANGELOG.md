@@ -2,6 +2,19 @@
 
 All notable changes to RegiBase.
 
+## 0.12.1 — 2026-07-19
+
+### Reorder records (registration order)
+
+- New **⇅ Reorder** button in the record toolbar (edit permission). It changes the
+  **stored registration order** of the records — not just the current view sort.
+  - **Drag** rows to arrange records by hand, or
+  - **Sort by a field** (ascending / descending) to reorder them by any non-secret,
+    non-attachment field's value (numeric-aware).
+- Saving writes a per-record `sort` position and switches the view to registration
+  order so the result is immediately visible. A new `sort` column is added to the
+  records table (existing records keep their current order).
+
 ## 0.12.0 — 2026-07-17
 
 ### Command-line access (occ)

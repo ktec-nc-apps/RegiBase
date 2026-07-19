@@ -384,6 +384,22 @@ class ApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function reorderRecords(int $id): JSONResponse {
+		try {
+			$ids = $this->request->getParam('ids', []);
+			$ids = is_array($ids) ? $ids : [];
+			$changed = $this->service->reorderRecords($this->uid(), $id, $ids);
+			return new JSONResponse(['changed' => $changed]);
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
 	public function createRecord(int $id): JSONResponse {
 		try {
 			$data = $this->request->getParam('data', []);

@@ -414,6 +414,11 @@
 #regibase-root .schema-row.dragging { opacity: .45; }
 #regibase-root .schema-row.dragover { outline: 2px dashed var(--primary); outline-offset: 1px; }
 #regibase-root .schema-row .flags { display: flex; gap: 10px; grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+#regibase-root .reorder-byfield { margin-bottom: 12px; }
+#regibase-root .reorder-list { max-height: 52vh; overflow-y: auto; }
+#regibase-root .schema-row.reorder-row { grid-template-columns: auto auto 1fr; }
+#regibase-root .reorder-row .reorder-num { color: var(--muted); font-size: 12px; min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+#regibase-root .reorder-row .reorder-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #regibase-root .schema-row .flags label { display: inline-flex; align-items: center; gap: 4px; }
 #regibase-root .schema-row input:not([type=checkbox]):not([type=radio]),
 #regibase-root .schema-row select,

@@ -1,6 +1,16 @@
 {
         "Click to choose an icon": "クリックしてアイコンを選択",
     "translations": {
+        "Reorder": "並べ替え",
+        "Change the registration order (drag rows, or sort by a field)": "登録順を変更（行をドラッグ、または項目で並べ替え）",
+        "⇅ Reorder records": "⇅ レコードの並べ替え",
+        "This changes the stored registration order of the records — not just how they are shown. Drag rows to arrange them by hand, or sort them by a field below.": "レコードの登録順そのものを変更します（表示順だけではありません）。行をドラッグして手動で並べ替えるか、下の項目で並べ替えできます。",
+        "Sort by field": "項目で並べ替え",
+        "Ascending": "昇順",
+        "Descending": "降順",
+        "Save order": "並び順を保存",
+        "Order updated": "並び順を更新しました",
+        "Could not save the new order": "並び順を保存できませんでした",
         "Custom": "カスタム",
         "Edited": "編集済み",
         "Edit template": "テンプレートを編集",

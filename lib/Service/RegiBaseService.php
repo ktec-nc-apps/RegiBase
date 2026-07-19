@@ -384,12 +384,15 @@ class RegiBaseService {
 		if ($mode === 'kana_title' || $mode === 'kana_reading') {
 			$mode = 'title_asc';
 		}
+		// Registration order follows the per-record `sort` position (id as tie-break),
+		// so it reflects any manual drag / sort-by-field reordering the user applied.
+		$cmpPos = fn ($a, $b) => ($a['sort'] <=> $b['sort']) ?: ($a['id'] - $b['id']);
 		switch ($mode) {
-			case 'created_asc': usort($rows, fn ($a, $b) => $a['id'] - $b['id']); break;
+			case 'created_asc': usort($rows, $cmpPos); break;
 			case 'title_asc': usort($rows, $cmpTitle); break;
 			case 'title_desc': usort($rows, fn ($a, $b) => -$cmpTitle($a, $b)); break;
 			case 'created_desc':
-			default: usort($rows, fn ($a, $b) => $b['id'] - $a['id']); break;
+			default: usort($rows, fn ($a, $b) => -$cmpPos($a, $b)); break;
 		}
 		return $rows;
 	}
@@ -422,6 +425,7 @@ class RegiBaseService {
 		$e->setCollectionId($collectionId);
 		$e->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 		$e->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
+		$e->setSort($this->records->maxSort($collectionId) + 1);
 		$e->setCreatedAt($this->now());
 		$e->setUpdatedAt($this->now());
 		$e = $this->records->insert($e);
@@ -469,6 +473,52 @@ class RegiBaseService {
 		return $n;
 	}
 
+	/**
+	 * Reassign the registration order (`sort` position) of a collection's records
+	 * to match the given id order (position 1..N). Edit permission required. Ids
+	 * that don't belong to the collection are ignored; any records omitted from
+	 * $orderedIds keep their current relative order, appended after the listed ones.
+	 * @return int number of records whose position actually changed
+	 */
+	public function reorderRecords(string $userId, int $collectionId, array $orderedIds): int {
+		$this->require($userId, $collectionId, self::PERM_EDIT);
+		$records = $this->records->findForCollection($collectionId);
+		$byId = [];
+		foreach ($records as $r) {
+			$byId[(int)$r->getId()] = $r;
+		}
+
+		$seen = [];
+		$sequence = [];
+		foreach ($orderedIds as $id) {
+			$id = (int)$id;
+			if (isset($byId[$id]) && !isset($seen[$id])) {
+				$sequence[] = $byId[$id];
+				$seen[$id] = true;
+			}
+		}
+		// records not mentioned in the payload keep their existing order, at the end
+		foreach ($records as $r) {
+			$id = (int)$r->getId();
+			if (!isset($seen[$id])) {
+				$sequence[] = $r;
+				$seen[$id] = true;
+			}
+		}
+
+		$pos = 0;
+		$changed = 0;
+		foreach ($sequence as $r) {
+			$pos++;
+			if ((int)$r->getSort() !== $pos) {
+				$r->setSort($pos);
+				$this->records->update($r);
+				$changed++;
+			}
+		}
+		return $changed;
+	}
+
 	// ---- fields (append) ----
 	/**
 	 * Append new fields to a collection (used by transfer "add as new field").
@@ -514,6 +564,7 @@ class RegiBaseService {
 	private function bulkInsertRecords(int $collectionId, array $dataArray): int {
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$ts = $this->now();
+		$sort = $this->records->maxSort($collectionId);
 		$n = 0;
 		foreach ($dataArray as $data) {
 			$data = is_array($data) ? $data : [];
@@ -521,6 +572,7 @@ class RegiBaseService {
 			$e->setCollectionId($collectionId);
 			$e->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 			$e->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
+			$e->setSort(++$sort);
 			$e->setCreatedAt($ts);
 			$e->setUpdatedAt($ts);
 			$this->records->insert($e);

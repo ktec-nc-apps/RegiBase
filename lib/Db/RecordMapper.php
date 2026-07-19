@@ -20,8 +20,21 @@ class RecordMapper extends QBMapper {
 	public function findForCollection(int $collectionId): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())
-			->where($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+			->where($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)))
+			->orderBy('sort', 'ASC')
+			->addOrderBy('id', 'ASC');
 		return $this->findEntities($qb);
+	}
+
+	/** Highest `sort` value in a collection (0 if empty) — used to append new records at the end. */
+	public function maxSort(int $collectionId): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->func()->max('sort'))->from($this->getTableName())
+			->where($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+		$r = $qb->executeQuery();
+		$v = $r->fetchOne();
+		$r->closeCursor();
+		return (int)$v;
 	}
 
 	public function find(int $id): RecordEntity {

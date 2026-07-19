@@ -1,6 +1,16 @@
 {
         "Click to choose an icon": "Click to choose an icon",
     "translations": {
+        "Reorder": "Reorder",
+        "Change the registration order (drag rows, or sort by a field)": "Change the registration order (drag rows, or sort by a field)",
+        "⇅ Reorder records": "⇅ Reorder records",
+        "This changes the stored registration order of the records — not just how they are shown. Drag rows to arrange them by hand, or sort them by a field below.": "This changes the stored registration order of the records — not just how they are shown. Drag rows to arrange them by hand, or sort them by a field below.",
+        "Sort by field": "Sort by field",
+        "Ascending": "Ascending",
+        "Descending": "Descending",
+        "Save order": "Save order",
+        "Order updated": "Order updated",
+        "Could not save the new order": "Could not save the new order",
         "Custom": "Custom",
         "Edited": "Edited",
         "Edit template": "Edit template",

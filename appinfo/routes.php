@@ -35,6 +35,7 @@ return [
 
 		// records
 		['name' => 'api#records', 'url' => '/api/collections/{id}/records', 'verb' => 'GET'],
+		['name' => 'api#reorderRecords', 'url' => '/api/collections/{id}/record-order', 'verb' => 'PUT'],
 		['name' => 'api#createRecord', 'url' => '/api/collections/{id}/records', 'verb' => 'POST'],
 		['name' => 'api#getRecord', 'url' => '/api/records/{id}', 'verb' => 'GET'],
 		['name' => 'api#updateRecord', 'url' => '/api/records/{id}', 'verb' => 'PUT'],
