@@ -236,13 +236,17 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
 </g></svg></span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
-      <button v-for="c in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id}" @click="selectCollection(c.id)">
+      <button v-for="c in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id}" @click="selectCollection(c.id)" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
         <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
         <div>{{ t('No collections yet') }}</div>
       </div>
     </nav>
+    <div v-if="collTip.show" class="coll-tip" :style="{left: collTip.x + 'px', top: collTip.y + 'px'}">
+      <div class="coll-tip-name">{{ collTip.name }}</div>
+      <div class="coll-tip-desc">{{ collTip.desc }}</div>
+    </div>
     <div class="sidebar-foot">
       <button class="btn primary block" @click="openTemplatePicker">{{ t('＋ New collection') }}</button>
       <button class="btn sm block" @click="openSettings" :title="t('Theme, storage location, etc.')">{{ t('⚙️ Settings') }}</button>
@@ -1300,6 +1304,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
         reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
+        collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
         selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
@@ -2395,6 +2400,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const [it] = a.splice(from, 1);
         a.splice(to, 0, it);
       },
+      // ---- sidebar collection hover: description popup ----
+      showCollTip(c, e) {
+        const desc = ((c && c.description) || '').trim();
+        if (!desc) { this.hideCollTip(); return; }
+        const el = e && e.currentTarget;
+        const r = (el && el.getBoundingClientRect) ? el.getBoundingClientRect() : { right: 0, top: 0 };
+        const y = Math.min(Math.round(r.top), (window.innerHeight || 800) - 140);
+        this.collTip = { show: true, name: (c.name || ''), desc, x: Math.round(r.right + 8), y: Math.max(8, y) };
+      },
+      hideCollTip() { this.collTip.show = false; },
       // ---- record reorder (registration order) ----
       openReorder() {
         if (!this.canEdit || this.records.length < 2) return;
