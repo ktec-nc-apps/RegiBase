@@ -120,7 +120,7 @@
 #regibase-root .coll-item.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); font-weight: 700; }
 #regibase-root .coll-item .ci-bar { flex: 0 0 auto; width: 4px; align-self: stretch; min-height: 20px; border-radius: 3px; }
 #regibase-root .coll-item .ic { font-size: 20px; width: 26px; text-align: center; }
-#regibase-root .coll-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .coll-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; word-break: break-word; overflow-wrap: anywhere; }
 #regibase-root .coll-item .ct { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 1px 8px; border-radius: 999px; }
 #regibase-root .coll-item.active .ct { color: var(--primary); }
 #regibase-root .sidebar-foot { padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -313,7 +313,7 @@
 #regibase-root .home-card:hover { border-color: var(--primary); transform: translateY(-1px); transition: transform .12s; }
 #regibase-root .home-card .hc-icon { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
 #regibase-root .home-card .hc-body { min-width: 0; flex: 1; }
-#regibase-root .home-card .hc-name { font-weight: 800; font-size: 16px; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .home-card .hc-name { font-weight: 800; font-size: 16px; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; word-break: break-word; overflow-wrap: anywhere; }
 #regibase-root .home-card .hc-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #regibase-root .home-card .hc-count { font-size: 12px; color: var(--muted); background: var(--surface-2); display: inline-block; padding: 1px 9px; border-radius: 999px; }
 

@@ -2,6 +2,12 @@
 
 All notable changes to RegiBase.
 
+## 0.12.3 — 2026-07-19
+
+- Collection names in the collection list (sidebar and the home card grid) now wrap to
+  **up to two lines**, with an ellipsis (…) at the end of the second line when longer —
+  instead of being cut off on a single line.
+
 ## 0.12.2 — 2026-07-19
 
 ### Reorder UX improvements
