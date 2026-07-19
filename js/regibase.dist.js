@@ -2922,7 +2922,7 @@ return function render(_ctx, _cache) {
                     (_ctx.isOwner)
                       ? (_openBlock(), _createElementBlock("button", {
                           key: 0,
-                          class: "btn danger",
+                          class: "btn danger foot-left",
                           onClick: _cache[102] || (_cache[102] = (...args) => (_ctx.deleteCollection && _ctx.deleteCollection(...args)))
                         }, _toDisplayString(_ctx.t('Delete collection')), 1 /* TEXT */))
                       : _createCommentVNode("v-if", true),

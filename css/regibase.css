@@ -335,6 +335,7 @@
 #regibase-root .modal-head h3 { margin: 0; font-size: 17px; flex: 1; }
 #regibase-root .modal-body { padding: 16px 18px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 #regibase-root .modal-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+#regibase-root .modal-foot .foot-left { margin-right: auto; }
 #regibase-root .icon-btn { border: none; background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; border-radius: 8px; }
 #regibase-root .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 

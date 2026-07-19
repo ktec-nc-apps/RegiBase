@@ -812,7 +812,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
       </div>
       <div class="modal-foot">
-        <button v-if="isOwner" class="btn danger" @click="deleteCollection">{{ t('Delete collection') }}</button>
+        <button v-if="isOwner" class="btn danger foot-left" @click="deleteCollection">{{ t('Delete collection') }}</button>
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button v-if="canSettings" class="btn primary" @click="saveCollSettings">{{ t('Save') }}</button>
       </div>

@@ -8,6 +8,8 @@ All notable changes to RegiBase.
   **up to three lines**, with an ellipsis (…) at the end of the third line when longer —
   instead of being cut off on a single line.
 - Hovering a collection in the left sidebar now shows a **popup with its description**.
+- In collection settings, the **Delete collection** button is now left-aligned, separated
+  from Cancel / Save on the right.
 
 ## 0.12.2 — 2026-07-19
 
