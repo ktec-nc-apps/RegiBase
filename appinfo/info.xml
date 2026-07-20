@@ -38,7 +38,7 @@ Features:
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによる読み取り専用のコマンドライン操作（一覧／取得／エクスポート／検索）、秘密項目の復号はオプトイン
 - 12言語対応]]></description>
-	<version>0.12.5</version>
+	<version>0.12.6</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
