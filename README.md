@@ -8,86 +8,7 @@ about in collections whose fields **you design yourself**.
 > Personal project · self-hosted · your data stays in your own Nextcloud.
 > 個人プロジェクト · セルフホスト · データはあなた自身の Nextcloud の中だけに保存されます。
 
-`日本語` ↓ · [English ↓](#english)
-
----
-
-<a id="japanese"></a>
-
-## 日本語
-
-クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、
-「覚えておきたい情報」を、**自分で項目を設計したコレクション**として整理・保管できる
-Nextcloud ネイティブアプリです。
-
-### 特長
-
-- **フォームテンプレート** — クレジットカード / 銀行口座 / オンラインアカウント /
-  会員 / ライセンス / 連絡先… などのテンプレートから始めても、ゼロから項目を設計しても OK。
-  **自分のテンプレートを保存**したり、**初期テンプレートを編集**（自分用に上書き・既定に戻す）もできます。
-- **項目ごとの入力規則** — 文字種・最小/最大長・パターン（正規表現）を指定できます。
-- **複数の表示形式** — リスト / リスト詳細 / **表計算風テーブル**（先頭列を固定して
-  掴んで横スクロール）/ カード / サムネイル付きカード。
-- **クライアント側暗号化（任意）** — パスワードや暗証番号、カード番号などの秘密項目は、
-  ブラウザ内で **AES-GCM** により暗号化されます。サーバーはマスターキーも平文も一切見ません。
-  *マスターキーを忘れるとデータは復元できません。*
-- **パスワード付きバックアップ／復元** — 全データ（コレクション・レコード・設定・添付）を
-  **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／追加）できます。
-- **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
-  **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
-- **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。
-- **整理** — レコードをコレクション間で移動・コピー・マージできます。
-- **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
-- **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
-  任意のアクセスパスワードや、秘密項目の共有にも対応します。
-- **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、
-  またはコレクションを Tables へ**書き出し**できます。
-- **12 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
-  Русский · Português · العربية · हिन्दी · 한국어 · Italiano。
-  Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
-
-### 動作環境
-
-- Nextcloud **30 – 32**
-- PHP 8.1 以上
-- Nextcloud 対応データベース（MySQL/MariaDB, PostgreSQL, SQLite）
-
-### インストール
-
-**Nextcloud App Store** で公開しています。管理者の「アプリ」→「整理」または「ツール」で
-**RegiBase** を検索してインストールできます（[apps.nextcloud.com/apps/regibase](https://apps.nextcloud.com/apps/regibase)）。
-
-または、ソースから手動で導入する場合:
-
-```bash
-cd /path/to/nextcloud/apps
-git clone https://github.com/ktec-nc-apps/RegiBase.git regibase
-sudo -u www-data php ../occ app:enable regibase
-```
-
-その後、Nextcloud のアプリメニューから **RegiBase** を開きます。
-
-### コマンドライン（occ）
-
-RegiBase はサーバーのコンソールから読み取れます。スクリプトやバックアップに便利です:
-
-```bash
-occ regibase:collections [--user=UID]              # コレクション一覧
-occ regibase:records <collection> [--user=UID]     # コレクションのレコード一覧
-occ regibase:get <collection> <record> [--field=KEY] [-o json]
-occ regibase:export <collection> [--format=json|csv]
-occ regibase:find <collection> <query>             # 値で検索
-```
-
-`<collection>` は id か名前で指定します。すべて**読み取り専用**です。秘密フィールドは
-既定でマスクされ、`--reveal` を付けたときだけ復号します。その際のマスターパスワードは
-環境変数 `REGIBASE_PASSWORD` または対話式の隠し入力から読み取ります（サーバー側の復号は
-ブラウザと同じ PBKDF2 / AES-GCM を再現し、事前にパスワードを検証します）。例 —
-スクリプトから秘密の値を 1 つ取り出す:
-
-```bash
-REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
-```
+[English ↓](#english) · [日本語 ↓](#japanese)
 
 ---
 
@@ -175,10 +96,97 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
 
 ---
 
+<a id="japanese"></a>
+
+## 日本語
+
+クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、
+「覚えておきたい情報」を、**自分で項目を設計したコレクション**として整理・保管できる
+Nextcloud ネイティブアプリです。
+
+### 特長
+
+- **フォームテンプレート** — クレジットカード / 銀行口座 / オンラインアカウント /
+  会員 / ライセンス / 連絡先… などのテンプレートから始めても、ゼロから項目を設計しても OK。
+  **自分のテンプレートを保存**したり、**初期テンプレートを編集**（自分用に上書き・既定に戻す）もできます。
+- **項目ごとの入力規則** — 文字種・最小/最大長・パターン（正規表現）を指定できます。
+- **複数の表示形式** — リスト / リスト詳細 / **表計算風テーブル**（先頭列を固定して
+  掴んで横スクロール）/ カード / サムネイル付きカード。
+- **クライアント側暗号化（任意）** — パスワードや暗証番号、カード番号などの秘密項目は、
+  ブラウザ内で **AES-GCM** により暗号化されます。サーバーはマスターキーも平文も一切見ません。
+  *マスターキーを忘れるとデータは復元できません。*
+- **パスワード付きバックアップ／復元** — 全データ（コレクション・レコード・設定・添付）を
+  **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／追加）できます。
+- **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
+  **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
+- **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。
+- **整理** — レコードをコレクション間で移動・コピー・マージできます。
+- **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
+- **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
+  任意のアクセスパスワードや、秘密項目の共有にも対応します。
+- **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、
+  またはコレクションを Tables へ**書き出し**できます。
+- **12 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
+  Русский · Português · العربية · हिन्दी · 한국어 · Italiano。
+  Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
+
+### 動作環境
+
+- Nextcloud **30 – 32**
+- PHP 8.1 以上
+- Nextcloud 対応データベース（MySQL/MariaDB, PostgreSQL, SQLite）
+
+### インストール
+
+**Nextcloud App Store** で公開しています。管理者の「アプリ」→「整理」または「ツール」で
+**RegiBase** を検索してインストールできます（[apps.nextcloud.com/apps/regibase](https://apps.nextcloud.com/apps/regibase)）。
+
+または、ソースから手動で導入する場合:
+
+```bash
+cd /path/to/nextcloud/apps
+git clone https://github.com/ktec-nc-apps/RegiBase.git regibase
+sudo -u www-data php ../occ app:enable regibase
+```
+
+その後、Nextcloud のアプリメニューから **RegiBase** を開きます。
+
+### コマンドライン（occ）
+
+RegiBase はサーバーのコンソールから読み取れます。スクリプトやバックアップに便利です:
+
+```bash
+occ regibase:collections [--user=UID]              # コレクション一覧
+occ regibase:records <collection> [--user=UID]     # コレクションのレコード一覧
+occ regibase:get <collection> <record> [--field=KEY] [-o json]
+occ regibase:export <collection> [--format=json|csv]
+occ regibase:find <collection> <query>             # 値で検索
+```
+
+`<collection>` は id か名前で指定します。すべて**読み取り専用**です。秘密フィールドは
+既定でマスクされ、`--reveal` を付けたときだけ復号します。その際のマスターパスワードは
+環境変数 `REGIBASE_PASSWORD` または対話式の隠し入力から読み取ります（サーバー側の復号は
+ブラウザと同じ PBKDF2 / AES-GCM を再現し、事前にパスワードを検証します）。例 —
+スクリプトから秘密の値を 1 つ取り出す:
+
+```bash
+REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
+```
+
+---
+
 ## Screenshots
 
-<!-- Add screenshots here, e.g. -->
-<!-- ![Table view](screenshots/table.png) -->
+| | |
+|---|---|
+| ![Collections home](screenshots/01-collections-home.png) | ![Table view](screenshots/02-table-view.png) |
+| Collections home / コレクション一覧 | Table view / テーブル表示 |
+| ![Design fields](screenshots/03-design-fields.png) | ![Record detail](screenshots/04-record-detail.png) |
+| Design fields / 項目設計 | Record detail / レコード詳細 |
+| ![Settings](screenshots/05-settings.png) | ![Templates](screenshots/06-templates.png) |
+| Settings / 設定 | Templates / テンプレート |
+| ![Card view](screenshots/07-card-view.png) | ![Collection settings](screenshots/08-collection-settings.png) |
+| Card view / カード表示 | Collection settings / コレクション設定 |
 
 ## Architecture
 
@@ -200,4 +208,4 @@ QBMapper entities, services).
 
 ## License
 
-[GNU AGPL v3](LICENSE) © ktec-jp (Japan 🇯🇵)
+[GNU AGPL v3](LICENSE) · © KTEC

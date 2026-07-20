@@ -3,6 +3,7 @@
 	<id>regibase</id>
 	<name>RegiBase</name>
 	<summary>Personal database — templates, sharing, encryption, Tables integration and multiple views</summary>
+	<summary lang="ja">個人用データベース ― テンプレート・共有・暗号化・Tables連携・複数の表示形式に対応</summary>
 	<description><![CDATA[RegiBase is a lightweight personal database for the information you want to keep — credit cards, bank accounts, online accounts, memberships, licenses, contacts and anything else.
 
 Design your own fields (or start from a template), then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
@@ -20,9 +21,26 @@ Features:
 - Password-protected full backup & restore (AES-256 ZIP)
 - Read-only command-line access via occ (list / get / export / find), with opt-in secret decryption
 - Available in 12 languages]]></description>
+	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
+
+項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・リスト詳細・表計算風テーブル（先頭列固定）・カード・画像ギャラリーの各表示形式で閲覧できます。
+
+主な機能:
+- 項目ごとに入力規則を設定できるカスタムフォーム項目。再利用可能なテンプレートから作成
+- 自分のテンプレートを保存でき、初期テンプレートも編集可能（ユーザーごとの上書き、既定への復元も可能）
+- コレクションの複製（レコードを含めるかどうか選択可）
+- 他のNextcloudユーザーとのコレクション共有（閲覧／編集／削除の3段階、任意のアクセスパスワード、秘密項目の共有にも対応）
+- 秘密項目のクライアント側暗号化（AES-GCM、任意）― サーバーは鍵も平文も一切関知しません
+- Nextcloud Tables連携 ― テーブルを新規コレクションとして取込、またはコレクションをTablesへ書出
+- CSV / JSON（Googleパスワードマネージャーのエクスポート等）や、Nextcloud連絡先（写真含む）からのインポート
+- Nextcloud FilesやNotesからの画像・ファイル添付
+- レコードのコレクション間での移動・コピー・マージ
+- パスワード保護された全体バックアップ／復元（AES-256 ZIP）
+- occによる読み取り専用のコマンドライン操作（一覧／取得／エクスポート／検索）、秘密項目の復号はオプトイン
+- 12言語対応]]></description>
 	<version>0.12.5</version>
 	<licence>agpl</licence>
-	<author>ktec-jp</author>
+	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
 	<category>organization</category>
 	<category>tools</category>
