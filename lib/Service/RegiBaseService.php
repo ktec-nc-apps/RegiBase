@@ -160,6 +160,50 @@ class RegiBaseService {
 		return $out;
 	}
 
+	/**
+	 * Reassign the sidebar order (`sort` position) of the user's own collections
+	 * to match the given id order (position 1..N). Ids that aren't owned by the
+	 * user are ignored; collections omitted from $orderedIds keep their current
+	 * relative order and are appended after the listed ones.
+	 * @return int number of collections whose position actually changed
+	 */
+	public function reorderCollections(string $userId, array $orderedIds): int {
+		$own = $this->collections->findAllForUser($userId);
+		$byId = [];
+		foreach ($own as $c) {
+			$byId[(int)$c->getId()] = $c;
+		}
+
+		$seen = [];
+		$sequence = [];
+		foreach ($orderedIds as $id) {
+			$id = (int)$id;
+			if (isset($byId[$id]) && !isset($seen[$id])) {
+				$sequence[] = $byId[$id];
+				$seen[$id] = true;
+			}
+		}
+		foreach ($own as $c) {
+			$id = (int)$c->getId();
+			if (!isset($seen[$id])) {
+				$sequence[] = $c;
+				$seen[$id] = true;
+			}
+		}
+
+		$pos = 0;
+		$changed = 0;
+		foreach ($sequence as $c) {
+			$pos++;
+			if ((int)$c->getSort() !== $pos) {
+				$c->setSort($pos);
+				$this->collections->update($c);
+				$changed++;
+			}
+		}
+		return $changed;
+	}
+
 	public function getCollection(string $userId, int $id): array {
 		[$c, , $isOwner, $share] = $this->resolve($userId, $id);
 		$j = $c->jsonSerialize();

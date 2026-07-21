@@ -328,6 +328,13 @@ class ApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function reorderCollections(): JSONResponse {
+		$ids = $this->request->getParam('ids', []);
+		$ids = is_array($ids) ? $ids : [];
+		return new JSONResponse(['changed' => $this->service->reorderCollections($this->uid(), $ids)]);
+	}
+
+	#[NoAdminRequired]
 	public function createCollection(): JSONResponse {
 		$body = $this->request->getParams();
 		$c = $this->service->createCollection($this->uid(), $body, $this->appL10n());

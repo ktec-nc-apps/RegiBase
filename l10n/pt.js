@@ -226,6 +226,7 @@ OC.L10N.register(
     "[image]": "[imagem]",
     "Copied the whole card": "Cartão inteiro copiado",
     "Copy failed": "Falha ao copiar",
+    "Could not save the order": "Não foi possível salvar a ordem",
     "🖼 Image": "🖼 Imagem",
     "📎 File": "📎 Arquivo",
     "Could not load the image": "Não foi possível carregar a imagem",

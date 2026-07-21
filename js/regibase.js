@@ -236,7 +236,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
 </g></svg></span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
-      <button v-for="c in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id}" @click="selectCollection(c.id)" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
+      <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
         <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
@@ -1305,6 +1305,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         selectedIds: [], delConfirm: false,
         reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
         collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
+        collDrag: { from: null, over: null },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
         selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
@@ -2410,6 +2411,44 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.collTip = { show: true, name: (c.name || ''), desc, x: Math.round(r.right + 8), y: Math.max(8, y) };
       },
       hideCollTip() { this.collTip.show = false; },
+      // ---- sidebar collection drag & drop reordering (own collections only) ----
+      cDragStart(i, e) {
+        const c = this.collections[i];
+        if (!c || c.is_owner === false) { if (e) e.preventDefault(); return; }
+        this.hideCollTip();
+        this.collDrag.from = i;
+        try {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(c.id));
+        } catch (_) { /* ignore */ }
+      },
+      cDragOver(i) {
+        if (this.collDrag.from === null) return;
+        const c = this.collections[i];
+        this.collDrag.over = (c && c.is_owner !== false) ? i : null;
+      },
+      cDragLeave(i) { if (this.collDrag.over === i) this.collDrag.over = null; },
+      cDrop(i) {
+        const from = this.collDrag.from;
+        this.collDrag.from = null; this.collDrag.over = null;
+        if (from === null || i === null || from === i) return;
+        const target = this.collections[i];
+        if (!target || target.is_owner === false) return;
+        const a = this.collections;
+        const [it] = a.splice(from, 1);
+        a.splice(i, 0, it);
+        this.saveCollOrder();
+      },
+      cDragEnd() { this.collDrag.from = null; this.collDrag.over = null; },
+      async saveCollOrder() {
+        const ids = this.collections.filter((c) => c.is_owner !== false).map((c) => c.id);
+        try {
+          await api('collection-order', { method: 'PUT', body: JSON.stringify({ ids }) });
+        } catch (e) {
+          this.showToast(T('Could not save the order'));
+          this.loadCollections();
+        }
+      },
       // ---- record reorder (registration order) ----
       openReorder() {
         if (!this.canEdit || this.records.length < 2) return;

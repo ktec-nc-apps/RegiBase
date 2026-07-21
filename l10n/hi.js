@@ -226,6 +226,7 @@ OC.L10N.register(
     "[image]": "[छवि]",
     "Copied the whole card": "पूरा कार्ड कॉपी किया गया",
     "Copy failed": "कॉपी विफल",
+    "Could not save the order": "क्रम सहेजा नहीं जा सका",
     "🖼 Image": "🖼 छवि",
     "📎 File": "📎 फ़ाइल",
     "Could not load the image": "छवि लोड नहीं हो सकी",

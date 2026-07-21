@@ -226,6 +226,7 @@ OC.L10N.register(
     "[image]": "[图片]",
     "Copied the whole card": "已复制整张卡片",
     "Copy failed": "复制失败",
+    "Could not save the order": "无法保存排序",
     "🖼 Image": "🖼 图片",
     "📎 File": "📎 文件",
     "Could not load the image": "无法加载图片",

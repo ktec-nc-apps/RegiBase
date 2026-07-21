@@ -226,6 +226,7 @@ OC.L10N.register(
     "[image]": "[صورة]",
     "Copied the whole card": "تم نسخ البطاقة بالكامل",
     "Copy failed": "فشل النسخ",
+    "Could not save the order": "تعذّر حفظ الترتيب",
     "🖼 Image": "🖼 صورة",
     "📎 File": "📎 ملف",
     "Could not load the image": "تعذّر تحميل الصورة",

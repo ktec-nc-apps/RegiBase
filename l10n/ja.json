@@ -279,6 +279,7 @@
         "[image]": "[画像]",
         "Copied the whole card": "カード全体をコピーしました",
         "Copy failed": "コピー失敗",
+        "Could not save the order": "並び順を保存できませんでした",
         "🖼 Image": "🖼 画像",
         "📎 File": "📎 ファイル",
         "Could not load the image": "画像を読み込めません",

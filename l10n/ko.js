@@ -226,6 +226,7 @@ OC.L10N.register(
     "[image]": "[이미지]",
     "Copied the whole card": "카드 전체를 복사했습니다",
     "Copy failed": "복사 실패",
+    "Could not save the order": "순서를 저장하지 못했습니다",
     "🖼 Image": "🖼 이미지",
     "📎 File": "📎 파일",
     "Could not load the image": "이미지를 불러올 수 없습니다",

@@ -19,6 +19,7 @@ return [
 		['name' => 'api#collections', 'url' => '/api/collections', 'verb' => 'GET'],
 		['name' => 'api#getCollection', 'url' => '/api/collections/{id}', 'verb' => 'GET'],
 		['name' => 'api#createCollection', 'url' => '/api/collections', 'verb' => 'POST'],
+		['name' => 'api#reorderCollections', 'url' => '/api/collection-order', 'verb' => 'PUT'],
 		['name' => 'api#updateCollection', 'url' => '/api/collections/{id}', 'verb' => 'PATCH'],
 		['name' => 'api#deleteCollection', 'url' => '/api/collections/{id}', 'verb' => 'DELETE'],
 		['name' => 'api#duplicateCollection', 'url' => '/api/collections/{id}/duplicate', 'verb' => 'POST'],
