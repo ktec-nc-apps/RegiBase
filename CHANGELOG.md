@@ -2,6 +2,20 @@
 
 All notable changes to RegiBase.
 
+## 0.12.7 — 2026-07-21
+
+- The collection list in the left sidebar can now be **reordered by drag & drop**. Drop
+  targets are highlighted while dragging, and the new order is saved immediately (no
+  save button). Collections shared with you by other users are not draggable.
+
+## 0.12.6 — 2026-07-21
+
+- Added a Japanese summary/description to the Nextcloud App Store listing, which
+  previously had English text only.
+- Reorganized the README into a consistent English-then-Japanese layout and added the
+  screenshots that were previously missing from it.
+- Minor cleanup: unified the author name to “KTEC”.
+
 ## 0.12.5 — 2026-07-19
 
 - Collection names in the collection list (sidebar and the home card grid) now wrap to
