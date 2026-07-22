@@ -2,6 +2,17 @@
 
 All notable changes to RegiBase.
 
+## 0.12.10 — 2026-07-22
+
+### Flags now render on Windows
+
+- Windows ships no flag glyphs: Segoe UI Emoji draws 🇯🇵 as a boxed "JP" letter pair and
+  🏴󠁧󠁢󠁷󠁬󠁳󠁿 as an empty box, so the 269 flags in the icon picker were unusable there. RegiBase
+  now carries a **flag-only subset of Noto Color Emoji** (SIL OFL 1.1) and declares it
+  with a `unicode-range` limited to the flag code points: the browser fetches the file
+  the first time a flag is actually drawn — not on app start — and then caches it. Every
+  other emoji still comes from the system font, so nothing else changes.
+
 ## 0.12.9 — 2026-07-22
 
 ### The icon picker now holds every Unicode emoji
