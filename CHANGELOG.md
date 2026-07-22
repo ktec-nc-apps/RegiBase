@@ -2,6 +2,31 @@
 
 All notable changes to RegiBase.
 
+## 0.12.11 — 2026-07-22
+
+### Emoji no longer depend on the viewer's device
+
+0.12.10 shipped a flag-only font, which treated the symptom. The cause is that the app was
+letting whatever emoji font a device happens to ship decide whether an icon is readable —
+and flags are simply where that shows up first, because **Windows has no flag glyphs on any
+version** (Segoe UI Emoji draws 🇯🇵 as a boxed "JP" and 🏴󠁧󠁢󠁷󠁬󠁳󠁿 as an empty box, a deliberate
+omission that updates will not fix). The same gap hits anything newer than the device's
+font: Segoe UI Emoji only gained the Unicode 13/14 additions (🫠 🫰 🫡 …) in Windows 11 22H2.
+Collections get shared, so an icon has to survive being viewed on someone else's screen.
+
+- RegiBase now carries **all 1,849 emoji** it offers, as a subset of Noto Color Emoji
+  (SIL OFL 1.1) — the vector COLRv1 build, 1.7 MB where the bitmap build of the same
+  coverage would be 4.4 MB.
+- It is a **fallback, not a replacement**: the first `@font-face` is `local()` only and
+  names the platform emoji fonts, so a device with a complete font uses its own and
+  downloads nothing. Font fallback reaches the bundled file only for the glyphs the
+  platform font turned out to be missing, and the browser caches it from then on.
+- Measured on three simulated devices — complete emoji font: **never fetched**; Windows-like
+  (emoji font present, no flags): fetched the first time a flag is drawn, **not** on app
+  start; no emoji font at all: fetched on load, and every one of the 1,849 renders.
+- The font pair applies only to the elements that display an icon, never to body text, so
+  characters such as © ® ™ ↔ stay plain text everywhere else.
+
 ## 0.12.10 — 2026-07-22
 
 ### Flags now render on Windows
