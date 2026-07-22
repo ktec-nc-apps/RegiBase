@@ -1,35 +1,34 @@
-/* Emoji rendering must not depend on the viewer's device, and the reason is not that
-   flags are special — it is that we were letting whatever emoji font the device happens
-   to ship decide whether an icon is readable at all:
+/* Emoji rendering must not depend on the viewer's device, so it doesn't: the app draws every
+   icon from its own copy of Noto Color Emoji (SIL OFL 1.1, see css/fonts/), covering all
+   1,849 emoji the picker offers.
 
-     - Windows has no flag glyphs on any version. Segoe UI Emoji draws a regional-indicator
-       pair as a boxed letter pair ("JP") and a subdivision flag as an empty box. That is a
-       deliberate omission by Microsoft, so it will not fix itself with updates.
-     - Anything newer than the device's font is missing too. Segoe UI Emoji only gained the
-       Unicode 13/14 additions (🫠 🫰 🫡 …) in Windows 11 22H2; on Windows 10 they are boxes.
-     - Linux and Android images vary in how recent their emoji font is.
+   Leaving it to the device does not work, and not only for the obvious reason:
 
-   Collections get shared, so an icon has to survive being viewed on someone else's screen.
-   The app therefore carries its own copy of Noto Color Emoji (SIL OFL 1.1, see css/fonts/)
-   covering all 1,849 emoji the picker offers — but only as a *fallback*:
+     - Windows cannot draw flags on any version, and a fallback chain cannot rescue it.
+       Segoe UI Emoji *has* glyphs for the regional indicator letters, so it reports the
+       code points as covered — it just draws 🇯🇵 as a boxed "JP" pair and 🏴󠁧󠁢󠁷󠁬󠁳󠁿 as an empty
+       box instead of forming a flag. The browser never falls through, because as far as it
+       is concerned nothing is missing.
+     - Anything newer than the device's font is missing outright: Segoe UI Emoji only gained
+       the Unicode 13/14 additions (🫠 🫰 🫡 …) in Windows 11 22H2.
 
-     1. AppEmoji is local() only. If the device has an emoji font it is used and nothing is
-        downloaded.
-     2. AppEmojiFallback is the bundled file. Font fallback reaches it only for the glyphs
-        face 1 turned out to be missing, and the browser caches it from then on.
+   Taking only the flag code points away from the device font was tried and does not work
+   either: U+200D has to travel with them or 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️ split mid-sequence into a bare
+   flag, and once U+200D belongs to a different font than the base character, *every* ZWJ
+   emoji splits — families, couples, professions, hair colours. The set has to be rendered
+   by one font or the sequences come apart. Collections get shared, so consistent rendering
+   is the point anyway: everyone sees the icon the person who picked it saw.
 
-   Measured: a device with a complete emoji font never fetches it; a Windows-like device
-   (emoji font present but no flags) fetches it the first time a flag is drawn, not on app
-   start; a device with no emoji font at all fetches it immediately.
+   AppEmojiSystem is kept behind it purely as a safety net for a failed download. U+FE0F is
+   deliberately absent from the ranges — including it made pages pull the font for nothing.
 
-   The pair is applied to the elements that display a chosen icon, never to body text, so
-   the range can cover every code point in the set — including ones like © ® ™ ↔ that must
-   stay plain text everywhere else. U+200D has to be in the range or the run splits mid
-   sequence and 🏴‍☠️ shapes as a bare black flag. */
+   Both faces are applied to the elements that display an icon, never to body text, so the
+   ranges can cover every code point in the set — including ones like © ® ™ ↔ that have to
+   stay plain text everywhere else. */
 @font-face {
   font-family: 'AppEmoji';
-  src: local('Apple Color Emoji'), local('Segoe UI Emoji'), local('Noto Color Emoji'),
-       local('Twemoji Mozilla'), local('Segoe UI Symbol'), local('Android Emoji');
+  src: url('fonts/noto-emoji.woff2') format('woff2');
+  font-display: swap;
   unicode-range: U+0023, U+002A, U+0030-0039, U+00A9, U+00AE, U+200D, U+203C, U+2049, U+20E3, U+2122,
     U+2139, U+2194-2199, U+21A9-21AA, U+231A-231B, U+2328, U+23CF, U+23E9-23F3, U+23F8-23FA,
     U+24C2, U+25AA-25AB, U+25B6, U+25C0, U+25FB-25FE, U+2600-2604, U+260E, U+2611,
@@ -55,9 +54,9 @@
     U+1FAF0-1FAF6, U+E0020-E007F;
 }
 @font-face {
-  font-family: 'AppEmojiFallback';
-  src: url('fonts/noto-emoji.woff2') format('woff2');
-  font-display: swap;
+  font-family: 'AppEmojiSystem';
+  src: local('Apple Color Emoji'), local('Segoe UI Emoji'), local('Noto Color Emoji'),
+       local('Twemoji Mozilla'), local('Android Emoji');
   unicode-range: U+0023, U+002A, U+0030-0039, U+00A9, U+00AE, U+200D, U+203C, U+2049, U+20E3, U+2122,
     U+2139, U+2194-2199, U+21A9-21AA, U+231A-231B, U+2328, U+23CF, U+23E9-23F3, U+23F8-23FA,
     U+24C2, U+25AA-25AB, U+25B6, U+25C0, U+25FB-25FE, U+2600-2604, U+260E, U+2611,
@@ -727,5 +726,5 @@
 #regibase-root .ic, #regibase-root .hc-icon, #regibase-root .big, #regibase-root .noimg,
 #regibase-root .emoji-btn, #regibase-root .emoji-tab, #regibase-root .iconpick-cur,
 #regibase-root .iconpick-btn {
-  font-family: 'AppEmoji', 'AppEmojiFallback', -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
+  font-family: 'AppEmoji', 'AppEmojiSystem', -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
 }

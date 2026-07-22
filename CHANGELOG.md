@@ -2,6 +2,31 @@
 
 All notable changes to RegiBase.
 
+## 0.12.12 — 2026-07-23
+
+### Emoji are drawn by the app, not by the viewer's device
+
+0.12.11 bundled the full emoji set but kept it as a *fallback* behind the device's own font.
+That does not fix flags, and the reason is worth writing down: **Segoe UI Emoji has glyphs
+for the regional indicator letters**. It reports 🇯 and 🇵 as covered and simply draws them as
+two boxed letters instead of forming 🇯🇵 — so nothing is "missing", the browser never falls
+through, and the bundled font was never even downloaded. Taking only the flag code points
+away from the device font does not work either: U+200D has to travel with them or
+🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️ split into a bare flag, and once U+200D belongs to a different font than the
+base character, **every** ZWJ emoji comes apart — families, couples, professions, hair
+colours.
+
+- All 1,849 emoji are now rendered from the bundled Noto Color Emoji subset (SIL OFL 1.1),
+  on every platform. A device's own emoji font is kept behind it only as a safety net for a
+  failed download.
+- Verified on three simulated devices — a complete emoji font, a Windows-like one (has the
+  regional indicator glyphs but cannot form flags), and none at all: all 1,849 render
+  identically in each, flags and ZWJ sequences included.
+- The font applies only to the elements that display an icon, so the app's own UI keeps the
+  platform look and body text is untouched — characters such as © ® ™ ↔ stay plain text.
+- Cost: one cached 1.7 MB download. Collections are shared, so consistent rendering is the
+  point — everyone now sees the icon the person who picked it saw.
+
 ## 0.12.11 — 2026-07-22
 
 ### Emoji no longer depend on the viewer's device
