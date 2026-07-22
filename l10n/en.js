@@ -1,6 +1,15 @@
 OC.L10N.register(
     "regibase",
     {
+    "Smileys & Emotion" : "Smileys & Emotion",
+    "People & Body" : "People & Body",
+    "Animals & Nature" : "Animals & Nature",
+    "Food & Drink" : "Food & Drink",
+    "Travel & Places" : "Travel & Places",
+    "Activities" : "Activities",
+    "Flags" : "Flags",
+    "Search emoji" : "Search emoji",
+    "No matching emoji" : "No matching emoji",
     "Click to choose an icon" : "Click to choose an icon",
     "Display order — only changes how records are shown here" : "Display order — only changes how records are shown here",
     "Registration order (oldest first)" : "Registration order (oldest first)",

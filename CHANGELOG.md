@@ -2,6 +2,52 @@
 
 All notable changes to RegiBase.
 
+## 0.12.9 — 2026-07-22
+
+### The icon picker now holds every Unicode emoji
+
+- The collection icon picker used to offer a hand-picked 425 emoji. It now contains the
+  **complete Unicode 14.0 set — 1,849 emoji**, in the nine official Unicode groups
+  (Smileys & Emotion, People & Body, Animals & Nature, Food & Drink, Travel & Places,
+  Activities, Objects, Symbols, Flags), in the official emoji-ordering sequence.
+  Flags, arrows, numbers, professions, hair variants, family and couple sequences — all
+  of them are now selectable. (Skin-tone variants are not listed separately, matching
+  the Unicode emoji-ordering chart itself.) The curated **Recommended** set stays as
+  the first tab.
+- **Search box**: type to filter across all 1,849 by name or keyword, in your own
+  language (CLDR names for all 12 UI languages). Japanese search is kana-insensitive,
+  so "ねこ" finds ネコの顔.
+- **Group tabs** replace one long scroll, and hovering an emoji shows its name.
+- The emoji set is fetched only when the picker is first opened, so the app starts
+  just as fast as before.
+- The icon input accepts longer sequences (16 units instead of 8, and 16 instead of 4 in
+  the CSV/JSON import step), so multi-codepoint emoji such as 🏴󠁧󠁢󠁷󠁬󠁳󠁿 or 👩‍❤️‍💋‍👩 can be typed
+  or pasted without being cut off.
+
+### Translations
+
+- The emoji category names and the picker tooltip were only translated into Japanese and
+  English; they are now translated into **all 12 languages**.
+- Fixed: `Click to choose an icon` was stored outside the `translations` block of
+  `l10n/ja.json` and `l10n/en.json`, so it stayed English whenever the in-app language
+  selector was used.
+
+### The picker is now available everywhere an icon is set
+
+- The icon picker used to exist only in collection settings. It is now offered in the
+  **CSV / JSON import**, the **Contacts import**, the **Tables import** and the
+  **template editor** as well — the same picker, shared, so it always shows the same
+  1,849 emoji. Contacts and Tables imports previously had no icon field at all and
+  always produced 👤 / the table's own emoji; you can now choose one up front.
+
+### Fixed: the Nextcloud user-status menu was broken on RegiBase pages
+
+- RegiBase loads the "global" build of the Vue 3 runtime, which publishes `window.Vue`.
+  A third-party library bundled into Nextcloud core (vue-resize) auto-installs into that
+  global with the Vue 2 API — `window.Vue.use(...)` — which throws on a Vue 3 namespace
+  and aborted the script that renders the user-status menu. RegiBase now keeps its Vue
+  copy private and leaves `window.Vue` untouched.
+
 ## 0.12.7 — 2026-07-21
 
 - The collection list in the left sidebar can now be **reordered by drag & drop**. Drop

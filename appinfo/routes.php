@@ -14,6 +14,7 @@ return [
 		['name' => 'api#editBuiltinTemplate', 'url' => '/api/templates/builtin/{key}', 'verb' => 'POST'],
 		['name' => 'api#resetBuiltinTemplate', 'url' => '/api/templates/builtin/{key}', 'verb' => 'DELETE'],
 		['name' => 'api#getI18n', 'url' => '/api/i18n/{lang}', 'verb' => 'GET'],
+		['name' => 'api#getEmoji', 'url' => '/api/emoji/{lang}', 'verb' => 'GET'],
 
 		// collections
 		['name' => 'api#collections', 'url' => '/api/collections', 'verb' => 'GET'],

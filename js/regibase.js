@@ -2,6 +2,10 @@
  * Auth is handled by Nextcloud (per-user data); there is no master password. */
 (function () {
   'use strict';
+  // vue-private.js moved the runtime off window.Vue (see the note there).
+  // Shadow the global for this whole IIFE — the precompiled render function
+  // destructures `Vue` too, and window.Vue is intentionally not set.
+  const Vue = window.__RegiBaseVue || window.Vue;
   const { createApp } = Vue;
 
   const BASE = ((window.OC && OC.generateUrl) ? OC.generateUrl('/apps/regibase') : '/apps/regibase') + '/';
@@ -13,6 +17,11 @@
   // map (fetched from /api/i18n/<lang>) so the user can pick a language independent of NC.
   // escape:false because Vue's {{ }} / attribute binding already escapes output.
   let i18nOverride = null;
+  // Fold to lower case and hiragana → katakana, so emoji search matches however the
+  // user types it (CLDR Japanese names use katakana: "ねこ" must find "ネコの顔").
+  function kana(s) {
+    return String(s).toLowerCase().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  }
   function subst(s, vars) {
     return vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : m)) : s;
   }
@@ -549,7 +558,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <div class="field" style="max-width:120px"><label>🎨 {{ t('Color') }}</label><input type="color" v-model="tplEdit.color" style="height:44px;padding:4px;width:100%" /></div>
           </div>
           <div class="field-row">
-            <div class="field" style="max-width:140px"><label>😀 {{ t('Icon') }}</label><input v-model="tplEdit.icon" maxlength="8" :placeholder="t('Emoji')" /></div>
+            <div class="field" style="max-width:190px"><label>😀 {{ t('Icon') }}</label>
+              <div class="iconpick-head">
+                <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='tplEdit'}" @click.stop="openIconPicker('tplEdit')" :title="t('Click to choose an icon')">{{ tplEdit.icon || '🗂️' }}</button>
+                <input v-model="tplEdit.icon" maxlength="16" :placeholder="t('Emoji')" />
+              </div>
+            </div>
             <div class="field"><label>📝 {{ t('Description') }}</label><input v-model="tplEdit.description" /></div>
           </div>
         </div>
@@ -714,21 +728,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         <div class="field">
           <label>😀 {{ t('Icon') }}</label>
           <div class="iconpick-head">
-            <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen}" @click.stop="iconPickerOpen = !iconPickerOpen" :title="t('Click to choose an icon')">{{ collForm.icon || '🗂️' }}</button>
-            <input v-model="collForm.icon" maxlength="8" :placeholder="t('Emoji')" />
-            <div v-if="iconPickerOpen" class="emoji-popup" @click.stop>
-              <div class="emoji-palette">
-                <div class="emoji-group" v-for="g in iconGroupsAll" :key="g.key">
-                  <div class="emoji-cat">{{ t(g.key) }}</div>
-                  <div class="emoji-grid">
-                    <button type="button" class="emoji-btn" v-for="em in g.emojis" :key="em"
-                            :class="{sel: collForm.icon===em}" @click="collForm.icon = em; iconPickerOpen = false" :title="em">{{ em }}</button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='collForm'}" @click.stop="openIconPicker('collForm')" :title="t('Click to choose an icon')">{{ collForm.icon || '🗂️' }}</button>
+            <input v-model="collForm.icon" maxlength="16" :placeholder="t('Emoji')" />
           </div>
-          <div v-if="iconPickerOpen" class="perm-backdrop" @click="iconPickerOpen = false"></div>
         </div>
         </div>
         </template>
@@ -855,7 +857,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         <template v-else>
           <div style="margin-bottom:10px"><span class="chip">{{ t('Detected format:') }} {{ importAnalysis.formatLabel }}</span> <span class="chip">{{ t('{n} items', {n: importAnalysis.rowCount}) }}</span></div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="importColl.name" /></div>
-          <div class="field"><label>{{ t('Icon (emoji)') }}</label><input v-model="importColl.icon" maxlength="4" style="width:90px" /></div>
+          <div class="field"><label>{{ t('Icon (emoji)') }}</label>
+            <div class="iconpick-head">
+              <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='importColl'}" @click.stop="openIconPicker('importColl')" :title="t('Click to choose an icon')">{{ importColl.icon || '📥' }}</button>
+              <input v-model="importColl.icon" maxlength="16" :placeholder="t('Emoji')" />
+            </div>
+          </div>
           <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">{{ t('Field settings for each column (★ = list title / Secret = masked):') }}</p>
           <div v-for="(c,i) in importCols" :key="i" class="schema-row">
             <input v-model="c.label" :placeholder="t('Display name')" />
@@ -904,6 +911,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             </select>
           </div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="contactsImport.name" :placeholder="t('Contacts')" /></div>
+          <div class="field"><label>{{ t('Icon (emoji)') }}</label>
+            <div class="iconpick-head">
+              <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='contactsImport'}" @click.stop="openIconPicker('contactsImport')" :title="t('Click to choose an icon')">{{ contactsImport.icon || '👤' }}</button>
+              <input v-model="contactsImport.icon" maxlength="16" :placeholder="t('Emoji')" />
+            </div>
+          </div>
           <div v-if="contactsImport.err" style="color:var(--danger);font-size:13px">{{ contactsImport.err }}</div>
         </template>
       </div>
@@ -931,6 +944,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             </select>
           </div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="tablesImport.name" :placeholder="tablesSelectedTitle" /></div>
+          <div class="field"><label>{{ t('Icon (emoji)') }}</label>
+            <div class="iconpick-head">
+              <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='tablesImport'}" @click.stop="openIconPicker('tablesImport')" :title="t('Click to choose an icon')">{{ tablesImport.icon || '📊' }}</button>
+              <input v-model="tablesImport.icon" maxlength="16" :placeholder="t('Emoji')" />
+            </div>
+          </div>
           <div v-if="tablesImport.err" style="color:var(--danger);font-size:13px">{{ tablesImport.err }}</div>
         </template>
       </div>
@@ -1247,6 +1266,29 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     </div>
   </div>
 
+  <!-- One icon picker shared by every place that sets an icon (collection settings,
+       template editor, CSV/JSON import, Contacts import, Tables import). -->
+  <template v-if="iconPickerOpen">
+    <div class="emoji-backdrop" @click="iconPickerOpen = false"></div>
+    <div class="emoji-popup" @click.stop>
+      <input class="emoji-search" v-model="emojiQuery" :placeholder="t('Search emoji')" />
+      <div class="emoji-tabs">
+        <button type="button" class="emoji-tab" v-for="g in iconGroupsAll" :key="g.key"
+                :class="{sel: !emojiQuery && emojiTab===g.key}" :title="t(g.key)"
+                @click="emojiTab = g.key; emojiQuery = ''">{{ g.tab }}</button>
+      </div>
+      <div class="emoji-palette">
+        <div class="emoji-cat">{{ emojiQuery ? t('{n} items', {n: emojiShown.length}) : t(emojiTab) }}</div>
+        <div v-if="emojiLoading" class="emoji-none">{{ t('Loading…') }}</div>
+        <div v-else-if="!emojiShown.length" class="emoji-none">{{ t('No matching emoji') }}</div>
+        <div class="emoji-grid">
+          <button type="button" class="emoji-btn" v-for="em in emojiShown" :key="em"
+                  :class="{sel: iconTargetValue===em}" @click="pickIcon(em)" :title="emojiName(em)">{{ em }}</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
   <div v-if="toast" class="toast">{{ toast }}</div>
 </div>
 `;
@@ -1268,8 +1310,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         locale: 0,
         backupForm: { password: '', busy: false, err: '' },
         restoreForm: { password: '', busy: false, err: '', fileName: '', dataUrl: '', confirm: false, mode: 'overwrite' },
-        contactsImport: { books: [], selected: 'all', name: '', busy: false, err: '', loading: false, enabled: true },
-        tablesImport: { tables: [], selected: 0, name: '', busy: false, err: '', loading: false, available: true },
+        contactsImport: { books: [], selected: 'all', name: '', icon: '', busy: false, err: '', loading: false, enabled: true },
+        tablesImport: { tables: [], selected: 0, name: '', icon: '', busy: false, err: '', loading: false, available: true },
         tablesExportBusy: false,
         apps: { contacts: true, tables: true },
         tableDrag: { active: false, startX: 0, startScroll: 0, el: null, pid: null },
@@ -1284,7 +1326,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         secretUnlocked: {},
         editingOrig: null,
         permOpen: false,
-        iconPickerOpen: false,
+        iconPickerOpen: false, iconTarget: 'collForm',
         shareExpanded: false,
         unlockKey: '', unlockErr: '', unlockRemember: true,
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
@@ -1325,16 +1367,11 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           { e: '⚙️', t: 'Settings / gear' }, { e: '🧩', t: 'Puzzle' }, { e: '💡', t: 'Idea / bulb' }, { e: '🔧', t: 'Tools' }, { e: '📦', t: 'Package / box' },
           { e: '🎯', t: 'Goal' }, { e: '🐶', t: 'Dog' }, { e: '🐱', t: 'Cat' }, { e: '🌱', t: 'Plant / sprout' }, { e: '💊', t: 'Medicine' }, { e: '⚡', t: 'Electricity' },
         ],
-        iconGroups: [
-          { key: 'Faces & emotion', emojis: '😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫡 🤭 🫢 🤫 😴 😷 🤒 🤕 🤢 🤮 🥴 😵 🤠'.split(' ') },
-          { key: 'Hands', emojis: '👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ ✋ 🤚 🖐️ 🖖 👋 🤝 🙏 ✍️ 💪 👏 🙌 👐 🤲 🫶'.split(' ') },
-          { key: 'People', emojis: '👶 🧒 👦 👧 🧑 👨 👩 🧓 👴 👵 👮 🕵️ 💂 👷 🤴 👸 👰 🤵 🧕 🎅 🤶 🦸 🦹 🧙 🧚 🧛 🧜 🧝 👤 👥 🚶 🏃'.split(' ') },
-          { key: 'Animals & nature', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🐢 🐍 🦖 🐙 🦑 🦀 🐠 🐟 🐬 🐳 🐋 🦈 🌸 🌷 🌹 🌻 🌼 🌵 🌲 🌳 🍀 🍁 🍂 🌾 ⭐ 🌙 ☀️ ⛅ ☁️ 🌈 ⚡ ❄️ 🔥 💧 🌊'.split(' ') },
-          { key: 'Food & drink', emojis: '🍎 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥝 🍅 🥑 🥦 🌽 🥕 🥔 🍞 🥐 🥯 🧀 🥚 🍳 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🍜 🍝 🍣 🍱 🍚 🍙 🍘 🍢 🍡 🍧 🍨 🍦 🍰 🎂 🧁 🍩 🍪 🍫 🍬 🍭 ☕ 🍵 🍶 🍺 🍻 🍷 🥂 🍸 🍹 🥤'.split(' ') },
-          { key: 'Travel & places', emojis: '🚗 🚕 🚙 🚌 🚑 🚒 🚓 🏎️ 🚄 🚅 🚆 🚇 🚉 ✈️ 🚀 🛸 🚁 ⛵ 🚤 🚢 🏠 🏡 🏢 🏥 🏦 🏨 🏫 🏪 🗼 🗽 ⛩️ 🏰 🎡 🎢 🗻 🏔️ 🌋 🏖️ 🏝️'.split(' ') },
-          { key: 'Objects', emojis: '📱 💻 ⌨️ 🖥️ 🖨️ 📷 📸 🎥 📺 ⏰ ⌚ 📚 📖 ✏️ 📝 📌 📎 🔒 🔑 💡 🔦 🔧 🔨 ⚙️ 🎁 🎈 🎉 🎊 🎀 💰 💳 💎 🔔 🎵 🎶 ⚽ 🏀 ⚾ 🎾 🏐 🏈 🎯 🎮 🎲 ♠️ ♥️ ♦️ ♣️'.split(' ') },
-          { key: 'Symbols', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 ✅ ❌ ⭕ ❗ ❓ ⚠️ 💯 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ ✨ ⭐ 🌟'.split(' ') },
-        ],
+        // Full Unicode 14.0 emoji set (1,849 emoji in the 9 Unicode groups) plus the
+        // CLDR names/keywords for the active language. Fetched from /api/emoji the
+        // first time the icon picker is opened, then kept for the session.
+        emoji: { groups: [], names: {} },
+        emojiTab: 'Recommended', emojiQuery: '', emojiLoading: false,
         toast: '', busy: false,
       };
     },
@@ -1364,10 +1401,35 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           delete: T('You can view, edit and delete records in this shared collection.') };
         return map[this.curPerm] || '';
       },
+      // Current value of the field the shared picker is bound to (for the selected outline).
+      iconTargetValue() {
+        const form = this[this.iconTarget];
+        return form ? form.icon : '';
+      },
       iconGroupsAll() {
-        // Fold the curated recommended set in as the first palette category so nothing is lost,
-        // then the general themed groups — a single unified picker (same shape as FormulaBase).
-        return [{ key: 'Recommended', emojis: this.iconChoices.map((c) => c.e) }, ...this.iconGroups];
+        // The curated recommended set stays the first tab, followed by the nine Unicode
+        // groups in the official emoji-ordering sequence.
+        return [{ key: 'Recommended', tab: '⭐', e: this.iconChoices.map((c) => c.e) }, ...this.emoji.groups];
+      },
+      // Emoji shown in the grid: the active tab, or — while searching — every emoji whose
+      // CLDR name or keywords match, in group order (capped so typing stays responsive).
+      emojiShown() {
+        const q = this.emojiQuery.trim().toLowerCase();
+        const groups = this.iconGroupsAll;
+        if (!q) {
+          const g = groups.find((x) => x.key === this.emojiTab) || groups[0];
+          return g ? g.e : [];
+        }
+        const nq = kana(q);
+        const out = [], seen = {}, names = this.emoji.names;
+        for (const g of groups) {
+          for (const em of g.e) {
+            if (seen[em]) continue;
+            if (em === q || kana(names[em] || '').includes(nq)) { seen[em] = true; out.push(em); }
+            if (out.length >= 400) return out;
+          }
+        }
+        return out;
       },
       listFields() {
         if (!this.current) return [];
@@ -1419,6 +1481,10 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         return m;
       },
     },
+    watch: {
+      // the picker floats above the dialogs, so it must never outlive the one that opened it
+      modal() { this.iconPickerOpen = false; },
+    },
     async mounted() {
       rootProxy = this;
       const rootEl = document.getElementById('regibase-root');
@@ -1451,6 +1517,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           } catch (e) { i18nOverride = null; }
         }
         this.locale++;
+        // emoji names/keywords are language-specific too — drop them so the picker refetches
+        this.emoji = { groups: [], names: {} };
         // built-in templates are translated server-side by the RegiBase language setting;
         // refresh the cached list so the picker matches the newly chosen language.
         if (this.authenticated && this.templates.length) { try { this.templates = await api('templates'); } catch (e) { /* keep previous */ } }
@@ -2233,6 +2301,34 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.shareExpanded = false;
         if (this.isOwner) this.loadShares();
       },
+      // ---- icon (emoji) picker ----
+      // The Unicode set is ~150 KB with its names, so it is loaded on first use only.
+      async loadEmoji() {
+        if (this.emoji.groups.length || this.emojiLoading) return;
+        this.emojiLoading = true;
+        try {
+          const r = await api('emoji/' + encodeURIComponent((this.settingsForm && this.settingsForm.language) || 'auto'));
+          this.emoji = { groups: r.groups || [], names: r.names || {} };
+        } catch (e) { /* the recommended tab still works without it */ }
+        this.emojiLoading = false;
+      },
+      openIconPicker(target) {
+        this.iconPickerOpen = !(this.iconPickerOpen && this.iconTarget === target);
+        this.iconTarget = target;
+        if (!this.iconPickerOpen) return;
+        this.emojiQuery = '';
+        this.loadEmoji();
+      },
+      pickIcon(em) {
+        const form = this[this.iconTarget];
+        if (form) form.icon = em;
+        this.iconPickerOpen = false;
+      },
+      // CLDR short name for the tooltip; the stored value is "name|keyword keyword".
+      emojiName(em) {
+        const n = this.emoji.names[em];
+        return n ? n.split('|')[0] : em;
+      },
       // ---- internal sharing (owner side) ----
       shareBadge(c) { if (!c) return ''; if (c.shared_by_me) return '🔗'; if (c.shared_with_me) return '👥'; return ''; },
       shareBadgeTitle(c) { if (!c) return ''; if (c.shared_by_me) return T('Shared by you'); if (c.shared_with_me) return T('Shared with you'); return ''; },
@@ -2620,7 +2716,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.modal = { type: 'import' };
       },
       async openContactsImport() {
-        this.contactsImport = { books: [], selected: 'all', name: '', busy: false, err: '', loading: true, enabled: true };
+        this.contactsImport = { books: [], selected: 'all', name: '', icon: '', busy: false, err: '', loading: true, enabled: true };
         this.modal = { type: 'contactsImport' };
         try {
           const r = await api('contacts/addressbooks');
@@ -2632,7 +2728,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       async commitContactsImport() {
         this.contactsImport.busy = true; this.contactsImport.err = '';
         try {
-          const res = await api('contacts/import', { method: 'POST', body: JSON.stringify({ addressbook: this.contactsImport.selected, name: this.contactsImport.name || '' }) });
+          const res = await api('contacts/import', { method: 'POST', body: JSON.stringify({ addressbook: this.contactsImport.selected, name: this.contactsImport.name || '', icon: this.contactsImport.icon || '' }) });
           this.modal = null;
           await this.loadCollections();
           this.showToast(T('Imported {n} items', { n: res.imported }));
@@ -2641,7 +2737,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         finally { this.contactsImport.busy = false; }
       },
       async openTablesImport() {
-        this.tablesImport = { tables: [], selected: 0, name: '', busy: false, err: '', loading: true, available: true };
+        this.tablesImport = { tables: [], selected: 0, name: '', icon: '', busy: false, err: '', loading: true, available: true };
         this.modal = { type: 'tablesImport' };
         try {
           const r = await api('tables/list');
@@ -2656,7 +2752,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!this.tablesImport.selected) return;
         this.tablesImport.busy = true; this.tablesImport.err = '';
         try {
-          const res = await api('tables/import', { method: 'POST', body: JSON.stringify({ tableId: this.tablesImport.selected, name: this.tablesImport.name || '' }) });
+          const res = await api('tables/import', { method: 'POST', body: JSON.stringify({ tableId: this.tablesImport.selected, name: this.tablesImport.name || '', icon: this.tablesImport.icon || '' }) });
           this.modal = null;
           await this.loadCollections();
           this.showToast(T('Imported {n} items', { n: res.imported }));

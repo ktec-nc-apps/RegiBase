@@ -33,6 +33,7 @@ class PageController extends Controller {
 		Util::addStyle(Application::APP_ID, 'regibase');
 		// Runtime-only Vue + precompiled render function (no template compiler → no eval).
 		Util::addScript(Application::APP_ID, 'vue.runtime.global.prod');
+		Util::addScript(Application::APP_ID, 'vue-private');
 		Util::addScript(Application::APP_ID, 'regibase.dist');
 
 		// Translate the pre-Vue loading text using the RegiBase language setting

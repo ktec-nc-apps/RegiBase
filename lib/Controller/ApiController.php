@@ -102,6 +102,7 @@ class ApiController extends Controller {
 		}
 		$bookKey = (string)$this->request->getParam('addressbook', 'all');
 		$name = trim((string)$this->request->getParam('name', ''));
+		$icon = trim((string)$this->request->getParam('icon', ''));
 
 		$records = [];
 		foreach ($this->userAddressBooks() as $b) {
@@ -132,7 +133,7 @@ class ApiController extends Controller {
 		}
 		$created = $this->service->createCollection($uid, [
 			'name' => $name,
-			'icon' => '👤',
+			'icon' => $icon !== '' ? $icon : '👤',
 			'color' => '#0ea5e9',
 			'view' => 'card',
 			'fields' => ContactsImport::fields($l),
@@ -167,6 +168,7 @@ class ApiController extends Controller {
 			return new JSONResponse(['error' => $l->t('No table selected')], Http::STATUS_BAD_REQUEST);
 		}
 		$name = trim((string)$this->request->getParam('name', ''));
+		$icon = trim((string)$this->request->getParam('icon', ''));
 		try {
 			$payload = $this->tablesBridge->buildImport($uid, $tableId);
 		} catch (\Throwable $e) {
@@ -174,6 +176,9 @@ class ApiController extends Controller {
 		}
 		if ($name !== '') {
 			$payload['name'] = $name;
+		}
+		if ($icon !== '') {
+			$payload['icon'] = $icon;
 		}
 		$records = $payload['records'];
 		unset($payload['records']);
@@ -593,6 +598,33 @@ class ApiController extends Controller {
 		}
 		$data = json_decode((string)file_get_contents($path), true);
 		return new JSONResponse(['translations' => $data['translations'] ?? []]);
+	}
+
+	/**
+	 * The full Unicode 14.0 emoji set for the icon picker, plus the CLDR names and
+	 * keywords in $lang so the picker can be searched in the user's own language.
+	 * Fetched lazily (only when the picker is first opened) — it is ~150 KB.
+	 * 'auto' follows the Nextcloud language; anything unknown falls back to English.
+	 */
+	#[NoAdminRequired]
+	public function getEmoji(string $lang = 'auto'): JSONResponse {
+		if (!in_array($lang, $this->languageCodes(), true)) {
+			$lang = substr($this->l10nFactory->findLanguage(Application::APP_ID), 0, 2);
+		}
+		$base = realpath(__DIR__ . '/../../data/emoji');
+		if ($base === false) {
+			return $this->notFound();
+		}
+		$names = realpath($base . '/' . $lang . '.json');
+		if ($names === false || strpos($names, $base) !== 0) {
+			$names = $base . '/en.json';
+		}
+		$list = json_decode((string)file_get_contents($base . '/list.json'), true);
+		return new JSONResponse([
+			'version' => $list['version'] ?? '',
+			'groups' => $list['groups'] ?? [],
+			'names' => json_decode((string)file_get_contents($names), true) ?: [],
+		]);
 	}
 
 	#[NoAdminRequired]
