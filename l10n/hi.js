@@ -1,9 +1,9 @@
 OC.L10N.register(
     "regibase",
     {
+    "Address (map link)" : "पता (मानचित्र लिंक)",
     "Map service (for address links)" : "मानचित्र सेवा (पते के लिंक हेतु)",
-    "A 🗺 button on address fields opens the value in this map service." : "पता फ़ील्ड पर 🗺 बटन उस मान को इस मानचित्र सेवा में खोलता है।",
-    "🗺 Map link (address)" : "🗺 मानचित्र लिंक (पता)",
+    "A 🌐 button on address fields opens the value in this map service." : "पता फ़ील्ड पर 🌐 बटन उस मान को इस मानचित्र सेवा में खोलता है।",
     "Open in map" : "मानचित्र में खोलें",
     "Add reminder" : "अनुस्मारक जोड़ें",
     "The Calendar app is not enabled" : "कैलेंडर ऐप सक्षम नहीं है",

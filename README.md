@@ -62,8 +62,8 @@ from it. It connects with these apps when they are installed:
 - **Notes** — attach a note to a record.
 - **Calendar** — add a reminder from a date field; it opens Calendar's new-event editor prefilled with the date.
 
-Address fields can also show a 🗺 button that opens the value in **Google Maps, OpenStreetMap
-or Apple Maps** (chosen in Settings) — no external app required.
+Use the **Address** field type and its value gets a 🌐 button that opens it in **Google Maps,
+OpenStreetMap or Apple Maps** (chosen in Settings) — no external app required.
 
 Each integration's action becomes available once its app is enabled (otherwise the
 button stays disabled with a hint), so RegiBase adapts to whichever apps you run.
@@ -158,8 +158,8 @@ RegiBase は単独で完結するのではなく、お使いの Nextcloud に溶
 - **Notes（メモ）** — レコードにメモを添付。
 - **Calendar（カレンダー）** — 日付項目からリマインダーを追加。日付を入れた新規イベント画面が開きます。
 
-住所項目には 🗺 ボタンを表示でき、値を **Google マップ／OpenStreetMap／Apple マップ**（設定で選択）で
-開けます（外部アプリ不要）。
+項目タイプ「**住所**」を使うと、その値に 🌐 ボタンが付き、**Google マップ／OpenStreetMap／Apple マップ**
+（設定で選択）で開けます（外部アプリ不要）。
 
 各連携の操作は、対応アプリが有効なときに使用可能になります（無効時はボタンがヒント付きで
 グレーアウト表示）。導入しているアプリに合わせて RegiBase 側が自動的に対応します。

@@ -2,6 +2,16 @@
 
 All notable changes to RegiBase.
 
+## 0.13.1 — 2026-07-25
+
+### Address field type
+
+- The map link is now a dedicated **Address** field type instead of a per-field checkbox.
+  Pick the *Address* type and its value gets a 🌐 button that opens it in your chosen map
+  service (Google Maps / OpenStreetMap / Apple Maps). The built-in templates and the Contacts
+  import now use this type for address fields.
+- The map button uses a clearer 🌐 (globe) icon and sits before the copy button.
+
 ## 0.13.0 — 2026-07-25
 
 ### Reminders in your Calendar, and map links for addresses

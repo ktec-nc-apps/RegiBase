@@ -1,9 +1,9 @@
 OC.L10N.register(
     "regibase",
     {
+    "Address (map link)" : "Dirección (enlace de mapa)",
     "Map service (for address links)" : "Servicio de mapas (para enlaces de dirección)",
-    "A 🗺 button on address fields opens the value in this map service." : "Un botón 🗺 en los campos de dirección abre el valor en este servicio de mapas.",
-    "🗺 Map link (address)" : "🗺 Enlace de mapa (dirección)",
+    "A 🌐 button on address fields opens the value in this map service." : "Un botón 🌐 en los campos de dirección abre el valor en este servicio de mapas.",
     "Open in map" : "Abrir en el mapa",
     "Add reminder" : "Añadir recordatorio",
     "The Calendar app is not enabled" : "La aplicación Calendario no está habilitada",

@@ -1,9 +1,9 @@
 OC.L10N.register(
     "regibase",
     {
+    "Address (map link)" : "العنوان (رابط الخريطة)",
     "Map service (for address links)" : "خدمة الخرائط (لروابط العناوين)",
-    "A 🗺 button on address fields opens the value in this map service." : "يفتح زر 🗺 في حقول العناوين القيمة في خدمة الخرائط هذه.",
-    "🗺 Map link (address)" : "🗺 رابط الخريطة (العنوان)",
+    "A 🌐 button on address fields opens the value in this map service." : "يفتح زر 🌐 في حقول العناوين القيمة في خدمة الخرائط هذه.",
     "Open in map" : "فتح في الخريطة",
     "Add reminder" : "إضافة تذكير",
     "The Calendar app is not enabled" : "تطبيق التقويم غير مُفعّل",

@@ -1,8 +1,8 @@
 {
     "translations": {
+        "Address (map link)": "住所（地図リンク）",
         "Map service (for address links)": "地図サービス（住所リンク用）",
-        "A 🗺 button on address fields opens the value in this map service.": "住所項目の 🗺 ボタンで、その値をこの地図サービスで開きます。",
-        "🗺 Map link (address)": "🗺 地図リンク（住所）",
+        "A 🌐 button on address fields opens the value in this map service.": "住所項目の 🌐 ボタンで、その値をこの地図サービスで開きます。",
         "Open in map": "地図で開く",
         "Google Maps": "Google マップ",
         "Apple Maps": "Apple マップ",

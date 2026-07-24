@@ -21,7 +21,7 @@ class ContactsImport {
 			['key' => 'mobile', 'label' => $l->t('Mobile phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
 			['key' => 'phone', 'label' => $l->t('Phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
 			['key' => 'email', 'label' => $l->t('Email'), 'type' => 'email'],
-			['key' => 'address', 'label' => $l->t('Address'), 'type' => 'textarea'],
+			['key' => 'address', 'label' => $l->t('Address'), 'type' => 'address'],
 			['key' => 'birthday', 'label' => $l->t('Birthday'), 'type' => 'date'],
 			['key' => 'memo', 'label' => $l->t('Memo'), 'type' => 'textarea'],
 		];

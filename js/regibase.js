@@ -591,8 +591,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(modal.rec, f) }}</span>
             <button v-if="f.secret && !secretsMasked" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
             <button v-if="f.type==='date' || f.type==='month'" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(modal.rec, f)">📅</button>
+            <button v-if="fieldHasMap(f) && modal.rec.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(modal.rec.data[f.key])">🌐</button>
             <button v-if="!(f.secret && secretsMasked)" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
-            <button v-if="fieldHasMap(f) && modal.rec.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(modal.rec.data[f.key])">🗺</button>
           </div>
         </div>
       </div>
@@ -639,6 +639,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <option value="email">{{ t('Email') }}</option>
             <option value="url">URL</option>
             <option value="tel">{{ t('Phone number') }}</option>
+            <option value="address">{{ t('Address (map link)') }}</option>
             <option value="select">{{ t('Choices') }}</option>
             <option value="image">{{ t('Image (as-is / resize)') }}</option>
             <option value="image_crop">{{ t('Image (crop)') }}</option>
@@ -699,7 +700,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('★ Title') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
-            <label v-if="(f.type==='text' || f.type==='textarea') && !f.secret"><input type="checkbox" v-model="f._map" /> {{ t('🗺 Map link (address)') }}</label>
           </div>
         </div>
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
@@ -935,6 +935,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               <option value="url">URL</option>
               <option value="email">{{ t('Email') }}</option>
               <option value="tel">{{ t('Phone number') }}</option>
+              <option value="address">{{ t('Address (map link)') }}</option>
               <option value="date">{{ t('Date') }}</option>
               <option value="number">{{ t('Numeric') }}</option>
               <option value="image">{{ t('Image') }}</option>
@@ -1125,13 +1126,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>🗺 {{ t('Map service (for address links)') }}</label>
+          <label>🌐 {{ t('Map service (for address links)') }}</label>
           <select v-model="settingsForm.map_provider">
             <option value="google">{{ t('Google Maps') }}</option>
             <option value="osm">{{ t('OpenStreetMap') }}</option>
             <option value="apple">{{ t('Apple Maps') }}</option>
           </select>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🗺 button on address fields opens the value in this map service.') }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🌐 button on address fields opens the value in this map service.') }}</div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>💾 {{ t('Backup / Restore') }}</label>
@@ -2651,7 +2652,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             _pattern: (RULE_TYPES.includes(f.type) && o.pattern) ? o.pattern : '',
             _rmin: (RULE_TYPES.includes(f.type) && o.min > 0) ? o.min : '',
             _rmax: (RULE_TYPES.includes(f.type) && o.max > 0) ? o.max : '',
-            _map: !!o.map,
             _uid: this.uidCounter++,
           };
         });
@@ -2675,7 +2675,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             if (f._charset === 'custom' && f._pattern) rule.pattern = f._pattern;
             if (Number(f._rmin) > 0) rule.min = Number(f._rmin);
             if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
-            if ((f.type === 'text' || f.type === 'textarea') && f._map && !f.secret) rule.map = true;
             options = Object.keys(rule).length ? rule : undefined;
           }
           return {
@@ -2690,7 +2689,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.schemaFields = this.fieldsToSchemaRows(this.current.fields);
         this.modal = { type: 'schema' };
       },
-      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _map: false, _uid: this.uidCounter++ }); },
+      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
@@ -3323,8 +3322,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const url = OC.generateUrl('/apps/calendar/new/1/' + r.start + '/' + r.end);
         window.open(url, 'rbcal', 'popup,width=520,height=760,noopener');
       },
-      // A field opts into a map link via options.map (text / textarea, non-secret).
-      fieldHasMap(f) { return !!(f && f.options && f.options.map && !f.secret); },
+      // Address fields carry a map link. (options.map is honoured for backward
+      // compatibility with fields created before the dedicated 'address' type.)
+      fieldHasMap(f) { return !!(f && !f.secret && (f.type === 'address' || (f.options && f.options.map))); },
       // Build a search URL for the chosen map service from a free-text address.
       mapUrl(address) {
         const q = encodeURIComponent(String(address).trim());
