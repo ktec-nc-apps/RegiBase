@@ -640,6 +640,37 @@
 #regibase-root .emoji-popup { position: fixed; z-index: 10010; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, 92vw); max-height: 72vh; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 44px rgba(0,0,0,0.3); padding: 6px; }
 #regibase-root .emoji-popup .emoji-palette { max-height: none; flex: 1 1 auto; min-height: 0; border: 0; background: transparent; padding: 4px; overflow-y: auto; }
 #regibase-root .emoji-popup .emoji-search { width: 100%; margin: 2px 0 6px; text-align: left; }
+
+/* password generator — same fixed-popup treatment as the emoji picker so it is
+   never clipped by the scrolling record dialog it is opened from */
+#regibase-root .pwgen-popup { position: fixed; z-index: 10010; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(400px, 94vw); max-height: 88vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 44px rgba(0,0,0,0.3); padding: 12px 14px 10px; }
+#regibase-root .pwgen-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+#regibase-root .pwgen-out { display: flex; gap: 4px; align-items: stretch; }
+#regibase-root .pwgen-val { flex: 1 1 auto; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; letter-spacing: 0.4px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; }
+#regibase-root .pwgen-val:focus { border-color: var(--primary); }
+#regibase-root .pwgen-out .icon-btn { border: 1px solid var(--border); background: var(--surface-2); font-size: 17px; }
+#regibase-root .pwgen-meter { height: 6px; border-radius: 4px; background: var(--surface-2); margin: 8px 0 4px; overflow: hidden; }
+#regibase-root .pwgen-bar { height: 100%; border-radius: 4px; transition: width 0.15s ease; }
+#regibase-root .pwgen-bar.w1, #regibase-root .pwgen-strength .w1 { background: var(--danger); }
+#regibase-root .pwgen-bar.w2, #regibase-root .pwgen-strength .w2 { background: #e0a72c; }
+#regibase-root .pwgen-bar.w3, #regibase-root .pwgen-strength .w3 { background: #4a9d5b; }
+#regibase-root .pwgen-bar.w4, #regibase-root .pwgen-strength .w4 { background: #2f8f4e; }
+#regibase-root .pwgen-strength { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 10px; }
+#regibase-root .pwgen-strength span:first-child { background: transparent !important; font-weight: 700; }
+#regibase-root .pwgen-strength .w1 { color: var(--danger); }
+#regibase-root .pwgen-strength .w2 { color: #b5820f; }
+#regibase-root .pwgen-strength .w3, #regibase-root .pwgen-strength .w4 { color: #2f8f4e; }
+#regibase-root .pwgen-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+#regibase-root .pwgen-row .sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
+#regibase-root .pwgen-row input[type='range'] { flex: 1 1 auto; min-width: 0; accent-color: var(--primary); }
+#regibase-root .pwgen-num { width: 64px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; }
+#regibase-root .pwgen-opts { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+#regibase-root .pwgen-opts label { display: flex; align-items: center; gap: 7px; }
+#regibase-root .pwgen-opts label.dis { opacity: 0.45; }
+#regibase-root .pwgen-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+#regibase-root .pwgen-err { font-size: 12px; color: var(--danger); margin-top: 8px; line-height: 1.4; }
+#regibase-root .pwgen-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
 #regibase-root .emoji-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 #regibase-root .emoji-tab { flex: 1 1 auto; font-size: 18px; line-height: 1; padding: 6px 0; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; }
 #regibase-root .emoji-tab:hover { background: var(--surface-2); }

@@ -63,6 +63,38 @@
   const CHARSET_RE = { digits: /^[0-9]*$/, alnum: /^[0-9A-Za-z]*$/, alpha: /^[A-Za-z]*$/, hex: /^[0-9A-Fa-f]*$/, ascii: /^[\x20-\x7E]*$/, phone: /^[0-9+\-() ]*$/ };
   const CHARSET_LABEL = { digits: 'Digits', alnum: 'Alphanumeric', alpha: 'Letters', hex: 'Hexadecimal', ascii: 'ASCII characters', phone: 'Phone number (digits, +-() )', custom: 'Specified format' };
 
+  // ---- password generator (for secret fields; never leaves the browser) ----
+  // Symbols deliberately exclude space, quote, backtick and backslash: they are the
+  // characters that break shell/CSV round-trips and get mangled when pasted.
+  const PWGEN_SETS = {
+    upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    lower: 'abcdefghijklmnopqrstuvwxyz',
+    digits: '0123456789',
+    symbols: '!#$%&()*+,-./:;<=>?@[]^_{|}~',
+  };
+  const PWGEN_CLASSES = ['upper', 'lower', 'digits', 'symbols'];
+  const PWGEN_LOOKALIKE = '0O1lI|';
+  const PWGEN_HEX = '0123456789ABCDEF';
+  // Uniform in [0,n). `getRandomValues() % n` alone would bias the low values.
+  function randBelow(n) {
+    const buf = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / n) * n;
+    let v;
+    do { crypto.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+    return v % n;
+  }
+  function randPick(s) { return s.charAt(randBelow(s.length)); }
+  function makePassword(pools, len) {
+    const all = pools.join('');
+    if (!all || len <= 0) return '';
+    const out = [];
+    // one character from every selected class first, then fill from the union
+    for (const p of pools) { if (out.length < len) out.push(randPick(p)); }
+    while (out.length < len) out.push(randPick(all));
+    for (let i = out.length - 1; i > 0; i--) { const j = randBelow(i + 1); const t = out[i]; out[i] = out[j]; out[j] = t; }
+    return out.join('');
+  }
+
   // ---- client-side encryption of secret fields (E2EE; server never sees the key) ----
   const ENC_PREFIX = 'rbenc1:';
   const rbcrypto = {
@@ -503,6 +535,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </div>
           <div v-else class="control">
             <input :type="inputType(f)" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
+            <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click.stop="openPwGen('record', f)" :title="t('Generate a password')">🎲</button>
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
           </div>
           <div v-if="ruleHint(f)" class="rule-hint">📏 {{ ruleHint(f) }}</div>
@@ -779,7 +812,10 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <div class="share-opts">
               <div class="so-row">
                 <span class="sub">{{ t('Share password (optional)') }}</span>
-                <input v-model="sharePanel.password" type="text" :placeholder="t('Blank = no password')" autocomplete="off" data-1p-ignore data-lpignore="true" />
+                <div class="control">
+                  <input v-model="sharePanel.password" type="text" :placeholder="t('Blank = no password')" autocomplete="off" data-1p-ignore data-lpignore="true" />
+                  <button type="button" class="icon-btn" @click.stop="openPwGen('share')" :title="t('Generate a password')">🎲</button>
+                </div>
               </div>
               <div v-if="collectionHasSecret && enc.enabled" class="so-row so-secret">
                 <span class="sub">{{ t('Show secret fields to the recipient') }}</span>
@@ -1289,6 +1325,45 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     </div>
   </template>
 
+  <!-- One password generator shared by every secret field and by the share password.
+       Lives at root level so it can float above the record dialog. -->
+  <template v-if="pwgen.open">
+    <div class="emoji-backdrop" @click="closePwGen()"></div>
+    <div class="pwgen-popup" @click.stop>
+      <div class="pwgen-head"><span>🎲 {{ t('Password generator') }}</span><button type="button" class="icon-btn" @click="closePwGen()">✕</button></div>
+      <div class="pwgen-out">
+        <input class="pwgen-val" v-model="pwgen.value" spellcheck="false" autocorrect="off" autocapitalize="off"
+               autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" />
+        <button type="button" class="icon-btn" @click="pwgenMake()" :title="t('Regenerate')">🔄</button>
+        <button type="button" class="icon-btn" @click="copyVal(pwgen.value)" :title="t('Copy')">⧉</button>
+      </div>
+      <div class="pwgen-meter"><div class="pwgen-bar" :class="pwgenStrength.cls" :style="{width: pwgenStrength.pct + '%'}"></div></div>
+      <div class="pwgen-strength">
+        <span :class="pwgenStrength.cls">{{ t(pwgenStrength.label) }}</span>
+        <span class="muted">{{ t('{bits} bits of entropy', {bits: pwgenStrength.bits}) }}</span>
+      </div>
+      <div class="pwgen-row">
+        <span class="sub">{{ t('Length') }}</span>
+        <input type="range" :min="pwgenMin" :max="pwgenMax" v-model.number="pwgen.len" @input="pwgenSetLen()" />
+        <input type="number" class="pwgen-num" :min="pwgenMin" :max="pwgenMax" v-model.number="pwgen.len" @change="pwgenSetLen()" />
+      </div>
+      <div class="pwgen-opts">
+        <label v-for="c in pwgenClasses" :key="c.k" :class="{dis: !c.avail}">
+          <input type="checkbox" :checked="pwgen[c.k]" :disabled="!c.avail" @change="pwgenToggle(c.k, $event.target.checked)" /> {{ t(c.label) }}
+        </label>
+        <label :class="{dis: !pwgenLookalikeUsable}">
+          <input type="checkbox" v-model="pwgen.noLookalike" :disabled="!pwgenLookalikeUsable" @change="pwgenMake()" /> {{ t('Exclude look-alike characters (0 O 1 l I |)') }}
+        </label>
+      </div>
+      <div v-if="pwgenNote" class="pwgen-note">📏 {{ pwgenNote }}</div>
+      <div v-if="pwgen.err" class="pwgen-err">⚠️ {{ pwgen.err }}</div>
+      <div class="pwgen-foot">
+        <button type="button" class="btn sm" @click="closePwGen()">{{ t('Cancel') }}</button>
+        <button type="button" class="btn sm primary" :disabled="!pwgen.value" @click="pwgenApply()">{{ t('Use this password') }}</button>
+      </div>
+    </div>
+  </template>
+
   <div v-if="toast" class="toast">{{ toast }}</div>
 </div>
 `;
@@ -1327,6 +1402,10 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         editingOrig: null,
         permOpen: false,
         iconPickerOpen: false, iconTarget: 'collForm',
+        // password generator; `value` is a live secret, so it is cleared on close
+        // `prefLen` is what the user chose; `len` is that clamped to the current
+        // field's rule, so a 6–8 digit PIN field does not shrink the preference.
+        pwgen: { open: false, target: null, field: null, value: '', err: '', len: 20, prefLen: 20, upper: true, lower: true, digits: true, symbols: true, noLookalike: true, loaded: false },
         shareExpanded: false,
         unlockKey: '', unlockErr: '', unlockRemember: true,
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
@@ -1480,10 +1559,55 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         for (const r of this.records) m[r.id] = r;
         return m;
       },
+      // ---- password generator ----
+      // The field's input rule (if any) narrows what the generator may produce, so
+      // a generated value can never be rejected by the very rule that field carries.
+      pwgenRule() { return this.pwgen.field ? this.fieldRule(this.pwgen.field) : null; },
+      pwgenCharset() { const o = this.pwgenRule; return (o && o.charset) || ''; },
+      pwgenClasses() {
+        return [
+          { k: 'upper', label: 'Uppercase (A–Z)', avail: this.pwgenAvail('upper') },
+          { k: 'lower', label: 'Lowercase (a–z)', avail: this.pwgenAvail('lower') },
+          { k: 'digits', label: 'Digits (0–9)', avail: this.pwgenAvail('digits') },
+          { k: 'symbols', label: 'Symbols (!#$%…)', avail: this.pwgenAvail('symbols') },
+        ];
+      },
+      pwgenLookalikeUsable() { return this.pwgenCharset !== 'hex'; },
+      pwgenPools() {
+        if (this.pwgenCharset === 'hex') return [PWGEN_HEX]; // 0 and 1 are part of the alphabet here
+        const pools = [];
+        for (const c of PWGEN_CLASSES) {
+          if (!this.pwgen[c] || !this.pwgenAvail(c)) continue;
+          let s = PWGEN_SETS[c];
+          if (this.pwgen.noLookalike) s = s.split('').filter((ch) => PWGEN_LOOKALIKE.indexOf(ch) < 0).join('');
+          if (s) pools.push(s);
+        }
+        return pools;
+      },
+      pwgenMin() {
+        const o = this.pwgenRule;
+        const min = Math.max(4, (o && o.min) ? o.min : 4);
+        return Math.min(min, this.pwgenMax);
+      },
+      pwgenMax() {
+        const o = this.pwgenRule;
+        return Math.max(4, Math.min(128, (o && o.max) ? o.max : 64));
+      },
+      pwgenStrength() {
+        const pool = this.pwgenPools.join('').length;
+        const len = (this.pwgen.value || '').length;
+        const bits = (pool > 1 && len) ? Math.round(len * Math.log2(pool)) : 0;
+        let cls = 'w1', label = 'Weak';
+        if (bits >= 128) { cls = 'w4'; label = 'Very strong'; }
+        else if (bits >= 90) { cls = 'w3'; label = 'Strong'; }
+        else if (bits >= 60) { cls = 'w2'; label = 'Fair'; }
+        return { bits, cls, label, pct: Math.max(3, Math.min(100, Math.round((bits / 128) * 100))) };
+      },
+      pwgenNote() { return this.pwgen.field ? this.ruleHint(this.pwgen.field) : ''; },
     },
     watch: {
       // the picker floats above the dialogs, so it must never outlive the one that opened it
-      modal() { this.iconPickerOpen = false; },
+      modal() { this.iconPickerOpen = false; this.closePwGen(); },
     },
     async mounted() {
       rootProxy = this;
@@ -2966,6 +3090,66 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           return T('{label} may contain {charset} only', { label: f.label, charset: T(CHARSET_LABEL[o.charset]) });
         }
         return null;
+      },
+      // ---- password generator ----
+      pwgenAvail(c) {
+        const cs = this.pwgenCharset;
+        if (!cs || cs === 'ascii' || cs === 'custom') return true;
+        if (cs === 'digits' || cs === 'phone') return c === 'digits';
+        if (cs === 'alnum') return c !== 'symbols';
+        if (cs === 'alpha') return c === 'upper' || c === 'lower';
+        if (cs === 'hex') return false; // fixed 0-9A-F alphabet
+        return true;
+      },
+      openPwGen(target, field) {
+        const p = this.pwgen;
+        p.target = target; p.field = field || null; p.err = '';
+        if (!p.loaded) { // remembered options, like KeePass keeps its profile
+          p.loaded = true;
+          try {
+            const o = JSON.parse(localStorage.getItem('regibase.pwgen') || 'null');
+            if (o && typeof o === 'object') {
+              for (const k of ['upper', 'lower', 'digits', 'symbols', 'noLookalike']) if (typeof o[k] === 'boolean') p[k] = o[k];
+              if (Number(o.len) > 0) p.prefLen = Number(o.len);
+            }
+          } catch (e) { /* ignore unreadable prefs */ }
+        }
+        p.len = p.prefLen; // pwgenMake() clamps it to whatever this field allows
+        // the rule may forbid every class the user had enabled — fall back to what it allows
+        if (!this.pwgenPools.length) { for (const c of PWGEN_CLASSES) p[c] = this.pwgenAvail(c); }
+        p.open = true;
+        this.pwgenMake();
+      },
+      pwgenSetLen() { this.pwgen.prefLen = Number(this.pwgen.len) || this.pwgenMin; this.pwgenMake(); },
+      closePwGen() { const p = this.pwgen; p.open = false; p.value = ''; p.err = ''; p.field = null; p.target = null; },
+      pwgenToggle(k, on) {
+        const p = this.pwgen;
+        p[k] = on;
+        if (!this.pwgenPools.length) { p[k] = true; return; } // never leave zero classes selected
+        this.pwgenMake();
+      },
+      pwgenMake() {
+        const p = this.pwgen;
+        p.len = Math.max(this.pwgenMin, Math.min(this.pwgenMax, Number(p.len) || this.pwgenMin));
+        const pools = this.pwgenPools;
+        if (!pools.length) { p.value = ''; p.err = T('Select at least one character type'); return; }
+        p.value = makePassword(pools, p.len);
+        // a custom regex rule cannot be generated against — warn instead of silently failing on save
+        p.err = (p.field && this.validateField(p.field, p.value)) ? T('This field has a format rule the generator cannot match. Please check the value.') : '';
+      },
+      pwgenApply() {
+        const p = this.pwgen;
+        if (!p.value) return;
+        if (p.target === 'share') { this.sharePanel.password = p.value; }
+        else if (p.field) {
+          this.form[p.field.key] = p.value;
+          this.reveal = { ...this.reveal, [p.field.key]: true }; // show it once so it can be checked/copied
+        }
+        try {
+          localStorage.setItem('regibase.pwgen', JSON.stringify({ len: p.prefLen, upper: p.upper, lower: p.lower, digits: p.digits, symbols: p.symbols, noLookalike: p.noLookalike }));
+        } catch (e) { /* prefs are a convenience only */ }
+        this.closePwGen();
+        this.showToast(T('Password generated'));
       },
       toggleReveal(key) { this.reveal = { ...this.reveal, [key]: !this.reveal[key] }; },
       async copyVal(v) { try { await navigator.clipboard.writeText(String(v)); this.showToast(T('Copied')); } catch { this.showToast(T('Copy failed')); } },

@@ -2,6 +2,32 @@
 
 All notable changes to RegiBase.
 
+## 0.12.13 — 2026-07-24
+
+### Password generator for secret fields
+
+Every secret field in the record editor now has a 🎲 button next to the reveal eye, and the
+share password in the collection settings has one too. The master key deliberately does not —
+it is the one password you have to be able to remember and re-type.
+
+- Length 4–128 with a slider, and the four character classes (A–Z, a–z, 0–9, symbols) as
+  independent toggles. At least one character from every selected class is guaranteed.
+- Characters are drawn from `crypto.getRandomValues` with rejection sampling, so every
+  character is uniformly distributed — `% n` on a raw 32-bit draw would quietly favour the
+  low end of the alphabet — and the result is shuffled with the same source.
+- Optional "exclude look-alike characters" (`0 O 1 l I |`), for passwords that have to be
+  read aloud or typed from a printout.
+- Strength is shown as real entropy — length × log₂(alphabet) — not as a guess at what a
+  password "looks" strong.
+- A field's own input rule is respected: a digits-only or hexadecimal field can only produce
+  what it accepts, and the length range is clamped to the field's minimum and maximum, so a
+  generated value can never be rejected by the rule of the field it was generated for.
+- The generated value never leaves the browser. It is encrypted client-side like any other
+  secret when the collection has encryption enabled, and it is cleared from memory when the
+  dialog closes.
+- Symbols exclude space, quote, backtick and backslash — the characters that get mangled in
+  shells, CSV round-trips and copy-paste.
+
 ## 0.12.12 — 2026-07-23
 
 ### Emoji are drawn by the app, not by the viewer's device
