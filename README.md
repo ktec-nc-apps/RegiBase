@@ -51,6 +51,19 @@ anything else — in collections whose fields **you design yourself**.
   Русский · Português · العربية · हिन्दी · 한국어 · Italiano. Pick a language in the
   app independently of your Nextcloud language.
 
+### Works with your other Nextcloud apps
+
+RegiBase is designed to fit into the rest of your Nextcloud rather than stand apart
+from it. It connects with these apps when they are installed:
+
+- **Contacts** — import contacts, photos included, into a collection.
+- **Tables** — import a table into a new collection, or export a collection to Tables.
+- **Files** — attach any document, or pick images, straight from your Files.
+- **Notes** — attach a note to a record.
+
+Each integration's action becomes available once its app is enabled (otherwise the
+button stays disabled with a hint), so RegiBase adapts to whichever apps you run.
+
 ### Requirements
 
 - Nextcloud **30 – 32**
@@ -129,6 +142,19 @@ Nextcloud ネイティブアプリです。
 - **12 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
   Русский · Português · العربية · हिन्दी · 한국어 · Italiano。
   Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
+
+### 他の Nextcloud アプリと連携
+
+RegiBase は単独で完結するのではなく、お使いの Nextcloud に溶け込むよう設計しています。
+以下のアプリが導入されているときに連携できます:
+
+- **Contacts（連絡先）** — 連絡先（写真含む）をコレクションに取り込み。
+- **Tables** — テーブルを新規コレクションとして取込、またはコレクションを Tables へ書出。
+- **Files（ファイル）** — 任意のファイルの添付や、画像の選択を Files から直接。
+- **Notes（メモ）** — レコードにメモを添付。
+
+各連携の操作は、対応アプリが有効なときに使用可能になります（無効時はボタンがヒント付きで
+グレーアウト表示）。導入しているアプリに合わせて RegiBase 側が自動的に対応します。
 
 ### 動作環境
 

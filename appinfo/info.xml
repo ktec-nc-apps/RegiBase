@@ -8,6 +8,8 @@
 
 Design your own fields (or start from a template), then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
 
+RegiBase works together with your other Nextcloud apps — Contacts, Tables, Files and Notes — using each one when it is installed.
+
 Features:
 - Custom form fields with per-field input rules, built from reusable templates
 - Save your own templates, and edit the built-in ones (per-user override, resettable to default)
@@ -24,6 +26,8 @@ Features:
 	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
 
 項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・リスト詳細・表計算風テーブル（先頭列固定）・カード・画像ギャラリーの各表示形式で閲覧できます。
+
+RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files・Notes）と連携し、導入されているものを活用します。
 
 主な機能:
 - 項目ごとに入力規則を設定できるカスタムフォーム項目。再利用可能なテンプレートから作成
