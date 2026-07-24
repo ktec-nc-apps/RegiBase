@@ -54,8 +54,13 @@
     return body;
   }
 
+  let _slugSeq = 0;
   function slug(s) {
-    return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'f_' + Math.floor(performance.now());
+    // A monotonic counter keeps the fallback unique even when several fields are
+    // slugged in the same synchronous pass (non-ASCII labels all fall through here,
+    // and Math.floor(performance.now()) would otherwise collide within one frame).
+    return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+      || 'f_' + Math.floor(performance.now()).toString(36) + '_' + (_slugSeq++).toString(36);
   }
 
   // input rules (per-field character/length restrictions)
@@ -2639,6 +2644,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         });
       },
       serializeSchemaFields() {
+        const seen = new Set();
+        const uniqueKey = (k) => {
+          let key = k, n = 2;
+          while (seen.has(key)) { key = k + '_' + n; n++; }
+          seen.add(key);
+          return key;
+        };
         return this.schemaFields.filter((f) => (f.label || '').trim()).map((f) => {
           let options;
           if (f.type === 'select') options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -2653,7 +2665,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             options = Object.keys(rule).length ? rule : undefined;
           }
           return {
-            key: (f.key || '').trim() || slug(f.label),
+            key: uniqueKey((f.key || '').trim() || slug(f.label)),
             label: f.label.trim(), type: f.type, options,
             required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
           };

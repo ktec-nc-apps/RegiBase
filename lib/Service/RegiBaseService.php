@@ -354,10 +354,27 @@ class RegiBaseService {
 				$hasTitle = true;
 			}
 		}
+		$seenKeys = [];
 		foreach ($fields as $idx => $f) {
+			// Guarantee a unique field key regardless of what the caller sent.
+			// Duplicate keys make several fields share one form binding (editing
+			// one writes them all), so any collision — from the client, a CSV/JSON
+			// import, or a restore — is resolved here at the single write chokepoint.
+			$key = trim((string)($f['key'] ?? ''));
+			if ($key === '') {
+				$key = 'f_' . $idx;
+			}
+			if (isset($seenKeys[$key])) {
+				$n = 2;
+				while (isset($seenKeys[$key . '_' . $n])) {
+					$n++;
+				}
+				$key = $key . '_' . $n;
+			}
+			$seenKeys[$key] = true;
 			$e = new FieldEntity();
 			$e->setCollectionId($collectionId);
-			$e->setFieldKey((string)($f['key'] ?? ('f_' . $idx)));
+			$e->setFieldKey($key);
 			$e->setLabel((string)($f['label'] ?? ''));
 			$e->setType((string)($f['type'] ?? 'text'));
 			$e->setOptions(!empty($f['options']) ? json_encode($f['options']) : null);

@@ -2,6 +2,19 @@
 
 All notable changes to RegiBase.
 
+## 0.12.15 — 2026-07-25
+
+### Fix: fields could share one value
+
+Adding several fields at once — most often when their labels were non-Latin (Japanese,
+Chinese, and so on) — could give them the same internal key. Fields that share a key also
+share a single value, so editing one (for example a date) filled the others with the same
+entry. Field keys are now guaranteed unique at three levels: the client's key generator no
+longer collides within a single pass, the schema editor de-duplicates keys on save, and — the
+decisive guard — the server enforces uniqueness at the one place every field is written, so no
+import, restore, or future client regression can reintroduce a collision. Existing collections
+already affected are repaired by giving their duplicated fields distinct keys.
+
 ## 0.12.14 — 2026-07-24
 
 ### Password generator: choose the symbols and set per-class min/max
