@@ -1,6 +1,17 @@
 OC.L10N.register(
     "regibase",
     {
+    "Character types" : "Tipos de caracteres",
+    "Allowed symbols" : "Símbolos permitidos",
+    "min" : "Mín",
+    "max" : "Máx",
+    "Minimum count" : "Cantidad mínima",
+    "Maximum count (blank = no limit)" : "Cantidad máxima (vacío = sin límite)",
+    "Excluded as a look-alike" : "Excluido por ser parecido",
+    "Hexadecimal field: fixed 0–9 A–F alphabet." : "Campo hexadecimal: alfabeto fijo 0–9 A–F.",
+    "The maximum counts are too low for this length." : "Las cantidades máximas son demasiado bajas para esta longitud.",
+    "None" : "Ninguno",
+    "∞" : "∞",
     "Generate a password" : "Generar una contraseña",
     "Password generator" : "Generador de contraseñas",
     "Regenerate" : "Regenerar",

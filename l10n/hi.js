@@ -1,6 +1,17 @@
 OC.L10N.register(
     "regibase",
     {
+    "Character types" : "अक्षर प्रकार",
+    "Allowed symbols" : "अनुमत चिह्न",
+    "min" : "न्यून",
+    "max" : "अधि",
+    "Minimum count" : "न्यूनतम संख्या",
+    "Maximum count (blank = no limit)" : "अधिकतम संख्या (खाली = कोई सीमा नहीं)",
+    "Excluded as a look-alike" : "मिलते-जुलते के रूप में हटाया गया",
+    "Hexadecimal field: fixed 0–9 A–F alphabet." : "हेक्साडेसिमल फ़ील्ड: निश्चित वर्णमाला 0–9 A–F।",
+    "The maximum counts are too low for this length." : "इस लंबाई के लिए अधिकतम संख्याएँ बहुत कम हैं।",
+    "None" : "कोई नहीं",
+    "∞" : "∞",
     "Generate a password" : "पासवर्ड बनाएँ",
     "Password generator" : "पासवर्ड जेनरेटर",
     "Regenerate" : "फिर से बनाएँ",

@@ -1,6 +1,17 @@
 OC.L10N.register(
     "regibase",
     {
+    "Character types" : "أنواع الأحرف",
+    "Allowed symbols" : "الرموز المسموح بها",
+    "min" : "الأدنى",
+    "max" : "الأقصى",
+    "Minimum count" : "أقل عدد",
+    "Maximum count (blank = no limit)" : "أقصى عدد (فارغ = بلا حد)",
+    "Excluded as a look-alike" : "مُستبعَد لأنه حرف متشابه",
+    "Hexadecimal field: fixed 0–9 A–F alphabet." : "حقل سِتّ عشري: أبجدية ثابتة 0–9 A–F.",
+    "The maximum counts are too low for this length." : "القيم القصوى منخفضة جدًا لهذا الطول.",
+    "None" : "بلا",
+    "∞" : "∞",
     "Generate a password" : "إنشاء كلمة مرور",
     "Password generator" : "مولّد كلمات المرور",
     "Regenerate" : "إعادة الإنشاء",

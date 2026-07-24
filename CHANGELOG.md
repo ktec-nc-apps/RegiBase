@@ -2,6 +2,31 @@
 
 All notable changes to RegiBase.
 
+## 0.12.14 — 2026-07-24
+
+### Password generator: choose the symbols and set per-class min/max
+
+The generator now gives the same fine control KeePass does, with the constraints kept
+mutually consistent so you can never configure a request it cannot fulfil.
+
+- **Choose which symbols are allowed.** The full symbol palette is shown as a grid; tap to
+  include or exclude each one, with All / None shortcuts. Only the symbols you keep can appear.
+  (A symbol that is also a look-alike, such as `|`, is struck through while "exclude look-alike
+  characters" is on.)
+- **Minimum and maximum occurrences per character type.** Each of uppercase, lowercase, digits
+  and symbols has its own min and max. "min 2 / max 4 digits", "at least one symbol", "no more
+  than one uppercase" — all expressible. A blank max means no limit.
+- **Exclusive (mutually-consistent) handling.** Every change is reconciled so the request stays
+  generatable: a max is never below its own min, the total of the minimums never exceeds the
+  field's ceiling, and the length is clamped into the window the minimums and maximums allow.
+  The length slider's own floor and ceiling move with the constraints, so an impossible
+  combination simply cannot be entered.
+- Guarantees hold exactly: with 5000 sample draws, every minimum is always met, no maximum is
+  ever exceeded, and min == max produces exactly that count.
+- Your choices (symbol set, per-class min/max, length) are remembered between uses, and a
+  field's own input rule still wins — a digits-only or hexadecimal field ignores the controls
+  that do not apply to it.
+
 ## 0.12.13 — 2026-07-24
 
 ### Password generator for secret fields

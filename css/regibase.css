@@ -667,6 +667,26 @@
 #regibase-root .pwgen-opts { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
 #regibase-root .pwgen-opts label { display: flex; align-items: center; gap: 7px; }
 #regibase-root .pwgen-opts label.dis { opacity: 0.45; }
+/* per-class rows with min/max occurrence inputs */
+#regibase-root .pwgen-classes { display: flex; flex-direction: column; gap: 4px; font-size: 13px; margin-bottom: 8px; }
+#regibase-root .pwgen-hdr { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-weight: 700; padding: 0 2px 2px; }
+#regibase-root .pwgen-cls { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
+#regibase-root .pwgen-cls.dis { opacity: 0.45; }
+#regibase-root .pwgen-cls-on { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; }
+#regibase-root .pwgen-mm { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+#regibase-root .pwgen-mm input { width: 46px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; text-align: center; -moz-appearance: textfield; }
+#regibase-root .pwgen-mm input:focus { border-color: var(--primary); }
+#regibase-root .pwgen-mm-sep { color: var(--muted); }
+/* symbol chooser */
+#regibase-root .pwgen-symsel { margin-bottom: 8px; }
+#regibase-root .pwgen-symsel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+#regibase-root .pwgen-symsel-head .sub { font-size: 12px; color: var(--muted); flex: 1 1 auto; }
+#regibase-root .pwgen-mini { font-size: 11px; padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text); cursor: pointer; }
+#regibase-root .pwgen-mini:hover { border-color: var(--primary); }
+#regibase-root .pwgen-symgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 4px; }
+#regibase-root .pwgen-sym { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; line-height: 1; padding: 6px 0; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--muted); cursor: pointer; }
+#regibase-root .pwgen-sym.sel { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, var(--surface)); color: var(--text); font-weight: 700; }
+#regibase-root .pwgen-sym.dis { opacity: 0.3; text-decoration: line-through; }
 #regibase-root .pwgen-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
 #regibase-root .pwgen-err { font-size: 12px; color: var(--danger); margin-top: 8px; line-height: 1.4; }
 #regibase-root .pwgen-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }

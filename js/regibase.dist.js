@@ -84,13 +84,31 @@
     return v % n;
   }
   function randPick(s) { return s.charAt(randBelow(s.length)); }
-  function makePassword(pools, len) {
-    const all = pools.join('');
-    if (!all || len <= 0) return '';
+  // classes: [{ set, min, cap }] where cap is the max occurrences (Infinity = no cap).
+  // Places each class's `min` first, then fills the rest by picking characters
+  // uniformly across the classes that still have capacity, and shuffles the lot.
+  // The caller guarantees a feasible request (sum(min) <= len <= sum(cap)); if a
+  // pathological config slips through, generation stops early rather than looping.
+  function makePassword(classes, len) {
+    if (!classes.length || len <= 0) return '';
+    const cap = classes.map((c) => (c.cap == null ? Infinity : c.cap));
+    const used = classes.map(() => 0);
     const out = [];
-    // one character from every selected class first, then fill from the union
-    for (const p of pools) { if (out.length < len) out.push(randPick(p)); }
-    while (out.length < len) out.push(randPick(all));
+    for (let i = 0; i < classes.length; i++) {
+      for (let j = 0; j < classes[i].min && out.length < len; j++) { out.push(randPick(classes[i].set)); used[i]++; }
+    }
+    while (out.length < len) {
+      // characters still available = union of classes below their cap
+      const avail = [];
+      let total = 0;
+      for (let i = 0; i < classes.length; i++) {
+        if (used[i] < cap[i] && classes[i].set.length) { avail.push(i); total += classes[i].set.length; }
+      }
+      if (!total) break; // every class capped out — cannot reach len
+      let r = randBelow(total), ci = avail[0];
+      for (const i of avail) { if (r < classes[i].set.length) { ci = i; break; } r -= classes[i].set.length; }
+      out.push(randPick(classes[ci].set)); used[ci]++;
+    }
     for (let i = out.length - 1; i > 0; i--) { const j = randBelow(i + 1); const t = out[i]; out[i] = out[j]; out[j] = t; }
     return out.join('');
   }
@@ -1103,20 +1121,44 @@ const _hoisted_642 = { class: "pwgen-row" }
 const _hoisted_643 = { class: "sub" }
 const _hoisted_644 = ["min", "max"]
 const _hoisted_645 = ["min", "max"]
-const _hoisted_646 = { class: "pwgen-opts" }
-const _hoisted_647 = ["checked", "disabled", "onChange"]
-const _hoisted_648 = ["disabled"]
-const _hoisted_649 = {
+const _hoisted_646 = {
   key: 0,
+  class: "pwgen-opts"
+}
+const _hoisted_647 = { class: "pwgen-note" }
+const _hoisted_648 = { class: "pwgen-classes" }
+const _hoisted_649 = { class: "pwgen-hdr" }
+const _hoisted_650 = { class: "pwgen-mmhdr" }
+const _hoisted_651 = { class: "pwgen-cls-on" }
+const _hoisted_652 = ["checked", "disabled", "onChange"]
+const _hoisted_653 = {
+  key: 0,
+  class: "pwgen-mm"
+}
+const _hoisted_654 = ["max", "value", "onChange", "title"]
+const _hoisted_655 = /*#__PURE__*/_createElementVNode("span", { class: "pwgen-mm-sep" }, "/", -1 /* HOISTED */)
+const _hoisted_656 = ["max", "value", "placeholder", "onChange", "title"]
+const _hoisted_657 = {
+  key: 0,
+  class: "pwgen-symsel"
+}
+const _hoisted_658 = { class: "pwgen-symsel-head" }
+const _hoisted_659 = { class: "sub" }
+const _hoisted_660 = { class: "pwgen-symgrid" }
+const _hoisted_661 = ["title", "onClick"]
+const _hoisted_662 = { class: "pwgen-opts" }
+const _hoisted_663 = ["disabled"]
+const _hoisted_664 = {
+  key: 2,
   class: "pwgen-note"
 }
-const _hoisted_650 = {
-  key: 1,
+const _hoisted_665 = {
+  key: 3,
   class: "pwgen-err"
 }
-const _hoisted_651 = { class: "pwgen-foot" }
-const _hoisted_652 = ["disabled"]
-const _hoisted_653 = {
+const _hoisted_666 = { class: "pwgen-foot" }
+const _hoisted_667 = ["disabled"]
+const _hoisted_668 = {
   key: 23,
   class: "toast"
 }
@@ -4348,7 +4390,7 @@ return function render(_ctx, _cache) {
                 }),
                 _createElementVNode("div", {
                   class: "pwgen-popup",
-                  onClick: _cache[235] || (_cache[235] = _withModifiers(() => {}, ["stop"]))
+                  onClick: _cache[237] || (_cache[237] = _withModifiers(() => {}, ["stop"]))
                 }, [
                   _createElementVNode("div", _hoisted_635, [
                     _createElementVNode("span", null, "🎲 " + _toDisplayString(_ctx.t('Password generator')), 1 /* TEXT */),
@@ -4430,59 +4472,123 @@ return function render(_ctx, _cache) {
                       ]
                     ])
                   ]),
-                  _createElementVNode("div", _hoisted_646, [
-                    (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(_ctx.pwgenClasses, (c) => {
-                      return (_openBlock(), _createElementBlock("label", {
-                        key: c.k,
-                        class: _normalizeClass({dis: !c.avail})
-                      }, [
-                        _createElementVNode("input", {
-                          type: "checkbox",
-                          checked: _ctx.pwgen[c.k],
-                          disabled: !c.avail,
-                          onChange: $event => (_ctx.pwgenToggle(c.k, $event.target.checked))
-                        }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_647),
-                        _createTextVNode(" " + _toDisplayString(_ctx.t(c.label)), 1 /* TEXT */)
-                      ], 2 /* CLASS */))
-                    }), 128 /* KEYED_FRAGMENT */)),
-                    _createElementVNode("label", {
-                      class: _normalizeClass({dis: !_ctx.pwgenLookalikeUsable})
-                    }, [
-                      _withDirectives(_createElementVNode("input", {
-                        type: "checkbox",
-                        "onUpdate:modelValue": _cache[231] || (_cache[231] = $event => ((_ctx.pwgen.noLookalike) = $event)),
-                        disabled: !_ctx.pwgenLookalikeUsable,
-                        onChange: _cache[232] || (_cache[232] = $event => (_ctx.pwgenMake()))
-                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_648), [
-                        [_vModelCheckbox, _ctx.pwgen.noLookalike]
-                      ]),
-                      _createTextVNode(" " + _toDisplayString(_ctx.t('Exclude look-alike characters (0 O 1 l I |)')), 1 /* TEXT */)
-                    ], 2 /* CLASS */)
-                  ]),
+                  (_ctx.pwgenIsHex)
+                    ? (_openBlock(), _createElementBlock("div", _hoisted_646, [
+                        _createElementVNode("div", _hoisted_647, _toDisplayString(_ctx.t('Hexadecimal field: fixed 0–9 A–F alphabet.')), 1 /* TEXT */)
+                      ]))
+                    : (_openBlock(), _createElementBlock(_Fragment, { key: 1 }, [
+                        _createElementVNode("div", _hoisted_648, [
+                          _createElementVNode("div", _hoisted_649, [
+                            _createElementVNode("span", null, _toDisplayString(_ctx.t('Character types')), 1 /* TEXT */),
+                            _createElementVNode("span", _hoisted_650, _toDisplayString(_ctx.t('min')) + " / " + _toDisplayString(_ctx.t('max')), 1 /* TEXT */)
+                          ]),
+                          (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(_ctx.pwgenClassRows, (c) => {
+                            return (_openBlock(), _createElementBlock("div", {
+                              class: _normalizeClass(["pwgen-cls", {dis: !c.avail}]),
+                              key: c.k
+                            }, [
+                              _createElementVNode("label", _hoisted_651, [
+                                _createElementVNode("input", {
+                                  type: "checkbox",
+                                  checked: _ctx.pwgen[c.k],
+                                  disabled: !c.avail,
+                                  onChange: $event => (_ctx.pwgenToggle(c.k, $event))
+                                }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_652),
+                                _createTextVNode(" " + _toDisplayString(_ctx.t(c.label)), 1 /* TEXT */)
+                              ]),
+                              (c.avail && _ctx.pwgen[c.k] && c.set.length)
+                                ? (_openBlock(), _createElementBlock("span", _hoisted_653, [
+                                    _createElementVNode("input", {
+                                      type: "number",
+                                      min: "0",
+                                      max: _ctx.pwgenMax,
+                                      value: _ctx.pwgen.min[c.k],
+                                      onChange: $event => (_ctx.pwgenSetMin(c.k, $event.target.value)),
+                                      title: _ctx.t('Minimum count')
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_654),
+                                    _hoisted_655,
+                                    _createElementVNode("input", {
+                                      type: "number",
+                                      min: "0",
+                                      max: _ctx.pwgenMax,
+                                      value: _ctx.pwgen.max[c.k] == null ? '' : _ctx.pwgen.max[c.k],
+                                      placeholder: _ctx.t('∞'),
+                                      onChange: $event => (_ctx.pwgenSetMax(c.k, $event.target.value)),
+                                      title: _ctx.t('Maximum count (blank = no limit)')
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_656)
+                                  ]))
+                                : _createCommentVNode("v-if", true)
+                            ], 2 /* CLASS */))
+                          }), 128 /* KEYED_FRAGMENT */))
+                        ]),
+                        (_ctx.pwgenSymbolsAvail && _ctx.pwgen.symbols)
+                          ? (_openBlock(), _createElementBlock("div", _hoisted_657, [
+                              _createElementVNode("div", _hoisted_658, [
+                                _createElementVNode("span", _hoisted_659, _toDisplayString(_ctx.t('Allowed symbols')), 1 /* TEXT */),
+                                _createElementVNode("button", {
+                                  type: "button",
+                                  class: "pwgen-mini",
+                                  onClick: _cache[231] || (_cache[231] = $event => (_ctx.pwgenAllSymbols(true)))
+                                }, _toDisplayString(_ctx.t('All')), 1 /* TEXT */),
+                                _createElementVNode("button", {
+                                  type: "button",
+                                  class: "pwgen-mini",
+                                  onClick: _cache[232] || (_cache[232] = $event => (_ctx.pwgenAllSymbols(false)))
+                                }, _toDisplayString(_ctx.t('None')), 1 /* TEXT */)
+                              ]),
+                              _createElementVNode("div", _hoisted_660, [
+                                (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(_ctx.pwgenSymbolChips, (s) => {
+                                  return (_openBlock(), _createElementBlock("button", {
+                                    type: "button",
+                                    class: _normalizeClass(["pwgen-sym", {sel: s.on, dis: s.lookalike && _ctx.pwgen.noLookalike}]),
+                                    key: s.ch,
+                                    title: s.lookalike && _ctx.pwgen.noLookalike ? _ctx.t('Excluded as a look-alike') : '',
+                                    onClick: $event => (_ctx.pwgenToggleSymbol(s.ch))
+                                  }, _toDisplayString(s.ch), 11 /* TEXT, CLASS, PROPS */, _hoisted_661))
+                                }), 128 /* KEYED_FRAGMENT */))
+                              ])
+                            ]))
+                          : _createCommentVNode("v-if", true),
+                        _createElementVNode("div", _hoisted_662, [
+                          _createElementVNode("label", {
+                            class: _normalizeClass({dis: !_ctx.pwgenLookalikeUsable})
+                          }, [
+                            _withDirectives(_createElementVNode("input", {
+                              type: "checkbox",
+                              "onUpdate:modelValue": _cache[233] || (_cache[233] = $event => ((_ctx.pwgen.noLookalike) = $event)),
+                              disabled: !_ctx.pwgenLookalikeUsable,
+                              onChange: _cache[234] || (_cache[234] = $event => {_ctx.pwgenReconcile(); _ctx.pwgenMake()})
+                            }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_663), [
+                              [_vModelCheckbox, _ctx.pwgen.noLookalike]
+                            ]),
+                            _createTextVNode(" " + _toDisplayString(_ctx.t('Exclude look-alike characters (0 O 1 l I |)')), 1 /* TEXT */)
+                          ], 2 /* CLASS */)
+                        ])
+                      ], 64 /* STABLE_FRAGMENT */)),
                   (_ctx.pwgenNote)
-                    ? (_openBlock(), _createElementBlock("div", _hoisted_649, "📏 " + _toDisplayString(_ctx.pwgenNote), 1 /* TEXT */))
+                    ? (_openBlock(), _createElementBlock("div", _hoisted_664, "📏 " + _toDisplayString(_ctx.pwgenNote), 1 /* TEXT */))
                     : _createCommentVNode("v-if", true),
                   (_ctx.pwgen.err)
-                    ? (_openBlock(), _createElementBlock("div", _hoisted_650, "⚠️ " + _toDisplayString(_ctx.pwgen.err), 1 /* TEXT */))
+                    ? (_openBlock(), _createElementBlock("div", _hoisted_665, "⚠️ " + _toDisplayString(_ctx.pwgen.err), 1 /* TEXT */))
                     : _createCommentVNode("v-if", true),
-                  _createElementVNode("div", _hoisted_651, [
+                  _createElementVNode("div", _hoisted_666, [
                     _createElementVNode("button", {
                       type: "button",
                       class: "btn sm",
-                      onClick: _cache[233] || (_cache[233] = $event => (_ctx.closePwGen()))
+                      onClick: _cache[235] || (_cache[235] = $event => (_ctx.closePwGen()))
                     }, _toDisplayString(_ctx.t('Cancel')), 1 /* TEXT */),
                     _createElementVNode("button", {
                       type: "button",
                       class: "btn sm primary",
                       disabled: !_ctx.pwgen.value,
-                      onClick: _cache[234] || (_cache[234] = $event => (_ctx.pwgenApply()))
-                    }, _toDisplayString(_ctx.t('Use this password')), 9 /* TEXT, PROPS */, _hoisted_652)
+                      onClick: _cache[236] || (_cache[236] = $event => (_ctx.pwgenApply()))
+                    }, _toDisplayString(_ctx.t('Use this password')), 9 /* TEXT, PROPS */, _hoisted_667)
                   ])
                 ])
               ], 64 /* STABLE_FRAGMENT */))
             : _createCommentVNode("v-if", true),
           (_ctx.toast)
-            ? (_openBlock(), _createElementBlock("div", _hoisted_653, _toDisplayString(_ctx.toast), 1 /* TEXT */))
+            ? (_openBlock(), _createElementBlock("div", _hoisted_668, _toDisplayString(_ctx.toast), 1 /* TEXT */))
             : _createCommentVNode("v-if", true)
         ]))
 }
@@ -4525,7 +4631,18 @@ return function render(_ctx, _cache) {
         // password generator; `value` is a live secret, so it is cleared on close
         // `prefLen` is what the user chose; `len` is that clamped to the current
         // field's rule, so a 6–8 digit PIN field does not shrink the preference.
-        pwgen: { open: false, target: null, field: null, value: '', err: '', len: 20, prefLen: 20, upper: true, lower: true, digits: true, symbols: true, noLookalike: true, loaded: false },
+        // `prefLen` is the user's chosen length; `len` is that clamped to the
+        // current field's rule and the per-class min/max. `min`/`max` are the
+        // guaranteed floor and cap per class (max === null means "no cap").
+        // `symbolSet` is exactly which symbols may appear (chosen from PWGEN_SETS.symbols).
+        pwgen: {
+          open: false, target: null, field: null, value: '', err: '', capWarn: false,
+          len: 20, prefLen: 20,
+          upper: true, lower: true, digits: true, symbols: true,
+          min: { upper: 1, lower: 1, digits: 1, symbols: 1 },
+          max: { upper: null, lower: null, digits: null, symbols: null },
+          symbolSet: PWGEN_SETS.symbols, noLookalike: true, loaded: false,
+        },
         shareExpanded: false,
         unlockKey: '', unlockErr: '', unlockRemember: true,
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
@@ -4684,37 +4801,45 @@ return function render(_ctx, _cache) {
       // a generated value can never be rejected by the very rule that field carries.
       pwgenRule() { return this.pwgen.field ? this.fieldRule(this.pwgen.field) : null; },
       pwgenCharset() { const o = this.pwgenRule; return (o && o.charset) || ''; },
-      pwgenClasses() {
-        return [
-          { k: 'upper', label: 'Uppercase (A–Z)', avail: this.pwgenAvail('upper') },
-          { k: 'lower', label: 'Lowercase (a–z)', avail: this.pwgenAvail('lower') },
-          { k: 'digits', label: 'Digits (0–9)', avail: this.pwgenAvail('digits') },
-          { k: 'symbols', label: 'Symbols (!#$%…)', avail: this.pwgenAvail('symbols') },
-        ];
+      pwgenIsHex() { return this.pwgenCharset === 'hex'; }, // fixed 0-9A-F alphabet, no class/symbol controls
+      pwgenLookalikeUsable() { return !this.pwgenIsHex; },
+      pwgenSymbolsAvail() { return this.pwgenAvail('symbols'); },
+      // rows for the class list (with per-class availability and effective set)
+      pwgenClassRows() {
+        const meta = {
+          upper: 'Uppercase (A–Z)', lower: 'Lowercase (a–z)',
+          digits: 'Digits (0–9)', symbols: 'Symbols',
+        };
+        return PWGEN_CLASSES.map((k) => ({ k, label: meta[k], avail: this.pwgenAvail(k), set: this.pwgenClassSet(k) }));
       },
-      pwgenLookalikeUsable() { return this.pwgenCharset !== 'hex'; },
-      pwgenPools() {
-        if (this.pwgenCharset === 'hex') return [PWGEN_HEX]; // 0 and 1 are part of the alphabet here
-        const pools = [];
-        for (const c of PWGEN_CLASSES) {
-          if (!this.pwgen[c] || !this.pwgenAvail(c)) continue;
-          let s = PWGEN_SETS[c];
-          if (this.pwgen.noLookalike) s = s.split('').filter((ch) => PWGEN_LOOKALIKE.indexOf(ch) < 0).join('');
-          if (s) pools.push(s);
-        }
-        return pools;
+      // classes that will actually contribute characters: on + allowed + non-empty set
+      pwgenActive() {
+        return this.pwgenClassRows.filter((c) => this.pwgen[c.k] && c.avail && c.set.length);
       },
-      pwgenMin() {
-        const o = this.pwgenRule;
-        const min = Math.max(4, (o && o.min) ? o.min : 4);
-        return Math.min(min, this.pwgenMax);
+      // symbol chips (the whole master palette, marked selected / look-alike)
+      pwgenSymbolChips() {
+        return PWGEN_SETS.symbols.split('').map((ch) => ({
+          ch, on: this.pwgen.symbolSet.indexOf(ch) >= 0, lookalike: PWGEN_LOOKALIKE.indexOf(ch) >= 0,
+        }));
       },
-      pwgenMax() {
-        const o = this.pwgenRule;
-        return Math.max(4, Math.min(128, (o && o.max) ? o.max : 64));
+      // hard bounds on total length, from the field rule (never below sum of the mins)
+      pwgenHardMin() { const o = this.pwgenRule; return Math.max(1, (o && o.min) ? o.min : 1); },
+      pwgenHardMax() { const o = this.pwgenRule; return Math.max(this.pwgenHardMin, Math.min(128, (o && o.max) ? o.max : 128)); },
+      pwgenMinSum() { return this.pwgenActive.reduce((s, c) => s + (Number(this.pwgen.min[c.k]) || 0), 0); },
+      pwgenMaxSum() {
+        // sum of caps; a class with no cap contributes the whole length budget
+        let s = 0;
+        for (const c of this.pwgenActive) { const m = this.pwgen.max[c.k]; s += (m == null ? this.pwgenHardMax : m); }
+        return s;
       },
+      // the length slider's live floor/ceiling after reconciling every constraint
+      pwgenMin() { return Math.max(this.pwgenHardMin, this.pwgenMinSum); },
+      pwgenMax() { return Math.max(this.pwgenMin, Math.min(this.pwgenHardMax, this.pwgenMaxSum)); },
       pwgenStrength() {
-        const pool = this.pwgenPools.join('').length;
+        // entropy of the value actually produced: length x log2(effective alphabet)
+        let pool = 0;
+        for (const c of this.pwgenActive) pool += c.set.length;
+        if (this.pwgenIsHex) pool = 16;
         const len = (this.pwgen.value || '').length;
         const bits = (pool > 1 && len) ? Math.round(len * Math.log2(pool)) : 0;
         let cls = 'w1', label = 'Weak';
@@ -6212,6 +6337,12 @@ return function render(_ctx, _cache) {
         return null;
       },
       // ---- password generator ----
+      // the effective character set for one class, after removing look-alikes
+      pwgenClassSet(k) {
+        let s = k === 'symbols' ? this.pwgen.symbolSet : PWGEN_SETS[k];
+        if (this.pwgen.noLookalike) s = s.split('').filter((ch) => PWGEN_LOOKALIKE.indexOf(ch) < 0).join('');
+        return s;
+      },
       pwgenAvail(c) {
         const cs = this.pwgenCharset;
         if (!cs || cs === 'ascii' || cs === 'custom') return true;
@@ -6229,31 +6360,82 @@ return function render(_ctx, _cache) {
           try {
             const o = JSON.parse(localStorage.getItem('regibase.pwgen') || 'null');
             if (o && typeof o === 'object') {
-              for (const k of ['upper', 'lower', 'digits', 'symbols', 'noLookalike']) if (typeof o[k] === 'boolean') p[k] = o[k];
+              for (const k of PWGEN_CLASSES.concat('noLookalike')) if (typeof o[k] === 'boolean') p[k] = o[k];
               if (Number(o.len) > 0) p.prefLen = Number(o.len);
+              if (o.min && typeof o.min === 'object') for (const k of PWGEN_CLASSES) if (Number.isFinite(Number(o.min[k]))) p.min[k] = Math.max(0, Math.floor(Number(o.min[k])));
+              if (o.max && typeof o.max === 'object') for (const k of PWGEN_CLASSES) p.max[k] = (o.max[k] == null ? null : Math.max(0, Math.floor(Number(o.max[k]) || 0)));
+              if (typeof o.symbolSet === 'string') { const s = o.symbolSet.split('').filter((ch) => PWGEN_SETS.symbols.indexOf(ch) >= 0).join(''); p.symbolSet = s || PWGEN_SETS.symbols; }
             }
           } catch (e) { /* ignore unreadable prefs */ }
         }
-        p.len = p.prefLen; // pwgenMake() clamps it to whatever this field allows
+        p.len = p.prefLen;
         // the rule may forbid every class the user had enabled — fall back to what it allows
-        if (!this.pwgenPools.length) { for (const c of PWGEN_CLASSES) p[c] = this.pwgenAvail(c); }
+        if (!this.pwgenActive.length) { for (const k of PWGEN_CLASSES) p[k] = this.pwgenAvail(k); }
         p.open = true;
+        this.pwgenReconcile();
         this.pwgenMake();
       },
-      pwgenSetLen() { this.pwgen.prefLen = Number(this.pwgen.len) || this.pwgenMin; this.pwgenMake(); },
-      closePwGen() { const p = this.pwgen; p.open = false; p.value = ''; p.err = ''; p.field = null; p.target = null; },
-      pwgenToggle(k, on) {
+      pwgenSetLen() { this.pwgen.prefLen = Math.max(1, Math.floor(Number(this.pwgen.len) || 1)); this.pwgenReconcile(); this.pwgenMake(); },
+      closePwGen() { const p = this.pwgen; p.open = false; p.value = ''; p.err = ''; p.capWarn = false; p.field = null; p.target = null; },
+      pwgenToggle(k, ev) {
         const p = this.pwgen;
-        p[k] = on;
-        if (!this.pwgenPools.length) { p[k] = true; return; } // never leave zero classes selected
-        this.pwgenMake();
+        p[k] = ev.target.checked;
+        // never leave zero contributing classes. Reverting true→true is a no-op Vue
+        // won't repaint, so restore the DOM checkbox straight from the event.
+        if (!this.pwgenActive.length) { p[k] = true; ev.target.checked = true; return; }
+        this.pwgenReconcile(); this.pwgenMake();
+      },
+      pwgenSetMin(k, raw) {
+        this.pwgen.min[k] = Math.max(0, Math.floor(Number(raw) || 0));
+        this.pwgenReconcile(); this.pwgenMake();
+      },
+      pwgenSetMax(k, raw) {
+        const s = String(raw).trim();
+        this.pwgen.max[k] = (s === '') ? null : Math.max(0, Math.floor(Number(s) || 0));
+        this.pwgenReconcile(); this.pwgenMake();
+      },
+      pwgenToggleSymbol(ch) {
+        const p = this.pwgen;
+        const has = p.symbolSet.indexOf(ch) >= 0;
+        // keep the master order so the set reads the same however it was toggled
+        p.symbolSet = PWGEN_SETS.symbols.split('').filter((c) => (c === ch ? !has : p.symbolSet.indexOf(c) >= 0)).join('');
+        this.pwgenReconcile(); this.pwgenMake();
+      },
+      pwgenAllSymbols(on) { this.pwgen.symbolSet = on ? PWGEN_SETS.symbols : ''; this.pwgenReconcile(); this.pwgenMake(); },
+      // ---- 排他処理 (constraint reconciliation) ----
+      // Force min/max/length into a mutually consistent, generatable state so the
+      // user can never configure an impossible request. Priority: min <= max per
+      // class; sum(min) fits the field's ceiling; length lands in [minSum, maxSum].
+      pwgenReconcile() {
+        const p = this.pwgen;
+        const hardMax = this.pwgenHardMax, hardMin = this.pwgenHardMin;
+        const active = this.pwgenActive.map((c) => c.k);
+        // per-class normalisation
+        for (const k of PWGEN_CLASSES) {
+          let mn = Math.max(0, Math.floor(Number(p.min[k]) || 0));
+          let mx = p.max[k]; if (mx != null) mx = Math.max(0, Math.floor(Number(mx) || 0));
+          if (mn > hardMax) mn = hardMax;
+          if (mx != null && mx > hardMax) mx = hardMax;
+          if (mx != null && mx < mn) mx = mn;      // a cap below the floor makes no sense
+          p.min[k] = mn; p.max[k] = mx;
+        }
+        // sum(min) over active classes must not exceed the field ceiling; trim from the end
+        let over = active.reduce((s, k) => s + p.min[k], 0) - hardMax;
+        for (let i = active.length - 1; i >= 0 && over > 0; i--) { const cut = Math.min(over, p.min[active[i]]); p.min[active[i]] -= cut; over -= cut; }
+        // clamp length into the feasible window
+        const lo = Math.max(hardMin, this.pwgenMinSum);
+        const hi = Math.max(lo, Math.min(hardMax, this.pwgenMaxSum));
+        p.len = Math.max(lo, Math.min(hi, Number(p.len) || lo));
+        // caps so low that the length floor cannot be met (extreme misconfig)
+        p.capWarn = this.pwgenMaxSum < lo;
       },
       pwgenMake() {
         const p = this.pwgen;
-        p.len = Math.max(this.pwgenMin, Math.min(this.pwgenMax, Number(p.len) || this.pwgenMin));
-        const pools = this.pwgenPools;
-        if (!pools.length) { p.value = ''; p.err = T('Select at least one character type'); return; }
-        p.value = makePassword(pools, p.len);
+        if (this.pwgenIsHex) { p.value = makePassword([{ set: PWGEN_HEX, min: 0, cap: null }], p.len); p.err = ''; return; }
+        const classes = this.pwgenActive.map((c) => ({ set: c.set, min: Number(p.min[c.k]) || 0, cap: p.max[c.k] == null ? null : Number(p.max[c.k]) }));
+        if (!classes.length) { p.value = ''; p.err = T('Select at least one character type'); return; }
+        p.value = makePassword(classes, p.len);
+        if (p.capWarn) { p.err = T('The maximum counts are too low for this length.'); return; }
         // a custom regex rule cannot be generated against — warn instead of silently failing on save
         p.err = (p.field && this.validateField(p.field, p.value)) ? T('This field has a format rule the generator cannot match. Please check the value.') : '';
       },
@@ -6266,7 +6448,10 @@ return function render(_ctx, _cache) {
           this.reveal = { ...this.reveal, [p.field.key]: true }; // show it once so it can be checked/copied
         }
         try {
-          localStorage.setItem('regibase.pwgen', JSON.stringify({ len: p.prefLen, upper: p.upper, lower: p.lower, digits: p.digits, symbols: p.symbols, noLookalike: p.noLookalike }));
+          localStorage.setItem('regibase.pwgen', JSON.stringify({
+            len: p.prefLen, upper: p.upper, lower: p.lower, digits: p.digits, symbols: p.symbols,
+            noLookalike: p.noLookalike, min: p.min, max: p.max, symbolSet: p.symbolSet,
+          }));
         } catch (e) { /* prefs are a convenience only */ }
         this.closePwGen();
         this.showToast(T('Password generated'));

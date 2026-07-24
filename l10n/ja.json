@@ -1,5 +1,16 @@
 {
     "translations": {
+        "Character types": "文字の種類",
+        "Allowed symbols": "使用する記号",
+        "min": "最小",
+        "max": "最大",
+        "Minimum count": "最小出現数",
+        "Maximum count (blank = no limit)": "最大出現数（空欄＝制限なし）",
+        "Excluded as a look-alike": "紛らわしい文字のため除外",
+        "Hexadecimal field: fixed 0–9 A–F alphabet.": "16進数の項目：0–9 A–F の固定文字です。",
+        "The maximum counts are too low for this length.": "この長さに対して最大出現数が小さすぎます。",
+        "None": "なし",
+        "∞": "∞",
         "Generate a password": "パスワードを生成",
         "Password generator": "パスワード生成",
         "Regenerate": "再生成",
