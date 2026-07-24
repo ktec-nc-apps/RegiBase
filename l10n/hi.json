@@ -1,4 +1,11 @@
 { "translations": {
+        "Map service (for address links)": "मानचित्र सेवा (पते के लिंक हेतु)",
+        "A 🗺 button on address fields opens the value in this map service.": "पता फ़ील्ड पर 🗺 बटन उस मान को इस मानचित्र सेवा में खोलता है।",
+        "🗺 Map link (address)": "🗺 मानचित्र लिंक (पता)",
+        "Open in map": "मानचित्र में खोलें",
+        "Add reminder": "अनुस्मारक जोड़ें",
+        "The Calendar app is not enabled": "कैलेंडर ऐप सक्षम नहीं है",
+        "Not a valid date": "अमान्य तिथि",
         "Character types": "अक्षर प्रकार",
         "Allowed symbols": "अनुमत चिह्न",
         "min": "न्यून",

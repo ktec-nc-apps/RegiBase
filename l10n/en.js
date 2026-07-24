@@ -1,6 +1,13 @@
 OC.L10N.register(
     "regibase",
     {
+    "Map service (for address links)" : "Map service (for address links)",
+    "A 🗺 button on address fields opens the value in this map service." : "A 🗺 button on address fields opens the value in this map service.",
+    "🗺 Map link (address)" : "🗺 Map link (address)",
+    "Open in map" : "Open in map",
+    "Add reminder" : "Add reminder",
+    "The Calendar app is not enabled" : "The Calendar app is not enabled",
+    "Not a valid date" : "Not a valid date",
     "Character types" : "Character types",
     "Allowed symbols" : "Allowed symbols",
     "min" : "min",

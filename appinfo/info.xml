@@ -8,7 +8,7 @@
 
 Design your own fields (or start from a template), then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
 
-RegiBase works together with your other Nextcloud apps — Contacts, Tables, Files and Notes — using each one when it is installed.
+RegiBase works together with your other Nextcloud apps — Contacts, Tables, Files, Notes and Calendar — using each one when it is installed.
 
 Features:
 - Custom form fields with per-field input rules, built from reusable templates
@@ -19,6 +19,7 @@ Features:
 - Nextcloud Tables integration: import a table into a new collection, or export a collection to a new Tables table
 - Import from CSV / JSON (e.g. Google Password Manager), or from your Nextcloud Contacts (including photos)
 - Attach images and files from Nextcloud Files or Notes
+- Add reminders to Nextcloud Calendar from date fields, and open addresses in a map (Google Maps / OpenStreetMap / Apple Maps)
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
 - Read-only command-line access via occ (list / get / export / find), with opt-in secret decryption
@@ -27,7 +28,7 @@ Features:
 
 項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・リスト詳細・表計算風テーブル（先頭列固定）・カード・画像ギャラリーの各表示形式で閲覧できます。
 
-RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files・Notes）と連携し、導入されているものを活用します。
+RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files・Notes・Calendar）と連携し、導入されているものを活用します。
 
 主な機能:
 - 項目ごとに入力規則を設定できるカスタムフォーム項目。再利用可能なテンプレートから作成
@@ -38,11 +39,12 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - Nextcloud Tables連携 ― テーブルを新規コレクションとして取込、またはコレクションをTablesへ書出
 - CSV / JSON（Googleパスワードマネージャーのエクスポート等）や、Nextcloud連絡先（写真含む）からのインポート
 - Nextcloud FilesやNotesからの画像・ファイル添付
+- 日付項目から Nextcloud Calendar にリマインダー追加、住所を地図（Google マップ／OpenStreetMap／Apple マップ）で開く
 - レコードのコレクション間での移動・コピー・マージ
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによる読み取り専用のコマンドライン操作（一覧／取得／エクスポート／検索）、秘密項目の復号はオプトイン
 - 12言語対応]]></description>
-	<version>0.12.15</version>
+	<version>0.13.0</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

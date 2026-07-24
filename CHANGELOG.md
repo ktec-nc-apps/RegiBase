@@ -2,6 +2,19 @@
 
 All notable changes to RegiBase.
 
+## 0.13.0 — 2026-07-25
+
+### Reminders in your Calendar, and map links for addresses
+
+- **Add a reminder from a date.** Date and year/month fields now show a 📅 button in the
+  record detail. It opens Nextcloud Calendar's own new-event editor (in a popup) prefilled
+  with that date as an all-day event, where you set the title, reminders and repeat and save.
+  The button is shown but disabled when the Calendar app is not enabled.
+- **Map links for addresses.** A new per-field option, **🗺 Map link**, can be turned on for
+  text fields (for example an address). Such fields show a 🗺 button in the record detail that
+  opens the value in a map. Choose the map service — **Google Maps, OpenStreetMap or Apple
+  Maps** — in Settings.
+
 ## 0.12.15 — 2026-07-25
 
 ### Fix: fields could share one value

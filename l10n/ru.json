@@ -1,4 +1,11 @@
 { "translations": {
+        "Map service (for address links)": "Картографический сервис (для ссылок на адрес)",
+        "A 🗺 button on address fields opens the value in this map service.": "Кнопка 🗺 у адресных полей открывает значение в этом картографическом сервисе.",
+        "🗺 Map link (address)": "🗺 Ссылка на карту (адрес)",
+        "Open in map": "Открыть на карте",
+        "Add reminder": "Добавить напоминание",
+        "The Calendar app is not enabled": "Приложение «Календарь» не включено",
+        "Not a valid date": "Некорректная дата",
         "Character types": "Типы символов",
         "Allowed symbols": "Разрешённые символы",
         "min": "Мин",

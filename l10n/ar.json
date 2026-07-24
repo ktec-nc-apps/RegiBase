@@ -1,4 +1,11 @@
 { "translations": {
+        "Map service (for address links)": "خدمة الخرائط (لروابط العناوين)",
+        "A 🗺 button on address fields opens the value in this map service.": "يفتح زر 🗺 في حقول العناوين القيمة في خدمة الخرائط هذه.",
+        "🗺 Map link (address)": "🗺 رابط الخريطة (العنوان)",
+        "Open in map": "فتح في الخريطة",
+        "Add reminder": "إضافة تذكير",
+        "The Calendar app is not enabled": "تطبيق التقويم غير مُفعّل",
+        "Not a valid date": "تاريخ غير صالح",
         "Character types": "أنواع الأحرف",
         "Allowed symbols": "الرموز المسموح بها",
         "min": "الأدنى",

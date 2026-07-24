@@ -1,6 +1,13 @@
 OC.L10N.register(
     "regibase",
     {
+    "Map service (for address links)" : "지도 서비스(주소 링크용)",
+    "A 🗺 button on address fields opens the value in this map service." : "주소 항목의 🗺 버튼으로 해당 값을 이 지도 서비스에서 엽니다.",
+    "🗺 Map link (address)" : "🗺 지도 링크(주소)",
+    "Open in map" : "지도에서 열기",
+    "Add reminder" : "알림 추가",
+    "The Calendar app is not enabled" : "캘린더 앱이 활성화되어 있지 않습니다",
+    "Not a valid date" : "올바른 날짜가 아닙니다",
     "Character types" : "문자 종류",
     "Allowed symbols" : "허용할 기호",
     "min" : "최소",

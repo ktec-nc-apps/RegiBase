@@ -15,6 +15,7 @@ use OCA\RegiBase\Service\TablesBridge;
 use OCA\RegiBase\Service\TemplateService;
 use OCA\DAV\CardDAV\CardDavBackend;
 use OCP\Contacts\IManager as IContactsManager;
+use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -48,6 +49,7 @@ class ApiController extends Controller {
 		private CardDavBackend $cardDavBackend,
 		private TablesBridge $tablesBridge,
 		private TemplateService $tplService,
+		private IAppManager $appManager,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -555,6 +557,8 @@ class ApiController extends Controller {
 			// 'auto' = follow the Nextcloud user language; otherwise a specific bundle code.
 			'language' => $c->getUserValue($uid, Application::APP_ID, 'language', 'auto'),
 			'languages' => $this->availableLanguages(),
+			// Map service used by the 🗺 link on address fields.
+			'map_provider' => $c->getUserValue($uid, Application::APP_ID, 'map_provider', 'google'),
 			// client-side encryption metadata (server never sees the key or plaintext)
 			'enc_enabled' => $c->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1',
 			'enc_salt' => $c->getUserValue($uid, Application::APP_ID, 'enc_salt', ''),
@@ -563,6 +567,7 @@ class ApiController extends Controller {
 			'apps' => [
 				'contacts' => $this->contactsManager->isEnabled(),
 				'tables' => $this->tablesBridge->available(),
+				'calendar' => $this->appManager->isEnabledForUser('calendar'),
 			],
 		];
 	}
@@ -644,6 +649,12 @@ class ApiController extends Controller {
 			$lang = (string)$params['language'];
 			if ($lang === 'auto' || in_array($lang, $this->languageCodes(), true)) {
 				$this->config->setUserValue($uid, Application::APP_ID, 'language', $lang);
+			}
+		}
+		if (array_key_exists('map_provider', $params)) {
+			$mp = (string)$params['map_provider'];
+			if (in_array($mp, ['google', 'osm', 'apple'], true)) {
+				$this->config->setUserValue($uid, Application::APP_ID, 'map_provider', $mp);
 			}
 		}
 		// Encryption metadata: salt + verifier (ciphertext) + on/off flag. No key material.

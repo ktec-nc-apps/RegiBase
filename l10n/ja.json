@@ -1,5 +1,14 @@
 {
     "translations": {
+        "Map service (for address links)": "地図サービス（住所リンク用）",
+        "A 🗺 button on address fields opens the value in this map service.": "住所項目の 🗺 ボタンで、その値をこの地図サービスで開きます。",
+        "🗺 Map link (address)": "🗺 地図リンク（住所）",
+        "Open in map": "地図で開く",
+        "Google Maps": "Google マップ",
+        "Apple Maps": "Apple マップ",
+        "Add reminder": "リマインダー追加",
+        "The Calendar app is not enabled": "Calendar アプリが有効ではありません",
+        "Not a valid date": "正しい日付ではありません",
         "Character types": "文字の種類",
         "Allowed symbols": "使用する記号",
         "min": "最小",

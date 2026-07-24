@@ -590,7 +590,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <a v-if="linkFor(f, modal.rec.data[f.key])" class="val link" :href="linkFor(f, modal.rec.data[f.key])" target="_blank" rel="noopener noreferrer">{{ displayVal(modal.rec, f) }}</a>
             <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(modal.rec, f) }}</span>
             <button v-if="f.secret && !secretsMasked" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
+            <button v-if="f.type==='date' || f.type==='month'" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(modal.rec, f)">📅</button>
             <button v-if="!(f.secret && secretsMasked)" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
+            <button v-if="fieldHasMap(f) && modal.rec.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(modal.rec.data[f.key])">🗺</button>
           </div>
         </div>
       </div>
@@ -697,6 +699,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('★ Title') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
+            <label v-if="(f.type==='text' || f.type==='textarea') && !f.secret"><input type="checkbox" v-model="f._map" /> {{ t('🗺 Map link (address)') }}</label>
           </div>
         </div>
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
@@ -1122,6 +1125,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <label>🗺 {{ t('Map service (for address links)') }}</label>
+          <select v-model="settingsForm.map_provider">
+            <option value="google">{{ t('Google Maps') }}</option>
+            <option value="osm">{{ t('OpenStreetMap') }}</option>
+            <option value="apple">{{ t('Apple Maps') }}</option>
+          </select>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🗺 button on address fields opens the value in this map service.') }}</div>
+        </div>
+        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>💾 {{ t('Backup / Restore') }}</label>
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Save all collections, records, settings and attachments to a ZIP encrypted with your login password.') }}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1431,7 +1443,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
         collForm: { name: '', icon: '', color: '', description: '' },
-        settingsForm: { files_folder: '', theme: 'auto', language: 'auto' },
+        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google' },
         languages: [],
         locale: 0,
         backupForm: { password: '', busy: false, err: '' },
@@ -1439,7 +1451,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         contactsImport: { books: [], selected: 'all', name: '', icon: '', busy: false, err: '', loading: false, enabled: true },
         tablesImport: { tables: [], selected: 0, name: '', icon: '', busy: false, err: '', loading: false, available: true },
         tablesExportBusy: false,
-        apps: { contacts: true, tables: true },
+        apps: { contacts: true, tables: true, calendar: true },
         tableDrag: { active: false, startX: 0, startScroll: 0, el: null, pid: null },
         theme: 'auto',
         enc: { enabled: false, unlocked: false, salt: '', verifier: '' },
@@ -1733,7 +1745,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       async boot() {
         try {
           const s = await api('settings'); this.settingsForm = s; this.theme = s.theme || 'auto';
-          if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false };
+          if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false, calendar: s.apps.calendar !== false };
           this.languages = s.languages || [];
           if (s.language && s.language !== 'auto') await this.applyLanguage(s.language);
           this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '' };
@@ -2309,7 +2321,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       async saveSettings() {
         try {
-          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language }) });
+          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider }) });
           this.settingsForm = s; this.theme = s.theme || 'auto'; this.applyTheme();
           this.languages = s.languages || this.languages;
           await this.applyLanguage(s.language || 'auto');
@@ -2639,6 +2651,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             _pattern: (RULE_TYPES.includes(f.type) && o.pattern) ? o.pattern : '',
             _rmin: (RULE_TYPES.includes(f.type) && o.min > 0) ? o.min : '',
             _rmax: (RULE_TYPES.includes(f.type) && o.max > 0) ? o.max : '',
+            _map: !!o.map,
             _uid: this.uidCounter++,
           };
         });
@@ -2662,6 +2675,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             if (f._charset === 'custom' && f._pattern) rule.pattern = f._pattern;
             if (Number(f._rmin) > 0) rule.min = Number(f._rmin);
             if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
+            if ((f.type === 'text' || f.type === 'textarea') && f._map && !f.secret) rule.map = true;
             options = Object.keys(rule).length ? rule : undefined;
           }
           return {
@@ -2676,7 +2690,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.schemaFields = this.fieldsToSchemaRows(this.current.fields);
         this.modal = { type: 'schema' };
       },
-      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
+      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _map: false, _uid: this.uidCounter++ }); },
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
@@ -3290,6 +3304,41 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       toggleReveal(key) { this.reveal = { ...this.reveal, [key]: !this.reveal[key] }; },
       async copyVal(v) { try { await navigator.clipboard.writeText(String(v)); this.showToast(T('Copied')); } catch { this.showToast(T('Copy failed')); } },
+      // Build a start/end (epoch seconds) all-day range from a date/month field and open
+      // the Calendar app's own "new event" editor in a popup, prefilled with that date.
+      reminderRange(f, raw) {
+        if (raw == null || raw === '') return null;
+        let s = String(raw).trim();
+        if (f.type === 'month') s = /^\d{4}-\d{2}$/.test(s) ? s + '-01' : s;      // YYYY-MM -> first day
+        if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return null;                            // not a date value
+        const d = new Date(s.slice(0, 10) + 'T00:00:00');                         // local midnight
+        if (isNaN(d.getTime())) return null;
+        const start = Math.floor(d.getTime() / 1000);
+        return { start, end: start + 86400 };                                     // all-day, next-day exclusive end
+      },
+      addReminder(rec, f) {
+        if (!this.apps.calendar) return;
+        const r = this.reminderRange(f, rec.data[f.key]);
+        if (!r) { this.showToast(T('Not a valid date')); return; }
+        const url = OC.generateUrl('/apps/calendar/new/1/' + r.start + '/' + r.end);
+        window.open(url, 'rbcal', 'popup,width=520,height=760,noopener');
+      },
+      // A field opts into a map link via options.map (text / textarea, non-secret).
+      fieldHasMap(f) { return !!(f && f.options && f.options.map && !f.secret); },
+      // Build a search URL for the chosen map service from a free-text address.
+      mapUrl(address) {
+        const q = encodeURIComponent(String(address).trim());
+        if (!q) return null;
+        switch (this.settingsForm && this.settingsForm.map_provider) {
+          case 'osm': return 'https://www.openstreetmap.org/search?query=' + q;
+          case 'apple': return 'https://maps.apple.com/?q=' + q;
+          default: return 'https://www.google.com/maps/search/?api=1&query=' + q;
+        }
+      },
+      openMap(address) {
+        const url = this.mapUrl(address);
+        if (url) window.open(url, '_blank', 'noopener');
+      },
       displayVal(rec, f) {
         const v = rec.data[f.key];
         if (v == null || v === '') return '—';
