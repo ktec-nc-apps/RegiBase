@@ -27,6 +27,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setCreatedAt(string $v)
  * @method string getUpdatedAt()
  * @method void setUpdatedAt(string $v)
+ * @method bool getLocked()
+ * @method void setLocked(bool $v)
  */
 class CollectionEntity extends Entity implements \JsonSerializable {
 	protected $userId = '';
@@ -37,11 +39,13 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 	protected $view = 'list';
 	protected $recordSort = 'created_desc';
 	protected $sort = 0;
+	protected $locked = false;
 	protected $createdAt = '';
 	protected $updatedAt = '';
 
 	public function __construct() {
 		$this->addType('sort', 'integer');
+		$this->addType('locked', 'boolean');
 	}
 
 	public function jsonSerialize(): array {
@@ -53,6 +57,7 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 			'description' => $this->description ?? '',
 			'view' => $this->view,
 			'record_sort' => $this->recordSort,
+			'locked' => (bool)$this->locked,
 			'created_at' => $this->createdAt,
 			'updated_at' => $this->updatedAt,
 		];

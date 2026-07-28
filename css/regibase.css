@@ -205,6 +205,7 @@
 #regibase-root .coll-item .ci-bar { flex: 0 0 auto; width: 4px; align-self: stretch; min-height: 20px; border-radius: 3px; }
 #regibase-root .coll-item .ic { font-size: 20px; width: 26px; text-align: center; }
 #regibase-root .coll-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; line-height: 1.3; word-break: break-word; overflow-wrap: anywhere; }
+#regibase-root .coll-item .ci-lock { flex: 0 0 auto; font-size: 12px; line-height: 1; opacity: .85; }
 #regibase-root .coll-item .ct { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 1px 8px; border-radius: 999px; }
 #regibase-root .coll-item.active .ct { color: var(--primary); }
 #regibase-root .coll-item.dragging { opacity: .45; }

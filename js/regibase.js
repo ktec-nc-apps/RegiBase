@@ -301,7 +301,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
       <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
-        <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span class="ct">{{ c.record_count }}</span>
+        <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span v-if="c.locked" class="ci-lock" :title="t('Edit lock (view only)')">🔒</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
         <div>{{ t('No collections yet') }}</div>
@@ -328,7 +328,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div class="viewswitch">
             <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: current.view===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
           </div>
-          <button v-if="isOwner" class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
+          <button v-if="isOwner && !isLocked" class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
           <button class="btn sm" @click="openCollSettings" :title="t('Collection name, description, color, etc.')">{{ t('⚙️ Collection settings') }}</button>
           <button v-if="canEdit" class="btn accent sm" @click="openNewRecord">{{ t('＋ New record') }}</button>
           <div class="ta-break" aria-hidden="true"></div>
@@ -382,8 +382,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <button class="btn sm ghost" :disabled="!selectedIds.length" @click="clearSelection">{{ t('Clear') }}</button>
             <span class="selspacer"></span>
             <button v-if="canEdit" class="btn sm" :disabled="!selectedIds.length" @click="duplicateInPlace" :title="t('Duplicate within this collection')">{{ t('Duplicate') }}</button>
-            <button v-if="isOwner" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
-            <button v-if="isOwner" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
+            <button v-if="isOwner && !isLocked" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
+            <button v-if="isOwner && !isLocked" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
             <button v-if="canDelete" class="btn sm danger" :disabled="!selectedIds.length" @click="openBulkDelete">{{ t('Delete') }}</button>
           </div>
           </div>
@@ -599,7 +599,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="modal-foot">
         <button v-if="canDelete" class="btn danger" @click="deleteRecord(modal.rec)">{{ t('Delete') }}</button>
         <button class="btn" @click="copyRecord(modal.rec)">{{ t('⧉ Copy all') }}</button>
-        <button v-if="isOwner" class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
+        <button v-if="isOwner && !isLocked" class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
         <button v-if="canEdit" class="btn primary" @click="editRecord(modal.rec)">{{ t('Edit') }}</button>
       </div>
     </div>
@@ -793,6 +793,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
         </div>
         </template>
+
+        <div v-if="isOwner" class="field">
+          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="collForm.locked" style="width:18px;height:18px" />
+            <span>🔒 {{ t('Edit lock (view only)') }}</span>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('When on, this collection is view-only: records and fields cannot be added, edited or deleted. A 🔒 mark appears in the collection list. Turn it off here to edit again.') }}</div>
+        </div>
 
         <div v-if="isOwner" class="field share-section" :class="{open: shareExpanded}">
           <button type="button" class="share-toggle" :aria-expanded="shareExpanded ? 'true' : 'false'" @click="shareExpanded = !shareExpanded">
@@ -1115,9 +1123,19 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <label>{{ t('🔒 Encryption (secret fields) — optional') }}</label>
           <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
             <b style="color:var(--accent)">{{ t('Enabled') }}</b>{{ t(': Secret fields such as passwords are encrypted with the master key you entered on this device.') }}<span v-if="hasRemembered()">{{ t('(remembered on this device)') }}</span>
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn sm" @click="openEncChange">{{ t('Change master key') }}</button>
-              <button type="button" class="btn sm" @click="lockNow">{{ t('🔒 Lock now (forget key)') }}</button>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm" style="min-width:190px" @click="openEncChange">{{ t('Change master key') }}</button>
+                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Changes the master key and re-encrypts all secret fields.') }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm" style="min-width:190px" @click="reEncryptPlaintext">{{ t('Re-encrypt secret fields') }}</button>
+                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Re-encrypts secret fields that are stored in plain text.') }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm" style="min-width:190px" @click="lockNow">{{ t('🔒 Lock now (forget key)') }}</button>
+                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Forgets the master key on this device (locks secret fields).') }}</span>
+              </div>
             </div>
           </div>
           <div v-else style="font-size:13px;color:var(--muted)">
@@ -1251,6 +1269,29 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="modal-foot">
         <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button class="btn danger" :disabled="!delConfirm || busy" @click="commitBulkDelete">{{ t('Delete {n} items', {n: selectedIds.length}) }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 項目変更でデータ削除が発生する場合の厳重確認 -->
+  <div v-if="modal && modal.type==='schemaMigrate' && schemaPlan" class="modal-mask" @click.self="cancelSchemaMigrate">
+    <div class="modal">
+      <div class="modal-head"><h3>{{ t('⚠️ This change will delete data') }}</h3><button class="icon-btn" @click="cancelSchemaMigrate">✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:14px;margin-top:0">{{ t('Saving these field changes will delete the following existing data:') }}</p>
+        <ul style="margin:8px 0;padding-left:20px;color:var(--danger);font-size:13px">
+          <li v-for="(l,i) in schemaPlan.destructive" :key="i" style="margin:3px 0">{{ l }}</li>
+        </ul>
+        <p style="color:var(--danger);font-size:13px">{{ t('This action cannot be undone. Deleted data cannot be recovered.') }}</p>
+        <div v-if="schemaPlan.safe.length" style="font-size:13px;color:var(--muted);margin-top:8px">
+          {{ t('The following non-destructive changes will also be applied:') }}
+          <ul style="margin:6px 0 0;padding-left:20px"><li v-for="(l,i) in schemaPlan.safe" :key="'s'+i" style="margin:3px 0">{{ l }}</li></ul>
+        </div>
+        <label class="confirm-check"><input type="checkbox" v-model="schemaAck" /> {{ t('I understand the above and confirm the deletion') }}</label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" @click="cancelSchemaMigrate">{{ t('Cancel') }}</button>
+        <button class="btn danger" :disabled="!schemaAck || busy" @click="confirmSchemaMigrate">{{ t('Delete and save') }}</button>
       </div>
     </div>
   </div>
@@ -1443,7 +1484,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         schemaMode: 'collection',
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
-        collForm: { name: '', icon: '', color: '', description: '' },
+        collForm: { name: '', icon: '', color: '', description: '', locked: false },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google' },
         languages: [],
         locale: 0,
@@ -1499,6 +1540,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
+        schemaPlan: null, schemaAck: false,
         reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
         collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
         collDrag: { from: null, over: null },
@@ -1542,8 +1584,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       // ---- sharing permissions for the current collection ----
       curPerm() { return this.current ? (this.current.perm || 'owner') : 'owner'; },
       isOwner() { return this.current ? this.current.is_owner !== false : true; },
-      canEdit() { return ['owner', 'edit', 'delete'].includes(this.curPerm); },
-      canDelete() { return ['owner', 'delete'].includes(this.curPerm); },
+      // Edit lock: when a collection is locked it is view-only for everyone
+      // (owner included). Only collection settings can still be changed — that's
+      // how the lock is turned back off.
+      isLocked() { return !!(this.current && this.current.locked); },
+      canEdit() { return !this.isLocked && ['owner', 'edit', 'delete'].includes(this.curPerm); },
+      canDelete() { return !this.isLocked && ['owner', 'delete'].includes(this.curPerm); },
       // editing collection settings/title needs ownership or the 'delete' level
       canSettings() { return ['owner', 'delete'].includes(this.curPerm); },
       collectionHasSecret() { return !!(this.current && this.current.fields && this.current.fields.some((f) => f.secret)); },
@@ -2320,6 +2366,24 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         } catch (e) { this.encForm.err = T('Failed') + ': ' + (e.message || e); }
         finally { this.encForm.busy = false; }
       },
+      // Sweep every collection and encrypt any secret-field value still saved as
+      // plain text (e.g. imported server-side, or secreted after the fact).
+      async reEncryptPlaintext() {
+        if (!this.enc.enabled) { alert(T('Encryption is not enabled')); return; }
+        if (!encKey) { alert(T('Unlock encryption first')); return; }
+        if (!confirm(T('Re-encrypt every secret field that is still stored as plain text?'))) return;
+        try {
+          const plans = await this.collectSecretPlans();
+          let n = 0;
+          for (const p of plans) {
+            const data = { ...p.data }; let changed = false;
+            for (const k of p.sk) { const v = data[k]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[k] = await rbcrypto.encrypt(encKey, String(v)); changed = true; } }
+            if (changed) { await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data }) }); n++; }
+          }
+          if (this.current) await this.loadRecords();
+          this.showToast(n ? T('Encrypted {n} record(s)', { n }) : T('No plain-text secret values to encrypt'));
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+      },
       async saveSettings() {
         try {
           const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider }) });
@@ -2500,7 +2564,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (push) this.pushNav({ cid: null });
       },
       openCollSettings() {
-        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '' };
+        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked };
         this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
@@ -2809,7 +2873,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (a === '' && b === '') return 0;
         if (a === '') return 1;   // empties sink to the bottom
         if (b === '') return -1;
-        const isNum = (s) => /^-?[\d.,]+$/.test(s) && isFinite(parseFloat(s.replace(/,/g, '')));
+        // A real number has at most one decimal point (after stripping thousands
+        // separators). Strings like IP addresses "10.0.0.1" must NOT be treated as
+        // numbers — parseFloat() would stop at the 2nd dot and read every
+        // "10.0.0.x" as 10, collapsing them to equal so they never sort. Those
+        // fall through to the numeric-aware locale compare below, which orders
+        // each dotted segment correctly (10.0.0.2 before 10.0.0.10).
+        const isNum = (s) => { const t = s.replace(/,/g, ''); return /^-?\d+(\.\d+)?$/.test(t) && isFinite(parseFloat(t)); };
         if (isNum(a) && isNum(b)) return parseFloat(a.replace(/,/g, '')) - parseFloat(b.replace(/,/g, ''));
         return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
       },
@@ -2875,12 +2945,104 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       setTitleField(i) { this.schemaFields.forEach((f, k) => (f.is_title = k === i)); },
       async saveSchema() {
-        const fields = this.serializeSchemaFields();
-        if (!fields.length) { alert(T('Keep at least one field')); return; }
-        if (!fields.some((f) => f.is_title)) fields[0].is_title = true;
-        const c = await api('collections/' + this.current.id + '/fields', { method: 'PUT', body: JSON.stringify({ fields }) });
-        this.current = c; this.modal = null; await this.loadRecords(); this.showToast(T('Fields updated'));
+        const newFields = this.serializeSchemaFields();
+        if (!newFields.length) { alert(T('Keep at least one field')); return; }
+        if (!newFields.some((f) => f.is_title)) newFields[0].is_title = true;
+        // Guard existing data against incompatible field edits. Records are stored
+        // as JSON keyed by field key and are NOT touched by a schema change, so a
+        // type/secret change can silently break display, lose data on next edit,
+        // orphan attachment files, or expose ciphertext. We diff old vs new fields,
+        // migrate every record's data accordingly, and confirm once before saving.
+        const ATT = ['image', 'image_crop', 'file'];
+        const oldByKey = {}; (this.current.fields || []).forEach((f) => { oldByKey[f.key] = f; });
+        const newKeys = new Set(newFields.map((f) => f.key));
+        const selOpt = {}; newFields.forEach((f) => { if (f.type === 'select') selOpt[f.key] = (f.options || []).slice(); });
+        const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+        const isMonth = (v) => /^\d{4}-\d{2}$/.test(String(v));
+        const isNum = (v) => { const t = String(v).replace(/,/g, ''); return /^-?\d+(\.\d+)?$/.test(t) && isFinite(parseFloat(t)); };
+        let records;
+        try { records = await api('collections/' + this.current.id + '/records'); }
+        catch (e) { alert(T('Failed') + ': ' + (e.message || e)); return; }
+        const counts = { decrypt: 0, encrypt: 0, attCleared: 0, toAtt: 0, dateCleared: 0, numCleared: 0, pruned: 0, selectAdded: 0 };
+        const selectExtra = {};
+        let needUnlock = false;
+        const changed = [];
+        for (const r of records) {
+          const data = { ...r.data }; let dirty = false;
+          // 1) data left over from removed fields (attachments are trashed server-side
+          //    when we PUT the record below, while the OLD schema is still in effect)
+          for (const k of Object.keys(data)) {
+            if (!newKeys.has(k)) { if (data[k] != null && data[k] !== '') counts.pruned++; delete data[k]; dirty = true; }
+          }
+          // 2) per-field changes for keys that already existed
+          for (const nf of newFields) {
+            const of = oldByKey[nf.key]; if (!of) continue;
+            let v = data[nf.key]; if (v == null || v === '') continue;
+            // secret turned OFF: decrypt so the value is not shown/saved as ciphertext
+            if (of.secret && !nf.secret && rbcrypto.isEnc(v)) {
+              if (!encKey) { needUnlock = true; continue; }
+              data[nf.key] = await rbcrypto.decrypt(encKey, v); dirty = true; counts.decrypt++; v = data[nf.key];
+            } else if (!of.secret && nf.secret && !rbcrypto.isEnc(v) && this.enc.enabled && encKey) {
+              // secret turned ON: encrypt the existing plain-text value
+              data[nf.key] = await rbcrypto.encrypt(encKey, String(v)); dirty = true; counts.encrypt++; continue;
+            }
+            // type change: keep compatible values, clean up the rest
+            if (of.type !== nf.type) {
+              const from = of.type, to = nf.type;
+              if (ATT.includes(from) && !ATT.includes(to)) { delete data[nf.key]; dirty = true; counts.attCleared++; }
+              else if (!ATT.includes(from) && ATT.includes(to)) { delete data[nf.key]; dirty = true; counts.toAtt++; }
+              else if (to === 'date') { if (!isDate(v)) { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
+              else if (to === 'month') { if (isMonth(v)) { /* ok */ } else if (isDate(v)) { data[nf.key] = v.slice(0, 7); dirty = true; } else { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
+              else if (to === 'number') { if (!isNum(v)) { delete data[nf.key]; dirty = true; counts.numCleared++; } }
+              else if (to === 'select') { const opts = selOpt[nf.key] || []; if (!opts.includes(v)) (selectExtra[nf.key] = selectExtra[nf.key] || new Set()).add(v); }
+            }
+          }
+          if (dirty) changed.push({ id: r.id, data });
+        }
+        if (needUnlock) { alert(T('Turning off Secret requires unlocking encryption first. Unlock it in Settings and try again.')); return; }
+        // keep out-of-range values by adding them to the choices — never silently drop
+        for (const nf of newFields) { if (nf.type === 'select' && selectExtra[nf.key]) { const add = [...selectExtra[nf.key]]; nf.options = [...(nf.options || []), ...add]; counts.selectAdded += add.length; } }
+        // Split effects into data-destroying vs. safe. Anything that deletes a file
+        // or clears/removes a value is DESTRUCTIVE and must pass a stricter, gated
+        // confirmation (a checkbox the user has to tick) rather than a one-click OK.
+        const destructive = [], safe = [];
+        if (counts.attCleared) destructive.push(T('Delete {n} attached file(s) (field is no longer an attachment type)', { n: counts.attCleared }));
+        if (counts.toAtt) destructive.push(T('Clear {n} value(s) that are not compatible with an attachment field', { n: counts.toAtt }));
+        if (counts.dateCleared) destructive.push(T('Clear {n} value(s) that are not valid dates', { n: counts.dateCleared }));
+        if (counts.numCleared) destructive.push(T('Clear {n} value(s) that are not numbers', { n: counts.numCleared }));
+        if (counts.pruned) destructive.push(T('Remove leftover data of {n} value(s) from deleted fields', { n: counts.pruned }));
+        if (counts.decrypt) safe.push(T('Decrypt {n} value(s) back to plain text (Secret turned off)', { n: counts.decrypt }));
+        if (counts.encrypt) safe.push(T('Encrypt {n} value(s) (Secret turned on)', { n: counts.encrypt }));
+        if (counts.selectAdded) safe.push(T('Add {n} existing value(s) to the choices so nothing is lost', { n: counts.selectAdded }));
+        if (destructive.length) {
+          // deletion involved → open the strict, checkbox-gated confirmation modal
+          this.schemaPlan = { destructive, safe, fields: newFields, changed };
+          this.schemaAck = false;
+          this.modal = { type: 'schemaMigrate' };
+          return;
+        }
+        if (safe.length && !confirm(T('This field change affects existing data:') + '\n\n- ' + safe.join('\n- ') + '\n\n' + T('Continue?'))) return;
+        await this.commitSchema(newFields, changed);
       },
+      // Apply the staged record migrations, then save the new field schema. Record
+      // updates go FIRST, while the OLD schema is still active, so the server trashes
+      // attachment files that are being removed or retyped.
+      async commitSchema(newFields, changed) {
+        try { for (const cr of changed) await api('records/' + cr.id, { method: 'PUT', body: JSON.stringify({ data: cr.data }) }); }
+        catch (e) { alert(T('Failed') + ': ' + (e.message || e)); return false; }
+        const c = await api('collections/' + this.current.id + '/fields', { method: 'PUT', body: JSON.stringify({ fields: newFields }) });
+        this.current = c; this.modal = null; this.schemaPlan = null; this.schemaAck = false;
+        await this.loadRecords(); this.showToast(T('Fields updated'));
+        return true;
+      },
+      async confirmSchemaMigrate() {
+        if (!this.schemaPlan || !this.schemaAck || this.busy) return;
+        this.busy = true;
+        try { await this.commitSchema(this.schemaPlan.fields, this.schemaPlan.changed); }
+        finally { this.busy = false; }
+      },
+      // Cancel returns to the field editor (keeping the user's unsaved edits intact).
+      cancelSchemaMigrate() { this.schemaPlan = null; this.schemaAck = false; this.modal = { type: 'schema' }; },
       openNewRecord() {
         if (!this.canEdit) return;
         this.form = {}; this.reveal = {}; this.editingRecordId = null; this.editingOrig = null;

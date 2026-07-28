@@ -2,6 +2,36 @@
 
 All notable changes to RegiBase.
 
+## 0.14.1 — 2026-07-28
+
+### Edit lock (view-only collections)
+
+- A collection's settings now include an **Edit lock**. While it is on, the collection is
+  view-only: records and fields cannot be added, edited or deleted, and a 🔒 mark is shown next
+  to it in the collection list. It is enforced on the server, not only in the interface.
+
+### Field editing
+
+- Changing a field's type or its Secret setting, or removing a field, now migrates the existing
+  record data instead of leaving it inconsistent: values are decrypted when Secret is turned off
+  and encrypted when it is turned on; values that no longer fit the new type are cleared; a Select
+  field keeps existing out-of-range values by adding them to its choices; and data and attachments
+  left by removed fields are cleaned up.
+- The effects are listed in a single confirmation first. Any change that deletes data now needs a
+  checkbox confirmation rather than a single click.
+
+### Encryption
+
+- Settings has a **Re-encrypt secret fields** action for secret values still stored as plain text
+  (for example when encryption was enabled later). Turning a field into a secret field also offers
+  to encrypt its existing values.
+- The encryption section of Settings was rearranged so each action has a short description.
+
+### Fixes
+
+- Sorting a field of dotted values such as IP addresses treated them all as the same number and
+  left them unsorted; they now sort in natural order.
+
 ## 0.13.1 — 2026-07-25
 
 ### Address field type

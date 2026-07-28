@@ -92,6 +92,20 @@ class RegiBaseService {
 		return $res;
 	}
 
+	/** Throw if the collection is edit-locked (view only). */
+	private function assertEditable(CollectionEntity $c): void {
+		if ($c->getLocked()) {
+			throw new ForbiddenException('collection is edit-locked (view only)');
+		}
+	}
+
+	/** Like require(), but also rejects the call when the collection is edit-locked. */
+	private function requireEditable(string $userId, int $id, string $min): array {
+		$res = $this->require($userId, $id, $min);
+		$this->assertEditable($res[0]);
+		return $res;
+	}
+
 	/** Attachment-type fields of a collection (as jsonSerialized arrays). */
 	private function attachmentFields(int $collectionId): array {
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
@@ -223,6 +237,7 @@ class RegiBaseService {
 		$view = $input['view'] ?? 'list';
 		$c->setView(in_array($view, self::ALLOWED_VIEWS, true) ? $view : 'list');
 		$c->setRecordSort('created_desc');
+		$c->setLocked(!empty($input['locked']));
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -319,6 +334,9 @@ class RegiBaseService {
 		if (isset($patch['record_sort']) && in_array($patch['record_sort'], self::ALLOWED_SORTS, true)) {
 			$c->setRecordSort((string)$patch['record_sort']);
 		}
+		if (array_key_exists('locked', $patch)) {
+			$c->setLocked((bool)$patch['locked']);
+		}
 		$c->setUpdatedAt($this->now());
 		$this->collections->update($c);
 		return $this->getCollection($userId, $id);
@@ -340,7 +358,7 @@ class RegiBaseService {
 	}
 
 	public function replaceFields(string $userId, int $id, array $fields): array {
-		$this->collections->findForUser($id, $userId); // ownership check
+		$this->assertEditable($this->collections->findForUser($id, $userId)); // ownership + not locked
 		$this->fields->deleteForCollection($id);
 		$this->insertFields($id, $fields);
 		return $this->getCollection($userId, $id);
@@ -480,7 +498,7 @@ class RegiBaseService {
 	}
 
 	public function createRecord(string $userId, int $collectionId, array $data): array {
-		$this->require($userId, $collectionId, self::PERM_EDIT);
+		$this->requireEditable($userId, $collectionId, self::PERM_EDIT);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$e = new RecordEntity();
 		$e->setCollectionId($collectionId);
@@ -495,6 +513,7 @@ class RegiBaseService {
 
 	public function updateRecord(string $userId, int $id, array $data): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
+		$this->assertEditable($c);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$oldData = json_decode($r->getData() ?: '{}', true) ?: [];
 		$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
@@ -516,6 +535,7 @@ class RegiBaseService {
 
 	public function deleteRecord(string $userId, int $id): void {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_DELETE);
+		$this->assertEditable($c);
 		$data = json_decode($r->getData() ?: '{}', true) ?: [];
 		$this->trashDataAttachments($userId, $this->attachmentFields((int)$c->getId()), $data);
 		$this->records->delete($r);
@@ -542,7 +562,7 @@ class RegiBaseService {
 	 * @return int number of records whose position actually changed
 	 */
 	public function reorderRecords(string $userId, int $collectionId, array $orderedIds): int {
-		$this->require($userId, $collectionId, self::PERM_EDIT);
+		$this->requireEditable($userId, $collectionId, self::PERM_EDIT);
 		$records = $this->records->findForCollection($collectionId);
 		$byId = [];
 		foreach ($records as $r) {
@@ -586,7 +606,7 @@ class RegiBaseService {
 	 * Skips keys that already exist; forces is_title=false. Returns keys added.
 	 */
 	public function appendFields(string $userId, int $collectionId, array $fields): array {
-		$this->collections->findForUser($collectionId, $userId); // ownership
+		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // ownership + not locked
 		$existingFields = $this->fields->findForCollection($collectionId);
 		$existing = [];
 		$maxSort = 0;
@@ -689,9 +709,13 @@ class RegiBaseService {
 			throw new \RuntimeException('recordIds is required');
 		}
 
-		$this->collections->findForUser($sourceId, $userId); // transfer is owner-only (both sides)
+		$srcEntity = $this->collections->findForUser($sourceId, $userId); // transfer is owner-only (both sides)
 		$source = $this->getCollection($userId, $sourceId); // fields
-		$this->collections->findForUser($targetId, $userId); // ownership of target
+		$tgtEntity = $this->collections->findForUser($targetId, $userId); // ownership of target
+		$this->assertEditable($tgtEntity); // target is always written to
+		if ($mode === 'move') {
+			$this->assertEditable($srcEntity); // move also deletes from the source
+		}
 
 		if (!empty($opts['addFields']) && is_array($opts['addFields'])) {
 			$this->appendFields($userId, $targetId, $opts['addFields']);
@@ -949,7 +973,7 @@ class RegiBaseService {
 
 	/** Insert many records (from data arrays) into a collection the user owns. */
 	public function bulkAddRecords(string $userId, int $collectionId, array $dataArray): int {
-		$this->collections->findForUser($collectionId, $userId); // authz: throws if not owner
+		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // owner + not locked
 		return $this->bulkInsertRecords($collectionId, $dataArray);
 	}
 

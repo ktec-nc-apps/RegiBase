@@ -1,12 +1,14 @@
 # RegiBase 🗄️
 
-**A lightweight personal database for Nextcloud** — keep the information you care
-about in collections whose fields **you design yourself**.
-**Nextcloud 用の軽量パーソナルデータベース** — 大切な情報を、**自分で設計した項目**の
-コレクションにまとめて管理できます。
+A small personal-database app for Nextcloud. It keeps everyday information in
+collections whose fields you set up yourself.
+Nextcloud 用の小さなパーソナルデータベースです。日々の情報を、自分で決めた項目の
+コレクションにまとめておけます。
 
-> Personal project · self-hosted · your data stays in your own Nextcloud.
-> 個人プロジェクト · セルフホスト · データはあなた自身の Nextcloud の中だけに保存されます。
+> A personal project, written for my own use and shared in case it is useful to someone.
+> Self-hosted; your data stays in your own Nextcloud.
+> 自分用に作った個人プロジェクトで、どなたかの役に立てばと思い公開しています。
+> セルフホストで、データはあなた自身の Nextcloud の中だけに保存されます。
 
 [English ↓](#english) · [日本語 ↓](#japanese)
 
@@ -16,9 +18,9 @@ about in collections whose fields **you design yourself**.
 
 ## English
 
-A Nextcloud-native app to organise and keep the information you care about —
-credit cards, bank accounts, online accounts, memberships, licenses, contacts and
-anything else — in collections whose fields **you design yourself**.
+A Nextcloud app for keeping everyday information — credit cards, bank accounts,
+online accounts, memberships, licenses, contacts and so on — in collections whose
+fields you set up yourself.
 
 ### Features
 
@@ -53,8 +55,7 @@ anything else — in collections whose fields **you design yourself**.
 
 ### Works with your other Nextcloud apps
 
-RegiBase is designed to fit into the rest of your Nextcloud rather than stand apart
-from it. It connects with these apps when they are installed:
+RegiBase can use a few other Nextcloud apps when they happen to be installed:
 
 - **Contacts** — import contacts, photos included, into a collection.
 - **Tables** — import a table into a new collection, or export a collection to Tables.
@@ -62,11 +63,11 @@ from it. It connects with these apps when they are installed:
 - **Notes** — attach a note to a record.
 - **Calendar** — add a reminder from a date field; it opens Calendar's new-event editor prefilled with the date.
 
-Use the **Address** field type and its value gets a 🌐 button that opens it in **Google Maps,
-OpenStreetMap or Apple Maps** (chosen in Settings) — no external app required.
+An **Address** field type adds a 🌐 button that opens the value in Google Maps,
+OpenStreetMap or Apple Maps (chosen in Settings).
 
-Each integration's action becomes available once its app is enabled (otherwise the
-button stays disabled with a hint), so RegiBase adapts to whichever apps you run.
+Each action is available only when the relevant app is enabled; otherwise the
+button stays disabled.
 
 ### Requirements
 
@@ -118,8 +119,8 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
 ## 日本語
 
 クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、
-「覚えておきたい情報」を、**自分で項目を設計したコレクション**として整理・保管できる
-Nextcloud ネイティブアプリです。
+日々の情報を、自分で決めた項目のコレクションとして整理・保管しておける Nextcloud
+アプリです。
 
 ### 特長
 
@@ -149,8 +150,7 @@ Nextcloud ネイティブアプリです。
 
 ### 他の Nextcloud アプリと連携
 
-RegiBase は単独で完結するのではなく、お使いの Nextcloud に溶け込むよう設計しています。
-以下のアプリが導入されているときに連携できます:
+RegiBase は、以下のアプリが入っていれば、それらを利用します:
 
 - **Contacts（連絡先）** — 連絡先（写真含む）をコレクションに取り込み。
 - **Tables** — テーブルを新規コレクションとして取込、またはコレクションを Tables へ書出。
@@ -158,11 +158,10 @@ RegiBase は単独で完結するのではなく、お使いの Nextcloud に溶
 - **Notes（メモ）** — レコードにメモを添付。
 - **Calendar（カレンダー）** — 日付項目からリマインダーを追加。日付を入れた新規イベント画面が開きます。
 
-項目タイプ「**住所**」を使うと、その値に 🌐 ボタンが付き、**Google マップ／OpenStreetMap／Apple マップ**
-（設定で選択）で開けます（外部アプリ不要）。
+項目タイプ「住所」を使うと、その値に 🌐 ボタンが付き、Google マップ／OpenStreetMap／Apple マップ
+（設定で選択）で開けます。
 
-各連携の操作は、対応アプリが有効なときに使用可能になります（無効時はボタンがヒント付きで
-グレーアウト表示）。導入しているアプリに合わせて RegiBase 側が自動的に対応します。
+各操作は、対応するアプリが有効なときにのみ使えます（無効時はボタンはグレーアウトします）。
 
 ### 動作環境
 
