@@ -35,7 +35,17 @@ class RegiBaseService {
 		private ImageService $images,
 		private IL10N $l,
 		private ISession $session,
+		private HistoryService $history,
 	) {
+	}
+
+	/** Best-effort append to the undo/change-history journal (never blocks the op). */
+	private function rec(string $userId, string $op, ?int $collectionId, string $summary, array $undo, ?string $grp = null): void {
+		try {
+			$this->history->record($userId, $op, $collectionId, $summary, $undo, $grp);
+		} catch (\Throwable $e) {
+			// history is a safety net; a failure to record must not fail the action
+		}
 	}
 
 	private function unlockKey(int $collectionId): string {
@@ -251,6 +261,7 @@ class RegiBaseService {
 
 		$fields = $input['fields'] ?? ($tpl['fields'] ?? []);
 		$this->insertFields((int)$c->getId(), $fields);
+		$this->rec($userId, 'collection.create', (int)$c->getId(), $this->l->t('Create the collection “%s”', [$c->getName()]), ['kind' => 'del_collection', 'id' => (int)$c->getId()]);
 		return $this->getCollection($userId, (int)$c->getId());
 	}
 
@@ -297,6 +308,7 @@ class RegiBaseService {
 				$this->bulkInsertRecords($newId, $dataArray);
 			}
 		}
+		$this->rec($userId, 'collection.create', $newId, $this->l->t('Duplicate the collection “%s”', [$src->getName()]), ['kind' => 'del_collection', 'id' => $newId]);
 		return $this->getCollection($userId, $newId);
 	}
 
@@ -325,6 +337,11 @@ class RegiBaseService {
 		// editing collection settings (name/icon/color/description/view/sort) needs
 		// ownership or the highest recipient level ('delete'); 'edit'/'view' cannot.
 		[$c] = $this->require($userId, $id, self::PERM_DELETE);
+		// Don't clutter the undo history with pure display-preference switches
+		// (view / sort). Only real settings changes are worth an undo entry.
+		if (array_diff(array_keys($patch), ['view', 'record_sort'])) {
+			$this->rec($userId, 'collection.update', $id, $this->l->t('Change settings of “%s”', [$c->getName()]), ['kind' => 'restore_collection', 'id' => $id, 'settings' => $c->jsonSerialize()]);
+		}
 		if (isset($patch['name'])) {
 			$c->setName((string)$patch['name']);
 		}
@@ -362,6 +379,15 @@ class RegiBaseService {
 
 	public function deleteCollection(string $userId, int $id): void {
 		$c = $this->collections->findForUser($id, $userId);
+		// Snapshot the whole collection (settings + fields + record data) so the
+		// deletion can be reversed. Attachment files are trashed below; on undo the
+		// data references are restored (files may need restoring from the trash bin).
+		$dump = [
+			'settings' => $c->jsonSerialize(),
+			'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id)),
+			'records' => array_map(fn (RecordEntity $r) => ['data' => json_decode($r->getData() ?: '{}', true) ?: [], 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()], $this->records->findForCollection($id)),
+		];
+		$this->rec($userId, 'collection.delete', null, $this->l->t('Delete the collection “%s”', [$c->getName()]), ['kind' => 'recreate_collection', 'dump' => $dump]);
 		$attach = $this->attachmentFields($id);
 		if (count($attach) > 0) {
 			foreach ($this->records->findForCollection($id) as $r) {
@@ -375,8 +401,258 @@ class RegiBaseService {
 		$this->collections->delete($c);
 	}
 
-	public function replaceFields(string $userId, int $id, array $fields): array {
+	// ---- undo / change history ----
+
+	/** List the user's change history (newest first). */
+	public function history(string $userId): array {
+		return $this->history->listForUser($userId);
+	}
+
+	public function undoLimit(string $userId): int {
+		return $this->history->getLimit($userId);
+	}
+
+	public function setUndoLimit(string $userId, int $n): int {
+		return $this->history->setLimit($userId, $n);
+	}
+
+	public function clearHistory(string $userId): void {
+		$this->history->clearForUser($userId);
+	}
+
+	/**
+	 * Revert the most recent change (or the whole most-recent grouped action).
+	 * @return array{undone:int, summary?:string, collection_id?:?int}
+	 */
+	public function undo(string $userId): array {
+		$batch = $this->history->nextUndoBatch($userId); // newest-first
+		if (!$batch) {
+			return ['undone' => 0];
+		}
+		$summary = $batch[0]->getSummary();
+		$collectionId = null;
+		$done = 0;
+		foreach ($batch as $entry) {
+			try {
+				$cid = $this->applyInverse($userId, $this->history->decode($entry));
+				if ($cid !== null) {
+					$collectionId = $cid;
+				}
+			} catch (\Throwable $e) {
+				// keep going; still mark undone so we never loop on a bad entry
+			}
+			$this->history->markUndone($entry);
+			$done++;
+		}
+		return ['undone' => $done, 'summary' => $summary, 'collection_id' => $collectionId];
+	}
+
+	/** Apply a single inverse payload. Returns the affected collection id if known. */
+	private function applyInverse(string $userId, array $p): ?int {
+		switch ($p['kind'] ?? '') {
+			case 'del_record':
+				try {
+					$this->records->delete($this->records->find((int)$p['id']));
+				} catch (DoesNotExistException $e) {
+				}
+				return null;
+			case 'set_data':
+				try {
+					$r = $this->records->find((int)$p['id']);
+				} catch (DoesNotExistException $e) {
+					return null;
+				}
+				$cid = (int)$r->getCollectionId();
+				$data = is_array($p['data'] ?? null) ? $p['data'] : [];
+				$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($cid));
+				$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
+				$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
+				$r->setUpdatedAt($this->now());
+				$this->records->update($r);
+				return $cid;
+			case 'reinsert':
+				return $this->reinsertRecord(is_array($p['record'] ?? null) ? $p['record'] : []);
+			case 'reinsert_many':
+				$cid = null;
+				foreach (($p['records'] ?? []) as $rec) {
+					$cid = $this->reinsertRecord(is_array($rec) ? $rec : []) ?? $cid;
+				}
+				return $cid;
+			case 'reorder':
+				$cid = null;
+				foreach (($p['orders'] ?? []) as $pair) {
+					if (!is_array($pair) || count($pair) < 2) {
+						continue;
+					}
+					try {
+						$r = $this->records->find((int)$pair[0]);
+						if ((int)$r->getSort() !== (int)$pair[1]) {
+							$r->setSort((int)$pair[1]);
+							$this->records->update($r);
+						}
+						$cid = (int)$r->getCollectionId();
+					} catch (DoesNotExistException $e) {
+					}
+				}
+				return $cid;
+			case 'del_many':
+				foreach (($p['ids'] ?? []) as $id) {
+					try {
+						$this->records->delete($this->records->find((int)$id));
+					} catch (DoesNotExistException $e) {
+					}
+				}
+				return null;
+			case 'restore_fields':
+				$cid = (int)($p['collectionId'] ?? 0);
+				if ($cid > 0) {
+					$this->fields->deleteForCollection($cid);
+					$this->restoreFields($cid, is_array($p['fields'] ?? null) ? $p['fields'] : []);
+				}
+				return $cid ?: null;
+			case 'del_collection':
+				$id = (int)($p['id'] ?? 0);
+				try {
+					$c = $this->collections->findById($id);
+					$this->fields->deleteForCollection($id);
+					$this->records->deleteForCollection($id);
+					$this->shares->deleteForCollection($id);
+					$this->collections->delete($c);
+				} catch (DoesNotExistException $e) {
+				}
+				return null;
+			case 'restore_collection':
+				return $this->restoreCollectionSettings((int)($p['id'] ?? 0), is_array($p['settings'] ?? null) ? $p['settings'] : []);
+			case 'recreate_collection':
+				return $this->recreateCollection($userId, is_array($p['dump'] ?? null) ? $p['dump'] : []);
+			case 'undo_transfer':
+				foreach (($p['createdIds'] ?? []) as $id) {
+					try {
+						$this->records->delete($this->records->find((int)$id));
+					} catch (DoesNotExistException $e) {
+					}
+				}
+				$cid = null;
+				foreach (($p['restore'] ?? []) as $rec) {
+					$cid = $this->reinsertRecord(is_array($rec) ? $rec : []) ?? $cid;
+				}
+				return $cid;
+		}
+		return null;
+	}
+
+	private function reinsertRecord(array $rec): ?int {
+		$cid = (int)($rec['collectionId'] ?? 0);
+		if ($cid <= 0) {
+			return null;
+		}
+		$data = is_array($rec['data'] ?? null) ? $rec['data'] : [];
+		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($cid));
+		$e = new RecordEntity();
+		$e->setCollectionId($cid);
+		$e->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
+		$e->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
+		$e->setSort((int)($rec['sort'] ?? ($this->records->maxSort($cid) + 1)));
+		$e->setCreatedAt((string)($rec['createdAt'] ?? $this->now()));
+		$e->setUpdatedAt($this->now());
+		$this->records->insert($e);
+		return $cid;
+	}
+
+	/** Insert field rows exactly as captured (keys/sort/flags preserved). */
+	private function restoreFields(int $cid, array $fields): void {
+		foreach ($fields as $f) {
+			if (!is_array($f)) {
+				continue;
+			}
+			$e = new FieldEntity();
+			$e->setCollectionId($cid);
+			$e->setFieldKey((string)($f['key'] ?? ''));
+			$e->setLabel((string)($f['label'] ?? ''));
+			$e->setType((string)($f['type'] ?? 'text'));
+			$e->setOptions(!empty($f['options']) ? json_encode($f['options']) : null);
+			$e->setRequired(!empty($f['required']));
+			$e->setSecret(!empty($f['secret']));
+			$e->setIsTitle(!empty($f['is_title']));
+			$e->setPlaceholder($f['placeholder'] ?? null);
+			$e->setSort((int)($f['sort'] ?? 0));
+			$e->setConcat((int)($f['concat'] ?? 0));
+			$this->fields->insert($e);
+		}
+	}
+
+	private function restoreCollectionSettings(int $id, array $s): ?int {
+		try {
+			$c = $this->collections->findById($id);
+		} catch (DoesNotExistException $e) {
+			return null;
+		}
+		if (isset($s['name'])) {
+			$c->setName((string)$s['name']);
+		}
+		if (isset($s['icon'])) {
+			$c->setIcon((string)$s['icon']);
+		}
+		if (isset($s['color'])) {
+			$c->setColor((string)$s['color']);
+		}
+		if (array_key_exists('description', $s)) {
+			$c->setDescription((string)($s['description'] ?? ''));
+		}
+		if (isset($s['view'])) {
+			$c->setView((string)$s['view']);
+		}
+		if (isset($s['record_sort'])) {
+			$c->setRecordSort((string)$s['record_sort']);
+		}
+		if (array_key_exists('locked', $s)) {
+			$c->setLocked((bool)$s['locked']);
+		}
+		if (array_key_exists('key_head', $s)) {
+			$c->setKeyHead((bool)$s['key_head']);
+		}
+		if (isset($s['key_sep'])) {
+			$c->setKeySep((string)$s['key_sep']);
+		}
+		if (array_key_exists('key_sep_char', $s)) {
+			$c->setKeySepChar((string)($s['key_sep_char'] ?? ''));
+		}
+		$c->setUpdatedAt($this->now());
+		$this->collections->update($c);
+		return $id;
+	}
+
+	private function recreateCollection(string $userId, array $dump): ?int {
+		$s = is_array($dump['settings'] ?? null) ? $dump['settings'] : [];
+		$c = new CollectionEntity();
+		$c->setUserId($userId);
+		$c->setName((string)($s['name'] ?? 'RegiBase'));
+		$c->setIcon((string)($s['icon'] ?? '📁'));
+		$c->setColor((string)($s['color'] ?? '#3b82f6'));
+		$c->setDescription((string)($s['description'] ?? ''));
+		$c->setView((string)($s['view'] ?? 'table'));
+		$c->setRecordSort((string)($s['record_sort'] ?? 'created_desc'));
+		$c->setLocked(!empty($s['locked']));
+		$c->setKeyHead(!empty($s['key_head']));
+		$c->setKeySep((string)($s['key_sep'] ?? 'space'));
+		$c->setKeySepChar((string)($s['key_sep_char'] ?? ''));
+		$c->setSort($this->collections->maxSort($userId) + 1);
+		$c->setCreatedAt($this->now());
+		$c->setUpdatedAt($this->now());
+		$c = $this->collections->insert($c);
+		$nid = (int)$c->getId();
+		$this->restoreFields($nid, is_array($dump['fields'] ?? null) ? $dump['fields'] : []);
+		$data = array_map(fn ($r) => is_array($r['data'] ?? null) ? $r['data'] : [], is_array($dump['records'] ?? null) ? $dump['records'] : []);
+		if ($data) {
+			$this->bulkInsertRecords($nid, $data);
+		}
+		return $nid;
+	}
+
+	public function replaceFields(string $userId, int $id, array $fields, ?string $grp = null): array {
 		$this->assertEditable($this->collections->findForUser($id, $userId)); // ownership + not locked
+		$oldFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
+		$this->rec($userId, 'fields.replace', $id, $this->l->t('Edit fields'), ['kind' => 'restore_fields', 'collectionId' => $id, 'fields' => $oldFields], $grp);
 		$this->fields->deleteForCollection($id);
 		$this->insertFields($id, $fields);
 		return $this->getCollection($userId, $id);
@@ -419,6 +695,7 @@ class RegiBaseService {
 			$e->setIsTitle(!$hasTitle && $idx === 0 ? true : !empty($f['is_title']));
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort($idx);
+			$e->setConcat((int)($f['concat'] ?? 0));
 			$this->fields->insert($e);
 		}
 	}
@@ -546,14 +823,16 @@ class RegiBaseService {
 		$e->setCreatedAt($this->now());
 		$e->setUpdatedAt($this->now());
 		$e = $this->records->insert($e);
+		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Add a record'), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
 		return $this->getRecord($userId, (int)$e->getId());
 	}
 
-	public function updateRecord(string $userId, int $id, array $data): array {
+	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
 		$this->assertEditable($c);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$oldData = json_decode($r->getData() ?: '{}', true) ?: [];
+		$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edit a record'), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
 		$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 		$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
 		$r->setUpdatedAt($this->now());
@@ -571,25 +850,38 @@ class RegiBaseService {
 		return $this->getRecord($userId, $id);
 	}
 
-	public function deleteRecord(string $userId, int $id): void {
+	/** Permission-checked delete that returns the data needed to re-create it (for undo). */
+	private function deleteRecordCapture(string $userId, int $id): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_DELETE);
 		$this->assertEditable($c);
 		$data = json_decode($r->getData() ?: '{}', true) ?: [];
 		$this->trashDataAttachments($userId, $this->attachmentFields((int)$c->getId()), $data);
+		$snap = ['collectionId' => (int)$c->getId(), 'data' => $data, 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()];
 		$this->records->delete($r);
+		return $snap;
+	}
+
+	public function deleteRecord(string $userId, int $id): void {
+		$snap = $this->deleteRecordCapture($userId, $id);
+		$this->rec($userId, 'record.delete', $snap['collectionId'], $this->l->t('Delete a record'), ['kind' => 'reinsert', 'record' => $snap]);
 	}
 
 	public function deleteRecords(string $userId, array $ids): int {
-		$n = 0;
+		$snaps = [];
+		$cid = null;
 		foreach ($ids as $id) {
 			try {
-				$this->deleteRecord($userId, (int)$id);
-				$n++;
+				$s = $this->deleteRecordCapture($userId, (int)$id);
+				$snaps[] = $s;
+				$cid = $s['collectionId'];
 			} catch (DoesNotExistException | ForbiddenException $e) {
 				// skip records the user cannot delete
 			}
 		}
-		return $n;
+		if ($snaps) {
+			$this->rec($userId, 'record.delete_many', $cid, $this->l->t('Delete %s records', [count($snaps)]), ['kind' => 'reinsert_many', 'records' => $snaps]);
+		}
+		return count($snaps);
 	}
 
 	/**
@@ -603,9 +895,12 @@ class RegiBaseService {
 		$this->requireEditable($userId, $collectionId, self::PERM_EDIT);
 		$records = $this->records->findForCollection($collectionId);
 		$byId = [];
+		$prevOrder = [];
 		foreach ($records as $r) {
 			$byId[(int)$r->getId()] = $r;
+			$prevOrder[] = [(int)$r->getId(), (int)$r->getSort()];
 		}
+		$this->rec($userId, 'record.reorder', $collectionId, $this->l->t('Change record order'), ['kind' => 'reorder', 'orders' => $prevOrder]);
 
 		$seen = [];
 		$sequence = [];
@@ -646,6 +941,7 @@ class RegiBaseService {
 	public function appendFields(string $userId, int $collectionId, array $fields): array {
 		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // ownership + not locked
 		$existingFields = $this->fields->findForCollection($collectionId);
+		$this->rec($userId, 'fields.append', $collectionId, $this->l->t('Add fields'), ['kind' => 'restore_fields', 'collectionId' => $collectionId, 'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields)]);
 		$existing = [];
 		$maxSort = 0;
 		foreach ($existingFields as $f) {
@@ -681,10 +977,15 @@ class RegiBaseService {
 	// ---- bulk insert ----
 	/** Insert many records into a collection (ownership already checked). */
 	private function bulkInsertRecords(int $collectionId, array $dataArray): int {
+		return count($this->bulkInsertRecordsIds($collectionId, $dataArray));
+	}
+
+	/** Like bulkInsertRecords() but returns the ids of the inserted records (for undo). */
+	private function bulkInsertRecordsIds(int $collectionId, array $dataArray): array {
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$ts = $this->now();
 		$sort = $this->records->maxSort($collectionId);
-		$n = 0;
+		$ids = [];
 		foreach ($dataArray as $data) {
 			$data = is_array($data) ? $data : [];
 			$e = new RecordEntity();
@@ -694,10 +995,10 @@ class RegiBaseService {
 			$e->setSort(++$sort);
 			$e->setCreatedAt($ts);
 			$e->setUpdatedAt($ts);
-			$this->records->insert($e);
-			$n++;
+			$e = $this->records->insert($e);
+			$ids[] = (int)$e->getId();
 		}
-		return $n;
+		return $ids;
 	}
 
 	// ---- transfer (move/copy between collections) ----
@@ -789,17 +1090,23 @@ class RegiBaseService {
 			$moveIds[] = (int)$r->getId();
 		}
 
-		$count = $this->bulkInsertRecords($targetId, $mapped);
+		$createdIds = $this->bulkInsertRecordsIds($targetId, $mapped);
+		$movedBack = [];
 		if ($mode === 'move') {
 			foreach ($moveIds as $mid) {
 				try {
-					$this->records->delete($this->records->find($mid));
+					$r = $this->records->find($mid);
+					$movedBack[] = ['collectionId' => $sourceId, 'data' => json_decode($r->getData() ?: '{}', true) ?: [], 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()];
+					$this->records->delete($r);
 				} catch (DoesNotExistException $e) {
 					// skip
 				}
 			}
 		}
-		return ['count' => $count];
+		$this->rec($userId, 'record.transfer', $targetId,
+			$mode === 'move' ? $this->l->t('Move %s records', [count($createdIds)]) : $this->l->t('Copy %s records', [count($createdIds)]),
+			['kind' => 'undo_transfer', 'createdIds' => $createdIds, 'restore' => $movedBack]);
+		return ['count' => count($createdIds)];
 	}
 
 	// ---- CSV import ----
@@ -1021,7 +1328,11 @@ class RegiBaseService {
 	/** Insert many records (from data arrays) into a collection the user owns. */
 	public function bulkAddRecords(string $userId, int $collectionId, array $dataArray): int {
 		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // owner + not locked
-		return $this->bulkInsertRecords($collectionId, $dataArray);
+		$ids = $this->bulkInsertRecordsIds($collectionId, $dataArray);
+		if ($ids) {
+			$this->rec($userId, 'record.bulk_add', $collectionId, $this->l->t('Import %s records', [count($ids)]), ['kind' => 'del_many', 'ids' => $ids]);
+		}
+		return count($ids);
 	}
 
 	// ---- shares (internal sharing between users) ----

@@ -65,6 +65,9 @@
 
   // input rules (per-field character/length restrictions)
   const RULE_TYPES = ['text', 'textarea', 'password', 'tel', 'email', 'url', 'number'];
+  // choice types share the same "one option per line" config; radio/select store a
+  // single value, checkbox stores several joined by ", ".
+  const CHOICE_TYPES = ['select', 'radio', 'checkbox'];
   const CHARSET_RE = { digits: /^[0-9]*$/, alnum: /^[0-9A-Za-z]*$/, alpha: /^[A-Za-z]*$/, hex: /^[0-9A-Fa-f]*$/, ascii: /^[\x20-\x7E]*$/, phone: /^[0-9+\-() ]*$/ };
   const CHARSET_LABEL = { digits: 'Digits', alnum: 'Alphanumeric', alpha: 'Letters', hex: 'Hexadecimal', ascii: 'ASCII characters', phone: 'Phone number (digits, +-() )', custom: 'Specified format' };
 
@@ -323,6 +326,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="title" v-if="current"><span v-if="shareBadge(current)" class="share-badge" :title="shareBadgeTitle(current)">{{ shareBadge(current) }}</span><span class="ic">{{ current.icon }}</span><span class="nm">{{ current.name }}</span></div>
       <div class="title" v-else><span class="nm">{{ t('All collections') }}</span></div>
       <div class="spacer"></div>
+      <button v-if="undoTop" class="btn ghost sm rb-undo" @click="doUndo" :title="t('Undo: {what}', {what: undoTop})">↶ {{ t('Undo') }}</button>
       <template v-if="current">
         <div class="topbar-actions">
           <div class="viewswitch">
@@ -424,8 +428,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               <button class="rec-drow" @click="openRecord(r)">
                 <div class="rr-title">{{ r.title }}</div>
                 <div class="rr-fields">
-                  <span v-for="f in listFields" :key="f.key" v-show="r.data[f.key]!=null && r.data[f.key]!==''" class="rr-field">
-                    <b>{{ f.label }}:</b> {{ cellPreview(r, f) }}
+                  <span v-for="col in listGroups" :key="col.id" v-show="colText(r, col)!==''" class="rr-field">
+                    <b>{{ col.label }}:</b> {{ colText(r, col) }}
                   </span>
                 </div>
               </button>
@@ -439,8 +443,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <table class="rec-table">
               <thead>
                 <tr>
-                  <th class="rt-frozen" :class="{'rt-keycol': keyHeadOn || (tableFrozen && tableFrozen.is_title)}"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="keyHeadOn">{{ keyHeadLabel }}</span><span v-else-if="tableFrozen">{{ tableFrozen.label }}</span></label></th>
-                  <th v-for="f in tableScrollFields" :key="f.key" :class="{'rt-keycol': f.is_title}">{{ f.label }}</th>
+                  <th class="rt-frozen" :class="{'rt-keycol': tableFrozenCol && tableFrozenCol.keycol}"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="tableFrozenCol">{{ tableFrozenCol.label }}</span></label></th>
+                  <th v-for="col in tableScrollCols" :key="col.id" :class="{'rt-keycol': col.keycol}">{{ col.label }}</th>
                   <th class="rt-actions"></th>
                 </tr>
               </thead>
@@ -448,17 +452,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
                 <tr v-for="r in visibleRecords" :key="r.id" :class="{sel: isSelected(r.id)}">
                   <td class="rt-frozen">
                     <label class="rt-fcell" @click.stop><input type="checkbox" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" /></label>
-                    <span class="rt-fval" :class="{mono: !keyHeadOn && tableFrozen && tableFrozen.secret, 'rt-keycol': keyHeadOn || (tableFrozen && tableFrozen.is_title)}" @click="openRecord(r)" :title="t('Edit')">
-                      <template v-if="keyHeadOn">{{ r.title }}</template>
-                      <template v-else>
-                        <img v-if="tableFrozen && (tableFrozen.type==='image'||tableFrozen.type==='image_crop') && r.data[tableFrozen.key]" :src="imgUrl(r.data[tableFrozen.key])" class="rt-thumb" loading="lazy" />
-                        <template v-else>{{ tableFrozen ? cellPreview(r, tableFrozen) : r.title }}</template>
-                      </template>
+                    <span class="rt-fval" :class="{mono: tableFrozenCol && tableFrozenCol.secret, 'rt-keycol': tableFrozenCol && tableFrozenCol.keycol}" @click="openRecord(r)" :title="t('Edit')">
+                      <img v-if="colImg(r, tableFrozenCol)" :src="colImg(r, tableFrozenCol)" class="rt-thumb" loading="lazy" />
+                      <template v-else>{{ colText(r, tableFrozenCol) }}</template>
                     </span>
                   </td>
-                  <td v-for="f in tableScrollFields" :key="f.key" :class="{mono: f.secret, 'rt-keycol': f.is_title}">
-                    <img v-if="(f.type==='image'||f.type==='image_crop') && r.data[f.key]" :src="imgUrl(r.data[f.key])" class="rt-thumb" loading="lazy" />
-                    <span v-else>{{ cellPreview(r, f) }}</span>
+                  <td v-for="col in tableScrollCols" :key="col.id" :class="{mono: col.secret, 'rt-keycol': col.keycol}">
+                    <img v-if="colImg(r, col)" :src="colImg(r, col)" class="rt-thumb" loading="lazy" />
+                    <span v-else>{{ colText(r, col) }}</span>
                   </td>
                   <td class="rt-actions" @click.stop><button class="rec-copy inline" @click="copyRecord(r)" :title="t('Copy the whole card')">⧉</button></td>
                 </tr>
@@ -526,6 +527,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <option value="">{{ t('— Select —') }}</option>
             <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
           </select>
+          <div v-else-if="f.type==='radio'" class="choice-field">
+            <label v-for="o in f.options" :key="o" class="choice-opt"><input type="radio" :name="'r_'+f.key" :value="o" v-model="form[f.key]" /> <span>{{ o }}</span></label>
+            <button v-if="form[f.key]" type="button" class="btn sm choice-clear" @click="form[f.key]=''">{{ t('Clear') }}</button>
+          </div>
+          <div v-else-if="f.type==='checkbox'" class="choice-field">
+            <label v-for="o in f.options" :key="o" class="choice-opt"><input type="checkbox" :value="o" v-model="form[f.key]" /> <span>{{ o }}</span></label>
+          </div>
           <div v-else-if="f.type==='image' || f.type==='image_crop'" class="imgfield">
             <div class="dropzone" :class="{over: dropKey===f.key}"
                  @dragover.prevent @dragenter.prevent="dropKey=f.key" @dragleave.prevent="onDropLeave(f.key)" @drop.prevent="onImageDrop($event, f)">
@@ -644,7 +652,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <option value="url">URL</option>
             <option value="tel">{{ t('Phone number') }}</option>
             <option value="address">{{ t('Address (map link)') }}</option>
-            <option value="select">{{ t('Choices') }}</option>
+            <option value="select">{{ t('Choices (dropdown)') }}</option>
+            <option value="radio">{{ t('Choices (radio, single)') }}</option>
+            <option value="checkbox">{{ t('Choices (checkboxes, multiple)') }}</option>
             <option value="image">{{ t('Image (as-is / resize)') }}</option>
             <option value="image_crop">{{ t('Image (crop)') }}</option>
             <option value="file">{{ t('File attachment (PDF/Word/Excel/ODF, notes)') }}</option>
@@ -652,7 +662,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div style="display:flex;gap:4px;justify-content:flex-end">
             <button class="icon-btn" @click="removeSchemaField(i)" :title="t('Delete')">🗑</button>
           </div>
-          <textarea v-if="f.type==='select'" v-model="f.options" :placeholder="t('Enter choices, one per line')" style="grid-column:1/-1;min-height:56px"></textarea>
+          <textarea v-if="f.type==='select'||f.type==='radio'||f.type==='checkbox'" v-model="f.options" :placeholder="t('Enter choices, one per line')" style="grid-column:1/-1;min-height:56px"></textarea>
           <div v-if="f.type==='image'" class="imgcfg">
             <label class="cfg"><input type="checkbox" v-model="f._orig" /> {{ t('Save at original size (no processing)') }}</label>
             <label class="cfg" v-if="!f._orig">{{ t('Max size') }} <input type="number" min="200" max="6000" step="100" v-model.number="f._max" /> px</label>
@@ -704,6 +714,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('🏷️ Emphasis') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
+            <label :title="t('Fields sharing a group are shown combined (joined in field order), separate from Emphasis.')">🔗 {{ t('Concatenate') }} <select v-model.number="f.concat"><option :value="0">{{ t('None') }}</option><option v-for="g in 6" :key="g" :value="g">{{ g }}</option></select></label>
           </div>
         </div>
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
@@ -1176,6 +1187,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🌐 button on address fields opens the value in this map service.') }}</div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <label>↶ {{ t('Undo / change history') }}</label>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
+            <input type="number" min="0" max="1000" v-model.number="settingsForm.undo_limit" style="width:96px" />
+            <span style="font-size:13px;color:var(--muted)">{{ t('changes') }}</span>
+            <button type="button" class="btn sm" @click="openHistory">{{ t('View change history') }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change is recorded so you can undo it (Ctrl+Z, or the ↶ button). Set 0 to turn history off. Changes beyond the limit are discarded oldest-first.') }}</div>
+        </div>
+        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>💾 {{ t('Backup / Restore') }}</label>
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Save all collections, records, settings and attachments to a ZIP encrypted with your login password.') }}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1187,6 +1208,28 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="modal-foot">
         <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button class="btn primary" @click="saveSettings">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 変更履歴 / アンドウ -->
+  <div v-if="modal && modal.type==='history'" class="modal-mask" @click.self="modal=null">
+    <div class="modal">
+      <div class="modal-head"><h3>↶ {{ t('Change history') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <button class="btn sm" :disabled="!undoTop || busy" @click="doUndo">↶ {{ t('Undo last change') }}</button>
+          <span style="flex:1"></span>
+          <button v-if="history.length" class="btn sm danger" @click="clearHistoryConfirm">{{ t('Clear history') }}</button>
+        </div>
+        <div v-if="!history.length" class="empty"><p>{{ t('No changes recorded yet.') }}</p></div>
+        <div v-else class="hist-list">
+          <div v-for="h in history" :key="h.id" class="hist-row" :class="{done: h.undone}">
+            <span class="hist-when">{{ fmtHistTime(h.created_at) }}</span>
+            <span class="hist-sum">{{ h.summary }}</span>
+            <span v-if="h.undone" class="hist-tag">{{ t('undone') }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1508,7 +1551,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
         collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '' },
-        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google' },
+        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100 },
+        undoTop: null, history: [],
         languages: [],
         locale: 0,
         backupForm: { password: '', busy: false, err: '' },
@@ -1659,6 +1703,22 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!this.current) return [];
         return this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file').slice(0, 4);
       },
+      // Detailed-list "label: value" items, with concat groups merged into one item.
+      listGroups() {
+        if (!this.current) return [];
+        const eligible = this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file');
+        const groups = {};
+        eligible.forEach((f) => { const g = f.concat || 0; if (g) (groups[g] = groups[g] || []).push(f); });
+        const used = new Set();
+        const cols = [];
+        for (const f of eligible) {
+          if (used.has(f.key)) continue;
+          const g = f.concat || 0;
+          if (g) { const m = groups[g]; m.forEach((x) => used.add(x.key)); cols.push({ kind: 'concat', id: '__c' + g, members: m, label: m.map((x) => x.label).join(' / ') }); }
+          else { used.add(f.key); cols.push({ kind: 'field', id: f.key, field: f, label: f.label }); }
+        }
+        return cols.slice(0, 4);
+      },
       // Fields that can be used to sort the registration order (values must be
       // readable/comparable: no encrypted secrets, no attachment references).
       reorderFields() {
@@ -1718,16 +1778,32 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       keyPreview() {
         return this.keyFields.map((f) => f.label).join(this.collFormSepStr);
       },
-      tableFrozen() {
-        if (this.keyHeadOn) return null; // keys are combined into the leading column (r.title)
-        const fs = this.tableFields;
-        return fs.length ? (fs.find((f) => f.is_title) || fs[0]) : null;
+      // Ordered table columns. Concatenation groups (fields sharing a `concat`
+      // group id) are combined into one column and pulled to the front, ordered
+      // by group number; the emphasis title (when "combine at front" is on) leads.
+      // Then the remaining ungrouped fields follow in field order.
+      tableColumns() {
+        const fields = this.current ? this.current.fields.slice() : [];
+        if (!fields.length) return [];
+        const used = new Set();
+        const cols = [];
+        if (this.keyHeadOn) {
+          cols.push({ kind: 'title', id: '__title', label: this.keyHeadLabel, secret: false, keycol: true });
+          this.keyFields.forEach((f) => used.add(f.key));
+        }
+        const groups = {};
+        fields.forEach((f) => { const g = f.concat || 0; if (g && !used.has(f.key)) (groups[g] = groups[g] || []).push(f); });
+        Object.keys(groups).map(Number).sort((a, b) => a - b).forEach((g) => {
+          const m = groups[g]; m.forEach((x) => used.add(x.key));
+          cols.push({ kind: 'concat', id: '__c' + g, members: m, label: m.map((x) => x.label).join(' / '), secret: m.length > 0 && m.every((x) => x.secret), keycol: m.some((x) => x.is_title) });
+        });
+        const rest = fields.filter((f) => !used.has(f.key));
+        if (!this.keyHeadOn && !Object.keys(groups).length) { const ti = rest.findIndex((f) => f.is_title); if (ti > 0) { const [tf] = rest.splice(ti, 1); rest.unshift(tf); } }
+        rest.forEach((f) => cols.push({ kind: 'field', id: f.key, field: f, label: f.label, secret: !!f.secret, keycol: !!f.is_title }));
+        return cols;
       },
-      tableScrollFields() {
-        if (this.keyHeadOn) return this.tableFields.filter((f) => !f.is_title);
-        const fr = this.tableFrozen;
-        return this.tableFields.filter((f) => f !== fr);
-      },
+      tableFrozenCol() { const c = this.tableColumns; return c.length ? c[0] : null; },
+      tableScrollCols() { return this.tableColumns.slice(1); },
       allSelected() {
         return this.records.length > 0 && this.selectedIds.length === this.records.length;
       },
@@ -1830,8 +1906,20 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (cid) this.selectCollection(cid, false);
         else this.goHome(false);
       });
+      // Ctrl/Cmd+Z = undo the last change (ignored while typing in a field).
+      window.addEventListener('keydown', (e) => {
+        if (!this.authenticated) return;
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
+          const el = document.activeElement;
+          if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.readOnly) return;
+          if (this.modal && this.modal.type !== 'history') return; // don't fight modal editing
+          e.preventDefault();
+          this.doUndo();
+        }
+      });
       await this.boot();
       this.authenticated = true;
+      this.refreshUndo();
     },
     methods: {
       // reading this.locale makes every t() call re-evaluate when the language changes
@@ -1911,7 +1999,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const el = document.getElementById('regibase-root');
         if (el) el.setAttribute('data-rbtheme', dark ? 'dark' : 'light');
       },
-      async loadCollections() { this.collections = await api('collections'); },
+      async loadCollections() { this.collections = await api('collections'); this.refreshUndo(); },
       async selectCollection(id, push = true) {
         // a password-protected share must be unlocked (once per session) before opening
         const meta = this.collections.find((c) => c.id === id);
@@ -1934,6 +2022,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const qs = params.length ? '?' + params.join('&') : '';
         this.records = await api('collections/' + this.current.id + '/records' + qs);
         this.renderLimit = 200;
+        this.refreshUndo();
       },
       toggleSelectionMode() {
         this.selectionMode = !this.selectionMode;
@@ -2035,6 +2124,24 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (f.type === 'file') return '📎';
         const s = String(v);
         return s.length > 40 ? s.slice(0, 40) + '…' : s;
+      },
+      // Combine several fields' values (in field order) with the collection separator.
+      concatText(rec, members) {
+        const sep = this.keySepStr;
+        return members.map((m) => { const v = rec.data ? rec.data[m.key] : ''; if (v == null || v === '') return ''; return m.secret ? '••••••••' : String(v); }).filter((v) => v !== '').join(sep);
+      },
+      // Text shown for a table column (real field, concat group, or emphasis title).
+      colText(rec, col) {
+        if (!col) return '';
+        if (col.kind === 'title') return rec.title;
+        if (col.kind === 'concat') return this.concatText(rec, col.members);
+        return this.cellPreview(rec, col.field);
+      },
+      colImg(rec, col) {
+        if (col && col.kind === 'field' && (col.field.type === 'image' || col.field.type === 'image_crop')) {
+          const v = rec.data && rec.data[col.field.key]; return v ? this.imgUrl(v) : '';
+        }
+        return '';
       },
       readFileAsDataURL(file) {
         return new Promise((resolve, reject) => {
@@ -2462,12 +2569,43 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       async saveSettings() {
         try {
-          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider }) });
+          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider, undo_limit: this.settingsForm.undo_limit }) });
           this.settingsForm = s; this.theme = s.theme || 'auto'; this.applyTheme();
           this.languages = s.languages || this.languages;
           await this.applyLanguage(s.language || 'auto');
           this.modal = null; this.showToast(T('Settings saved'));
         } catch (e) { alert(T('Failed to save') + ': ' + e.message); }
+      },
+      // ---- undo / change history ----
+      async refreshUndo() {
+        try { const h = await api('history'); this.history = h.entries || []; const a = this.history.find((e) => !e.undone); this.undoTop = a ? a.summary : null; }
+        catch (e) { /* history is best-effort */ }
+      },
+      async doUndo() {
+        if (this.busy) return;
+        this.busy = true;
+        try {
+          const r = await api('history/undo', { method: 'POST' });
+          if (!r || !r.undone) { this.undoTop = null; this.showToast(T('Nothing to undo')); return; }
+          this.showToast(T('Undone: {what}', { what: r.summary || '' }));
+          await this.loadCollections();
+          const targetId = r.collection_id || (this.current && this.current.id);
+          if (targetId && this.collections.some((c) => c.id === targetId)) {
+            try { await this.selectCollection(targetId); } catch (e) { this.current = null; this.records = []; }
+          } else { this.current = null; this.records = []; }
+          await this.refreshUndo();
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+        finally { this.busy = false; }
+      },
+      async openHistory() { await this.refreshUndo(); this.modal = { type: 'history' }; },
+      fmtHistTime(s) {
+        try { const d = new Date(s); if (isNaN(d)) return s; return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+        catch (e) { return s; }
+      },
+      async clearHistoryConfirm() {
+        if (!confirm(T('Clear all change history? Undo will no longer be possible for past changes.'))) return;
+        try { await api('history', { method: 'DELETE' }); this.history = []; this.undoTop = null; this.showToast(T('History cleared')); }
+        catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
       },
       // ---- full backup / restore ----
       openBackup() { this.backupForm = { password: '', busy: false, err: '' }; this.modal = { type: 'backup' }; },
@@ -2783,7 +2921,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           const o = (f.options && typeof f.options === 'object' && !Array.isArray(f.options)) ? f.options : {};
           return {
             ...f,
-            options: (f.type === 'select' && Array.isArray(f.options)) ? f.options.join('\n') : '',
+            options: (CHOICE_TYPES.includes(f.type) && Array.isArray(f.options)) ? f.options.join('\n') : '',
             _orig: f.type === 'image' ? o.max === 0 : false,
             _max: (f.type === 'image' && o.max > 0) ? o.max : 1600,
             _ratio: f.type === 'image_crop' ? (o.ratio || '1:1') : '1:1',
@@ -2815,7 +2953,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         };
         return rows.map((f) => {
           let options;
-          if (f.type === 'select') options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
+          if (CHOICE_TYPES.includes(f.type)) options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
           else if (f.type === 'image') options = { max: f._orig ? 0 : (Number(f._max) || 1600), format: f._format || 'jpeg' };
           else if (f.type === 'image_crop') options = { ratio: f._ratio || '1:1', out: Number(f._out) || 600, format: f._format || 'jpeg' };
           else if (RULE_TYPES.includes(f.type)) {
@@ -2830,7 +2968,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           return {
             key: existing || freshKey(slug(f.label)),
             label: f.label.trim(), type: f.type, options,
-            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
+            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, concat: Number(f.concat) || 0, placeholder: f.placeholder || undefined,
           };
         });
       },
@@ -2839,7 +2977,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.schemaFields = this.fieldsToSchemaRows(this.current.fields);
         this.modal = { type: 'schema' };
       },
-      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
+      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, concat: 0, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
@@ -3082,7 +3220,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const ATT = ['image', 'image_crop', 'file'];
         const oldByKey = {}; (this.current.fields || []).forEach((f) => { oldByKey[f.key] = f; });
         const newKeys = new Set(newFields.map((f) => f.key));
-        const selOpt = {}; newFields.forEach((f) => { if (f.type === 'select') selOpt[f.key] = (f.options || []).slice(); });
+        const selOpt = {}; newFields.forEach((f) => { if (CHOICE_TYPES.includes(f.type)) selOpt[f.key] = (f.options || []).slice(); });
         const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
         const isMonth = (v) => /^\d{4}-\d{2}$/.test(String(v));
         const isNum = (v) => { const t = String(v).replace(/,/g, ''); return /^-?\d+(\.\d+)?$/.test(t) && isFinite(parseFloat(t)); };
@@ -3120,14 +3258,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               else if (to === 'date') { if (!isDate(v)) { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
               else if (to === 'month') { if (isMonth(v)) { /* ok */ } else if (isDate(v)) { data[nf.key] = v.slice(0, 7); dirty = true; } else { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
               else if (to === 'number') { if (!isNum(v)) { delete data[nf.key]; dirty = true; counts.numCleared++; } }
-              else if (to === 'select') { const opts = selOpt[nf.key] || []; if (!opts.includes(v)) (selectExtra[nf.key] = selectExtra[nf.key] || new Set()).add(v); }
+              else if (CHOICE_TYPES.includes(to)) { const opts = selOpt[nf.key] || []; const parts = (to === 'checkbox') ? String(v).split(', ').map((s) => s.trim()).filter(Boolean) : [v]; for (const p of parts) { if (!opts.includes(p)) (selectExtra[nf.key] = selectExtra[nf.key] || new Set()).add(p); } }
             }
           }
           if (dirty) changed.push({ id: r.id, data });
         }
         if (needUnlock) { alert(T('Turning off Secret requires unlocking encryption first. Unlock it in Settings and try again.')); return; }
         // keep out-of-range values by adding them to the choices — never silently drop
-        for (const nf of newFields) { if (nf.type === 'select' && selectExtra[nf.key]) { const add = [...selectExtra[nf.key]]; nf.options = [...(nf.options || []), ...add]; counts.selectAdded += add.length; } }
+        for (const nf of newFields) { if (CHOICE_TYPES.includes(nf.type) && selectExtra[nf.key]) { const add = [...selectExtra[nf.key]]; nf.options = [...(nf.options || []), ...add]; counts.selectAdded += add.length; } }
         // Split effects into data-destroying vs. safe. Anything that deletes a file
         // or clears/removes a value is DESTRUCTIVE and must pass a stricter, gated
         // confirmation (a checkbox the user has to tick) rather than a one-click OK.
@@ -3154,9 +3292,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       // updates go FIRST, while the OLD schema is still active, so the server trashes
       // attachment files that are being removed or retyped.
       async commitSchema(newFields, changed) {
-        try { for (const cr of changed) await api('records/' + cr.id, { method: 'PUT', body: JSON.stringify({ data: cr.data }) }); }
+        // One undo group so the whole schema save (record migrations + field change)
+        // reverts as a single Undo step.
+        const grp = 'schema-' + this.current.id + '-' + (this.uidCounter++);
+        try { for (const cr of changed) await api('records/' + cr.id, { method: 'PUT', body: JSON.stringify({ data: cr.data, _undoGroup: grp }) }); }
         catch (e) { alert(T('Failed') + ': ' + (e.message || e)); return false; }
-        const c = await api('collections/' + this.current.id + '/fields', { method: 'PUT', body: JSON.stringify({ fields: newFields }) });
+        const c = await api('collections/' + this.current.id + '/fields', { method: 'PUT', body: JSON.stringify({ fields: newFields, _undoGroup: grp }) });
         this.current = c; this.modal = null; this.schemaPlan = null; this.schemaAck = false;
         await this.loadRecords(); this.showToast(T('Fields updated'));
         return true;
@@ -3172,7 +3313,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       openNewRecord() {
         if (!this.canEdit) return;
         this.form = {}; this.reveal = {}; this.editingRecordId = null; this.editingOrig = null;
-        this.current.fields.forEach((f) => (this.form[f.key] = ''));
+        this.current.fields.forEach((f) => (this.form[f.key] = f.type === 'checkbox' ? [] : ''));
         this.modal = { type: 'record' };
       },
       openRecord(rec) { this.reveal = {}; this.openDecrypted = {}; this.preloadFileMetas(this.current.fields, rec.data); this.modal = { type: 'detail', rec }; this.decryptSecretsOf(rec); },
@@ -3183,6 +3324,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           // masked secrets in a shared collection: leave the field blank & read-only,
           // the original ciphertext is preserved on save (see saveRecord)
           if (f.secret && this.secretsMasked) { this.form[f.key] = ''; continue; }
+          if (f.type === 'checkbox') { this.form[f.key] = this.cbSplit(rec.data[f.key], f); continue; }
           this.form[f.key] = f.secret ? await this.secretPlain(rec.data[f.key]) : (rec.data[f.key] ?? '');
         }
         this.preloadFileMetas(this.current.fields, rec.data);
@@ -3192,7 +3334,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         for (const f of this.current.fields) if (f.required && !String(this.form[f.key] ?? '').trim()) { alert(T('{label} is required', { label: f.label })); return; }
         for (const f of this.current.fields) { const err = this.validateField(f, this.form[f.key]); if (err) { alert(err); return; } }
         let data = {};
-        for (const f of this.current.fields) { const v = this.form[f.key]; if (v !== '' && v != null) data[f.key] = v; }
+        for (const f of this.current.fields) { let v = this.form[f.key]; if (f.type === 'checkbox') v = this.cbJoin(v); if (v !== '' && v != null) data[f.key] = v; }
         // preserve masked secrets untouched (recipient can't see/change them)
         if (this.secretsMasked) {
           for (const f of this.current.fields) {
@@ -3455,6 +3597,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         else if (o.min) parts.push(T('{min} characters or more', { min: o.min }));
         else if (o.max) parts.push(T('up to {max} characters', { max: o.max }));
         return parts.join(' / ');
+      },
+      // checkbox stores multiple choices as a ", "-joined string; convert to/from
+      // an array for the checkbox inputs (kept in sync with the field's options).
+      cbJoin(arr) { return Array.isArray(arr) ? arr.filter((x) => x != null && x !== '').join(', ') : (arr || ''); },
+      cbSplit(v, f) {
+        if (v == null || v === '') return [];
+        const parts = String(v).split(', ').map((s) => s.trim()).filter(Boolean);
+        const opts = Array.isArray(f && f.options) ? f.options : null;
+        return opts ? parts.filter((p) => opts.includes(p)) : parts;
       },
       validateField(f, v) {
         const o = this.fieldRule(f); if (!o) return null;

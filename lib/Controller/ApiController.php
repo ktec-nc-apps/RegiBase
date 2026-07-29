@@ -377,8 +377,9 @@ class ApiController extends Controller {
 		if (!is_array($fields)) {
 			return new JSONResponse(['error' => 'fields[] required'], Http::STATUS_BAD_REQUEST);
 		}
+		$grp = $this->request->getParam('_undoGroup');
 		try {
-			return new JSONResponse($this->service->replaceFields($this->uid(), $id, $fields));
+			return new JSONResponse($this->service->replaceFields($this->uid(), $id, $fields, is_string($grp) ? $grp : null));
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		}
@@ -440,7 +441,8 @@ class ApiController extends Controller {
 	public function updateRecord(int $id): JSONResponse {
 		try {
 			$data = $this->request->getParam('data', []);
-			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : []));
+			$grp = $this->request->getParam('_undoGroup');
+			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : [], is_string($grp) ? $grp : null));
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (ForbiddenException $e) {
@@ -471,6 +473,24 @@ class ApiController extends Controller {
 			return new JSONResponse(['error' => 'ids required'], Http::STATUS_BAD_REQUEST);
 		}
 		return new JSONResponse(['deleted' => $this->service->deleteRecords($this->uid(), $ids)]);
+	}
+
+	// ---- undo / change history ----
+
+	#[NoAdminRequired]
+	public function history(): JSONResponse {
+		return new JSONResponse(['entries' => $this->service->history($this->uid())]);
+	}
+
+	#[NoAdminRequired]
+	public function undo(): JSONResponse {
+		return new JSONResponse($this->service->undo($this->uid()));
+	}
+
+	#[NoAdminRequired]
+	public function clearHistory(): JSONResponse {
+		$this->service->clearHistory($this->uid());
+		return new JSONResponse(['ok' => true]);
 	}
 
 	#[NoAdminRequired]
@@ -559,6 +579,8 @@ class ApiController extends Controller {
 			'languages' => $this->availableLanguages(),
 			// Map service used by the 🗺 link on address fields.
 			'map_provider' => $c->getUserValue($uid, Application::APP_ID, 'map_provider', 'google'),
+			// Undo / change-history depth (max entries kept; 0 disables).
+			'undo_limit' => $this->service->undoLimit($uid),
 			// client-side encryption metadata (server never sees the key or plaintext)
 			'enc_enabled' => $c->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1',
 			'enc_salt' => $c->getUserValue($uid, Application::APP_ID, 'enc_salt', ''),
@@ -656,6 +678,9 @@ class ApiController extends Controller {
 			if (in_array($mp, ['google', 'osm', 'apple'], true)) {
 				$this->config->setUserValue($uid, Application::APP_ID, 'map_provider', $mp);
 			}
+		}
+		if (array_key_exists('undo_limit', $params)) {
+			$this->service->setUndoLimit($uid, (int)$params['undo_limit']);
 		}
 		// Encryption metadata: salt + verifier (ciphertext) + on/off flag. No key material.
 		if (array_key_exists('enc_salt', $params)) {

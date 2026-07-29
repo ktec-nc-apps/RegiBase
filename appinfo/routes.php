@@ -47,6 +47,11 @@ return [
 		// transfer (move/copy between collections)
 		['name' => 'api#transfer', 'url' => '/api/transfer', 'verb' => 'POST'],
 
+		// undo / change history
+		['name' => 'api#history', 'url' => '/api/history', 'verb' => 'GET'],
+		['name' => 'api#undo', 'url' => '/api/history/undo', 'verb' => 'POST'],
+		['name' => 'api#clearHistory', 'url' => '/api/history', 'verb' => 'DELETE'],
+
 		// CSV import
 		['name' => 'api#importAnalyze', 'url' => '/api/import/analyze', 'verb' => 'POST'],
 		['name' => 'api#importCommit', 'url' => '/api/import/commit', 'verb' => 'POST'],

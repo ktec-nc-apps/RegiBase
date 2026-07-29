@@ -27,6 +27,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setPlaceholder(?string $v)
  * @method int getSort()
  * @method void setSort(int $v)
+ * @method int getConcat()
+ * @method void setConcat(int $v)
  */
 class FieldEntity extends Entity implements \JsonSerializable {
 	protected $collectionId = 0;
@@ -39,6 +41,7 @@ class FieldEntity extends Entity implements \JsonSerializable {
 	protected $isTitle = false;
 	protected $placeholder = null;
 	protected $sort = 0;
+	protected $concat = 0;
 
 	public function __construct() {
 		$this->addType('collectionId', 'integer');
@@ -46,6 +49,7 @@ class FieldEntity extends Entity implements \JsonSerializable {
 		$this->addType('secret', 'boolean');
 		$this->addType('isTitle', 'boolean');
 		$this->addType('sort', 'integer');
+		$this->addType('concat', 'integer');
 	}
 
 	public function jsonSerialize(): array {
@@ -61,6 +65,7 @@ class FieldEntity extends Entity implements \JsonSerializable {
 			'is_title' => (bool)$this->isTitle,
 			'placeholder' => $this->placeholder,
 			'sort' => (int)$this->sort,
+			'concat' => (int)$this->concat,
 		];
 	}
 }

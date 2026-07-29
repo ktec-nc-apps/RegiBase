@@ -2,6 +2,41 @@
 
 All notable changes to RegiBase.
 
+## 0.15.1 — 2026-07-30
+
+### Undo & change history
+
+- Every change — records, fields, collections, imports and moves — is now recorded and can be
+  reverted with **Ctrl+Z** or the **↶ Undo** button in the toolbar. A whole schema save (field
+  changes together with any record-data migration) is undone in a single step.
+- Settings has a **change-history** view and a configurable retention limit (default 100 changes;
+  set 0 to turn history off). Changes beyond the limit are discarded oldest-first.
+
+### New field types
+
+- **Choices (radio)** — pick one option from a set of radio buttons.
+- **Choices (checkboxes)** — pick several options; the selected values are stored together.
+- The previous **Choices** type is now labelled **Choices (dropdown)**.
+
+### Concatenation groups
+
+- In the collection editor each field can be given a **Concatenate** group number. Fields sharing a
+  group are shown combined — joined in field order — as one column (table view) or one line
+  (detailed list), e.g. last name + first name, and furigana last + first as a second group.
+  This is independent of the Emphasis (title) setting; combined columns are pulled to the front.
+
+### Also included since the last release (0.14.x)
+
+- **Emphasis (record name):** the list-title marker is now **🏷️ Emphasis** (previously “★ Title”),
+  and more than one field can be a key — their values combine in field order to form the record's
+  name (e.g. first + last name), shown in bold, and optionally as one leading column in the table
+  view with a chosen separator.
+- New collections open in the **table** view by default.
+- The collection editor is titled **Edit collection**; its field list auto-scrolls while you drag
+  to reorder.
+- Supports **Nextcloud 33**.
+- **Fix:** reordering fields right after renaming one could prune that field's record data on save.
+
 ## 0.14.13 — 2026-07-29
 
 ### Emphasis (record name) fields
