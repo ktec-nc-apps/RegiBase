@@ -439,8 +439,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <table class="rec-table">
               <thead>
                 <tr>
-                  <th class="rt-frozen"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="tableFrozen">{{ tableFrozen.label }}</span></label></th>
-                  <th v-for="f in tableScrollFields" :key="f.key">{{ f.label }}</th>
+                  <th class="rt-frozen" :class="{'rt-keycol': keyHeadOn || (tableFrozen && tableFrozen.is_title)}"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="keyHeadOn">{{ keyHeadLabel }}</span><span v-else-if="tableFrozen">{{ tableFrozen.label }}</span></label></th>
+                  <th v-for="f in tableScrollFields" :key="f.key" :class="{'rt-keycol': f.is_title}">{{ f.label }}</th>
                   <th class="rt-actions"></th>
                 </tr>
               </thead>
@@ -448,12 +448,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
                 <tr v-for="r in visibleRecords" :key="r.id" :class="{sel: isSelected(r.id)}">
                   <td class="rt-frozen">
                     <label class="rt-fcell" @click.stop><input type="checkbox" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" /></label>
-                    <span class="rt-fval" :class="{mono: tableFrozen && tableFrozen.secret}" @click="openRecord(r)" :title="t('Edit')">
-                      <img v-if="tableFrozen && (tableFrozen.type==='image'||tableFrozen.type==='image_crop') && r.data[tableFrozen.key]" :src="imgUrl(r.data[tableFrozen.key])" class="rt-thumb" loading="lazy" />
-                      <template v-else>{{ tableFrozen ? cellPreview(r, tableFrozen) : r.title }}</template>
+                    <span class="rt-fval" :class="{mono: !keyHeadOn && tableFrozen && tableFrozen.secret, 'rt-keycol': keyHeadOn || (tableFrozen && tableFrozen.is_title)}" @click="openRecord(r)" :title="t('Edit')">
+                      <template v-if="keyHeadOn">{{ r.title }}</template>
+                      <template v-else>
+                        <img v-if="tableFrozen && (tableFrozen.type==='image'||tableFrozen.type==='image_crop') && r.data[tableFrozen.key]" :src="imgUrl(r.data[tableFrozen.key])" class="rt-thumb" loading="lazy" />
+                        <template v-else>{{ tableFrozen ? cellPreview(r, tableFrozen) : r.title }}</template>
+                      </template>
                     </span>
                   </td>
-                  <td v-for="f in tableScrollFields" :key="f.key" :class="{mono: f.secret}">
+                  <td v-for="f in tableScrollFields" :key="f.key" :class="{mono: f.secret, 'rt-keycol': f.is_title}">
                     <img v-if="(f.type==='image'||f.type==='image_crop') && r.data[f.key]" :src="imgUrl(r.data[f.key])" class="rt-thumb" loading="lazy" />
                     <span v-else>{{ cellPreview(r, f) }}</span>
                   </td>
@@ -608,8 +611,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
   <!-- Schema editor -->
   <div v-if="modal && modal.type==='schema'" class="modal-mask" @click.self="modal=null">
     <div class="modal wide">
-      <div class="modal-head"><h3>{{ schemaMode==='template' ? (tplEdit.row_id || tplEdit.builtin_key ? t('✏️ Edit template') : t('⭐ New template')) : t('🧩 Design fields (form)') }}</h3><button class="icon-btn" @click="closeSchemaEditor">✕</button></div>
-      <div class="modal-body">
+      <div class="modal-head"><h3>{{ schemaMode==='template' ? (tplEdit.row_id || tplEdit.builtin_key ? t('✏️ Edit template') : t('⭐ New template')) : t('🧩 Edit collection') }}</h3><button class="icon-btn" @click="closeSchemaEditor">✕</button></div>
+      <div class="modal-body" ref="schemaBody" @dragover="onSchemaAutoScroll($event)">
         <div v-if="schemaMode==='template'" class="tpl-meta">
           <div class="field-row">
             <div class="field"><label>🏷️ {{ t('Template name') }}</label><input v-model="tplEdit.name" /></div>
@@ -625,7 +628,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <div class="field"><label>📝 {{ t('Description') }}</label><input v-model="tplEdit.description" /></div>
           </div>
         </div>
-        <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('The fields you create here become the input form. ★ = the field used as the list title.') }}</p>
+        <p v-if="schemaMode!=='template'" style="color:var(--muted);font-size:13px;margin-top:0">{{ t('※ Here you edit this collection\'s input form — the fields records are entered into. It does not change the records already saved.') }}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('The fields you create here become the input form. 🏷️ Emphasis marks the field(s) used as the record\'s name — shown as the record title in lists, cards and details, and used for name sorting. Tick more than one to combine them (e.g. first name + last name), joined in field order; the emphasized values are shown in bold.') }}</p>
         <div v-for="(f,i) in schemaFields" :key="f._uid" class="schema-row sortable" :class="{dragover: dragOverIndex===i, dragging: dragIndex===i}" @dragover.prevent="onFieldDragOver(i)" @drop.prevent="onFieldDrop(i)" @dragleave="onFieldDragLeave(i)">
           <span class="drag-handle" draggable="true" @dragstart="onFieldDragStart(i, $event)" @dragend="onFieldDragEnd" :title="t('Drag to reorder')">⠿</span>
           <input v-model="f.label" :placeholder="t('Display name (e.g. Password)')" />
@@ -697,7 +701,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label class="cfg">{{ t('Max') }} <input type="number" min="0" max="99999" v-model.number="f._rmax" style="width:74px" /> {{ t('chars') }}</label>
           </div>
           <div class="flags">
-            <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('★ Title') }}</label>
+            <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('🏷️ Emphasis') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
           </div>
@@ -791,6 +795,25 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <input v-model="collForm.icon" maxlength="16" :placeholder="t('Emoji')" />
           </div>
         </div>
+        </div>
+
+        <div v-if="keyFields.length" class="field">
+          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="collForm.key_head" style="width:18px;height:18px" />
+            <span>🏷️ {{ t('Show emphasized fields joined at the front') }}</span>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('In the table view, the emphasized field(s) are combined into a single leading column — joined in field order even if other fields sit between them.') }}</div>
+          <div v-if="keyFields.length>1" style="margin-top:10px">
+            <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px">{{ t('Separator between emphasized fields') }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center">
+              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="none" v-model="collForm.key_sep" /> {{ t('None') }}</label>
+              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="space" v-model="collForm.key_sep" /> {{ t('Half-width space') }}</label>
+              <label v-if="isCjkUi || collForm.key_sep==='fullspace'" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="fullspace" v-model="collForm.key_sep" /> {{ t('Full-width space') }}</label>
+              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="custom" v-model="collForm.key_sep" /> {{ t('Custom symbol') }}</label>
+              <input v-if="collForm.key_sep==='custom'" v-model="collForm.key_sep_char" maxlength="4" :placeholder="t('e.g. / , -')" style="width:90px" />
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:8px">{{ t('Preview') }}: <b>{{ keyPreview }}</b></div>
+          </div>
         </div>
         </template>
 
@@ -933,7 +956,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               <input v-model="importColl.icon" maxlength="16" :placeholder="t('Emoji')" />
             </div>
           </div>
-          <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">{{ t('Field settings for each column (★ = list title / Secret = masked):') }}</p>
+          <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">{{ t('Field settings for each column (🏷️ = emphasis / Secret = masked):') }}</p>
           <div v-for="(c,i) in importCols" :key="i" class="schema-row">
             <input v-model="c.label" :placeholder="t('Display name')" />
             <select v-model="c.type">
@@ -950,7 +973,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             </select>
             <span class="chip" :title="t('CSV column:')+' '+c.header">{{ c.header }}</span>
             <div class="flags">
-              <label><input type="radio" :checked="c.is_title" @change="setImportTitle(i)" /> {{ t('★ Title') }}</label>
+              <label><input type="radio" :checked="c.is_title" @change="setImportTitle(i)" /> {{ t('🏷️ Emphasis') }}</label>
               <label><input type="checkbox" v-model="c.secret" /> {{ t('Secret') }}</label>
             </div>
           </div>
@@ -1484,7 +1507,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         schemaMode: 'collection',
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
-        collForm: { name: '', icon: '', color: '', description: '', locked: false },
+        collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '' },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google' },
         languages: [],
         locale: 0,
@@ -1545,6 +1568,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
         collDrag: { from: null, over: null },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
+        autoScroll: { timer: null, dir: 0, el: null },
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
         selectionMode: (function () { try { return localStorage.getItem('rb-selmode') === '1'; } catch (e) { return false; } })(),
         iconChoices: [
@@ -1644,11 +1668,63 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       tableFields() {
         return this.current ? this.current.fields : [];
       },
+      // Key (title) fields, in field order — these form the record title.
+      keyFields() {
+        return this.current ? this.current.fields.filter((f) => f.is_title) : [];
+      },
+      // "Show emphasized fields joined at the front" — combine the emphasized
+      // (title) field(s) into one leading table column (only meaningful when at
+      // least one exists). Internal ids keep the historical key_* naming.
+      keyHeadOn() {
+        return !!(this.current && this.current.key_head && this.keyFields.length);
+      },
+      // Actual join string for the chosen separator setting.
+      keySepStr() {
+        const c = this.current || {};
+        switch (c.key_sep) {
+          case 'none': return '';
+          case 'fullspace': return '　';
+          case 'custom': return c.key_sep_char || '';
+          default: return ' ';
+        }
+      },
+      // Header label for the combined key column: the key field labels, joined.
+      keyHeadLabel() {
+        return this.keyFields.map((f) => f.label).join(' / ');
+      },
+      // Whether the effective UI language is CJK (Japanese / Chinese / Korean).
+      // The full-width space (U+3000) separator is only idiomatic in CJK typography,
+      // so its radio is offered only for those languages (see isCjkUi usage).
+      isCjkUi() {
+        void this.locale; // re-evaluate when the in-app language changes
+        let lang = (this.settingsForm && this.settingsForm.language) || 'auto';
+        if (lang === 'auto') {
+          lang = (typeof OC !== 'undefined' && OC.getLanguage && OC.getLanguage())
+            || (document.documentElement && document.documentElement.lang) || 'en';
+        }
+        return /^(ja|zh|ko)/.test(String(lang).toLowerCase());
+      },
+      // Live separator string for the value being edited in Collection settings.
+      collFormSepStr() {
+        const f = this.collForm || {};
+        switch (f.key_sep) {
+          case 'none': return '';
+          case 'fullspace': return '　';
+          case 'custom': return f.key_sep_char || '';
+          default: return ' ';
+        }
+      },
+      // Settings preview: the key field labels joined by the chosen separator.
+      keyPreview() {
+        return this.keyFields.map((f) => f.label).join(this.collFormSepStr);
+      },
       tableFrozen() {
+        if (this.keyHeadOn) return null; // keys are combined into the leading column (r.title)
         const fs = this.tableFields;
         return fs.length ? (fs.find((f) => f.is_title) || fs[0]) : null;
       },
       tableScrollFields() {
+        if (this.keyHeadOn) return this.tableFields.filter((f) => !f.is_title);
         const fr = this.tableFrozen;
         return this.tableFields.filter((f) => f !== fr);
       },
@@ -2517,6 +2593,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.modal = { type: 'schema' };
       },
       closeSchemaEditor() {
+        this.stopAutoScroll();
         const wasTemplate = this.schemaMode === 'template';
         this.schemaMode = 'collection';
         this.modal = wasTemplate ? { type: 'template' } : null;
@@ -2564,7 +2641,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (push) this.pushNav({ cid: null });
       },
       openCollSettings() {
-        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked };
+        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '' };
         this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
@@ -2767,8 +2844,39 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       onFieldDragOver(i) { if (this.dragIndex !== null) this.dragOverIndex = i; },
       onFieldDragLeave(i) { if (this.dragOverIndex === i) this.dragOverIndex = null; },
-      onFieldDrop(i) { this.moveFieldTo(this.dragIndex, i); this.dragIndex = null; this.dragOverIndex = null; },
-      onFieldDragEnd() { this.dragIndex = null; this.dragOverIndex = null; },
+      onFieldDrop(i) { this.moveFieldTo(this.dragIndex, i); this.dragIndex = null; this.dragOverIndex = null; this.stopAutoScroll(); },
+      onFieldDragEnd() { this.dragIndex = null; this.dragOverIndex = null; this.stopAutoScroll(); },
+      // Keep the field list scrolling while a row is dragged near the top/bottom
+      // edge of the modal body (native HTML5 drag does not auto-scroll).
+      onSchemaAutoScroll(e) {
+        if (this.dragIndex === null) return;
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        const edge = 56;             // px hot-zone at each edge
+        const maxStep = 16;          // px per tick at the very edge
+        const y = e.clientY;
+        let dir = 0;
+        if (y < r.top + edge) {
+          dir = -Math.ceil(((r.top + edge - y) / edge) * maxStep);
+        } else if (y > r.bottom - edge) {
+          dir = Math.ceil(((y - (r.bottom - edge)) / edge) * maxStep);
+        }
+        this.autoScroll.dir = dir;
+        this.autoScroll.el = el;
+        if (dir !== 0 && !this.autoScroll.timer) {
+          this.autoScroll.timer = setInterval(() => {
+            const s = this.autoScroll;
+            if (!s.el || !s.dir) return;
+            s.el.scrollTop += s.dir;
+          }, 16);
+        }
+      },
+      stopAutoScroll() {
+        if (this.autoScroll.timer) { clearInterval(this.autoScroll.timer); }
+        this.autoScroll.timer = null;
+        this.autoScroll.dir = 0;
+        this.autoScroll.el = null;
+      },
       moveFieldTo(from, to) {
         if (from === null || to === null || from === to) return;
         const a = this.schemaFields;
@@ -2943,7 +3051,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           this.reorder.busy = false;
         }
       },
-      setTitleField(i) { this.schemaFields.forEach((f, k) => (f.is_title = k === i)); },
+      // Multiple fields may be titles; their values are joined (in field order)
+      // to form the record title — e.g. tick "First name" + "Last name".
+      setTitleField(i) { this.schemaFields[i].is_title = !this.schemaFields[i].is_title; },
       async saveSchema() {
         const newFields = this.serializeSchemaFields();
         if (!newFields.length) { alert(T('Keep at least one field')); return; }

@@ -629,6 +629,8 @@
 #regibase-root .rec-table .rt-fhead { display: inline-flex; align-items: center; gap: 8px; }
 #regibase-root .rec-table .rt-fcell { display: inline-flex; vertical-align: middle; margin-right: 8px; }
 #regibase-root .rec-table .rt-fval { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+/* key column(s) — the field(s) forming the record's title — shown bold */
+#regibase-root .rec-table th.rt-keycol, #regibase-root .rec-table td.rt-keycol, #regibase-root .rec-table .rt-fval.rt-keycol { font-weight: 700; color: var(--text); }
 
 /* Collection icon: full categorized emoji palette (expandable) */
 #regibase-root .iconpick-head { position: relative; display: flex; align-items: center; gap: 10px; }

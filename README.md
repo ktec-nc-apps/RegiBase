@@ -71,7 +71,7 @@ button stays disabled.
 
 ### Requirements
 
-- Nextcloud **30 – 32**
+- Nextcloud **30 – 33**
 - PHP 8.1+
 - A Nextcloud-supported database (MySQL/MariaDB, PostgreSQL or SQLite)
 
@@ -165,7 +165,7 @@ RegiBase は、以下のアプリが入っていれば、それらを利用し�
 
 ### 動作環境
 
-- Nextcloud **30 – 32**
+- Nextcloud **30 – 33**
 - PHP 8.1 以上
 - Nextcloud 対応データベース（MySQL/MariaDB, PostgreSQL, SQLite）
 

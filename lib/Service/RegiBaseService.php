@@ -19,6 +19,7 @@ use OCP\ISession;
 class RegiBaseService {
 	private const ALLOWED_VIEWS = ['card', 'list', 'detail', 'image', 'table'];
 	private const ALLOWED_SORTS = ['created_asc', 'created_desc', 'title_asc', 'title_desc'];
+	private const KEY_SEPS = ['none', 'space', 'fullspace', 'custom'];
 	private const ATTACH_TYPES = ['image', 'image_crop', 'file'];
 	// recipient permission ranks; owner is implicitly above all of these
 	public const PERM_VIEW = 'view';
@@ -234,10 +235,15 @@ class RegiBaseService {
 		$c->setIcon($input['icon'] ?? ($tpl['icon'] ?? '📁'));
 		$c->setColor($input['color'] ?? ($tpl['color'] ?? '#3b82f6'));
 		$c->setDescription($input['description'] ?? ($tpl['description'] ?? ''));
-		$view = $input['view'] ?? 'list';
-		$c->setView(in_array($view, self::ALLOWED_VIEWS, true) ? $view : 'list');
+		// New collections default to the spreadsheet (table) view; callers that
+		// clone an existing collection (transfer/import) pass their own view.
+		$view = $input['view'] ?? 'table';
+		$c->setView(in_array($view, self::ALLOWED_VIEWS, true) ? $view : 'table');
 		$c->setRecordSort('created_desc');
 		$c->setLocked(!empty($input['locked']));
+		$c->setKeyHead(!empty($input['key_head']));
+		$c->setKeySep(in_array($input['key_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$input['key_sep'] : 'space');
+		$c->setKeySepChar(mb_substr((string)($input['key_sep_char'] ?? ''), 0, 4));
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -265,6 +271,9 @@ class RegiBaseService {
 		$c->setDescription($src->getDescription() ?? '');
 		$c->setView($src->getView());
 		$c->setRecordSort($src->getRecordSort());
+		$c->setKeyHead($src->getKeyHead());
+		$c->setKeySep($src->getKeySep());
+		$c->setKeySepChar($src->getKeySepChar());
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -337,6 +346,15 @@ class RegiBaseService {
 		if (array_key_exists('locked', $patch)) {
 			$c->setLocked((bool)$patch['locked']);
 		}
+		if (array_key_exists('key_head', $patch)) {
+			$c->setKeyHead((bool)$patch['key_head']);
+		}
+		if (isset($patch['key_sep']) && in_array($patch['key_sep'], self::KEY_SEPS, true)) {
+			$c->setKeySep((string)$patch['key_sep']);
+		}
+		if (array_key_exists('key_sep_char', $patch)) {
+			$c->setKeySepChar(mb_substr((string)$patch['key_sep_char'], 0, 4));
+		}
 		$c->setUpdatedAt($this->now());
 		$this->collections->update($c);
 		return $this->getCollection($userId, $id);
@@ -406,11 +424,30 @@ class RegiBaseService {
 	}
 
 	// ---- records ----
-	private function titleFor(array $fields, array $data): string {
+	/** Resolve a collection's key-separator setting to the actual join string. */
+	private function keySep(CollectionEntity $c): string {
+		switch ($c->getKeySep()) {
+			case 'none': return '';
+			case 'fullspace': return '　';
+			case 'custom': return (string)$c->getKeySepChar();
+			case 'space':
+			default: return ' ';
+		}
+	}
+
+	private function titleFor(array $fields, array $data, string $sep = ' '): string {
+		// One or more fields may be flagged as the title (key). When several are,
+		// their values are joined in field order (e.g. first name + last name) with
+		// the collection's chosen separator, skipping any that are empty — so a
+		// missing part does not leave a dangling separator.
+		$parts = [];
 		foreach ($fields as $f) {
 			if (($f['is_title'] ?? false) && !empty($data[$f['key']])) {
-				return (string)$data[$f['key']];
+				$parts[] = (string)$data[$f['key']];
 			}
+		}
+		if ($parts) {
+			return implode($sep, $parts);
 		}
 		foreach ($fields as $f) {
 			if (!empty($data[$f['key']])) {
@@ -438,10 +475,11 @@ class RegiBaseService {
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$mode = ($sort && in_array($sort, self::ALLOWED_SORTS, true)) ? $sort : $c->getRecordSort();
 
+		$sep = $this->keySep($c);
 		$rows = [];
 		foreach ($this->records->findForCollection($collectionId) as $r) {
 			$j = $r->jsonSerialize();
-			$j['title'] = $this->titleFor($fieldsJson, $j['data']);
+			$j['title'] = $this->titleFor($fieldsJson, $j['data'], $sep);
 			$rows[] = $j;
 		}
 
@@ -493,7 +531,7 @@ class RegiBaseService {
 		[$r, $c] = $this->collectionOfRecord($userId, $id);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$j = $r->jsonSerialize();
-		$j['title'] = $this->titleFor($fieldsJson, $j['data']);
+		$j['title'] = $this->titleFor($fieldsJson, $j['data'], $this->keySep($c));
 		return $j;
 	}
 
@@ -820,6 +858,9 @@ class RegiBaseService {
 					'description' => $c->getDescription() ?? '',
 					'view' => $c->getView(),
 					'record_sort' => $c->getRecordSort(),
+					'key_head' => $c->getKeyHead(),
+					'key_sep' => $c->getKeySep(),
+					'key_sep_char' => $c->getKeySepChar(),
 				],
 				'fields' => $fields,
 				'records' => array_map(fn ($r) => $r['data'], $rows),
@@ -882,6 +923,9 @@ class RegiBaseService {
 				'description' => $cj['description'] ?? '',
 				'view' => $cj['view'] ?? 'list',
 				'record_sort' => $cj['record_sort'] ?? 'created_desc',
+				'key_head' => $cj['key_head'] ?? false,
+				'key_sep' => $cj['key_sep'] ?? 'space',
+				'key_sep_char' => $cj['key_sep_char'] ?? '',
 				'fields' => $fieldsJson,
 				'records' => $records,
 			];
@@ -958,6 +1002,9 @@ class RegiBaseService {
 				'color' => $col['color'] ?? '#3b82f6',
 				'description' => $col['description'] ?? '',
 				'view' => $col['view'] ?? 'list',
+				'key_head' => $col['key_head'] ?? false,
+				'key_sep' => $col['key_sep'] ?? 'space',
+				'key_sep_char' => $col['key_sep_char'] ?? '',
 				'fields' => $fields,
 			]);
 			$cid = (int)$created['id'];

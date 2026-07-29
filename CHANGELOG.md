@@ -2,6 +2,29 @@
 
 All notable changes to RegiBase.
 
+## 0.14.11 — 2026-07-29
+
+### Emphasis (record name) fields
+
+- The list-title marker was renamed to **🏷️ Emphasis**, and a field list can now have more
+  than one. When several fields are emphasized, their values are combined in field order to form
+  the record's name (for example first name + last name), skipping any empty parts. Emphasized
+  values are shown in bold. (The marker was previously “★ Title”.)
+- Collection settings can combine the emphasized field(s) into a single leading column in the
+  table view, with a chosen **separator** — none, a half-width space, a full-width space (offered
+  for CJK languages), or a custom symbol.
+
+### Editing
+
+- New collections now open in the **table (spreadsheet)** view by default.
+- The collection editor is titled **Edit collection**, with a short note on what it changes.
+- While reordering fields by drag in the collection editor, the list now auto-scrolls when the
+  pointer nears the top or bottom edge.
+
+### Compatibility
+
+- Supports **Nextcloud 33**.
+
 ## 0.14.1 — 2026-07-28
 
 ### Edit lock (view-only collections)
