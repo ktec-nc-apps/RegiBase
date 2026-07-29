@@ -577,6 +577,8 @@ class RegiBaseService {
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort((int)($f['sort'] ?? 0));
 			$e->setConcat((int)($f['concat'] ?? 0));
+			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$f['concat_sep'] : 'space');
+			$e->setConcatSepChar(mb_substr((string)($f['concat_sep_char'] ?? ''), 0, 4));
 			$this->fields->insert($e);
 		}
 	}
@@ -696,6 +698,8 @@ class RegiBaseService {
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort($idx);
 			$e->setConcat((int)($f['concat'] ?? 0));
+			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$f['concat_sep'] : 'space');
+			$e->setConcatSepChar(mb_substr((string)($f['concat_sep_char'] ?? ''), 0, 4));
 			$this->fields->insert($e);
 		}
 	}

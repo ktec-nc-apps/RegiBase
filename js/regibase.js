@@ -638,9 +638,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
         <p v-if="schemaMode!=='template'" style="color:var(--muted);font-size:13px;margin-top:0">{{ t('※ Here you edit this collection\'s input form — the fields records are entered into. It does not change the records already saved.') }}</p>
         <p style="color:var(--muted);font-size:13px;margin-top:0">{{ t('The fields you create here become the input form. 🏷️ Emphasis marks the field(s) used as the record\'s name — shown as the record title in lists, cards and details, and used for name sorting. Tick more than one to combine them (e.g. first name + last name), joined in field order; the emphasized values are shown in bold.') }}</p>
+        <div v-if="schemaMode!=='template'" class="concat-help">
+          <div style="font-size:13px;color:var(--muted)">🔗 {{ t('Concatenate with: on a field, pick the next field to show combined with it, and the character to put between them — chain them (A→B→C) for a 3-way combine (e.g. Last name → First name → “Yamada Taro”). This only changes how records are shown in lists/table; the stored data is not merged.') }}</div>
+        </div>
         <div v-for="(f,i) in schemaFields" :key="f._uid" class="schema-row sortable" :class="{dragover: dragOverIndex===i, dragging: dragIndex===i}" @dragover.prevent="onFieldDragOver(i)" @drop.prevent="onFieldDrop(i)" @dragleave="onFieldDragLeave(i)">
           <span class="drag-handle" draggable="true" @dragstart="onFieldDragStart(i, $event)" @dragend="onFieldDragEnd" :title="t('Drag to reorder')">⠿</span>
-          <input v-model="f.label" :placeholder="t('Display name (e.g. Password)')" />
+          <input v-model="f.label" :class="{'field-required-empty': !(f.label||'').trim()}" :placeholder="t('Display name (required)')" />
           <select v-model="f.type">
             <option value="text">{{ t('Text') }}</option>
             <option value="textarea">{{ t('Multi-line text') }}</option>
@@ -714,7 +717,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('🏷️ Emphasis') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
-            <label :title="t('Fields sharing a group are shown combined (joined in field order), separate from Emphasis.')">🔗 {{ t('Concatenate') }} <select v-model.number="f.concat"><option :value="0">{{ t('None') }}</option><option v-for="g in 6" :key="g" :value="g">{{ g }}</option></select></label>
+            <span v-if="concatSourceLabel(f)" class="concat-base">🔗 {{ t('Concatenated from') }}: {{ concatSourceLabel(f) }}</span>
+            <label>🔗 {{ t('Concatenate with') }} <select :value="f._cnext||0" @change="f._cnext = Number($event.target.value)"><option :value="0">{{ t('Do not concatenate') }}</option><template v-for="g in concatTargets(f)" :key="g._uid"><option :value="g._uid">{{ g.label }}</option></template></select></label>
+            <label v-if="f._cnext" class="concat-sep-inline">{{ t('Separator') }} <select v-model="f._csep"><option value="none">{{ t('None') }}</option><option value="space">{{ t('Half-width space') }}</option><option v-if="isCjkUi || f._csep==='fullspace'" value="fullspace">{{ t('Full-width space') }}</option><option value="custom">{{ t('Custom symbol') }}</option></select><input v-if="f._csep==='custom'" v-model="f._csepChar" maxlength="4" :placeholder="t('e.g. / , -')" style="width:70px;margin-left:4px" /></label>
           </div>
         </div>
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
@@ -808,24 +813,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
         </div>
 
-        <div v-if="keyFields.length" class="field">
-          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" v-model="collForm.key_head" style="width:18px;height:18px" />
-            <span>🏷️ {{ t('Show emphasized fields joined at the front') }}</span>
-          </label>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('In the table view, the emphasized field(s) are combined into a single leading column — joined in field order even if other fields sit between them.') }}</div>
-          <div v-if="keyFields.length>1" style="margin-top:10px">
-            <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px">{{ t('Separator between emphasized fields') }}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center">
-              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="none" v-model="collForm.key_sep" /> {{ t('None') }}</label>
-              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="space" v-model="collForm.key_sep" /> {{ t('Half-width space') }}</label>
-              <label v-if="isCjkUi || collForm.key_sep==='fullspace'" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="fullspace" v-model="collForm.key_sep" /> {{ t('Full-width space') }}</label>
-              <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" value="custom" v-model="collForm.key_sep" /> {{ t('Custom symbol') }}</label>
-              <input v-if="collForm.key_sep==='custom'" v-model="collForm.key_sep_char" maxlength="4" :placeholder="t('e.g. / , -')" style="width:90px" />
-            </div>
-            <div style="font-size:12px;color:var(--muted);margin-top:8px">{{ t('Preview') }}: <b>{{ keyPreview }}</b></div>
-          </div>
-        </div>
         </template>
 
         <div v-if="isOwner" class="field">
@@ -1553,6 +1540,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '' },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100 },
         undoTop: null, history: [],
+        schemaSep: 'space', schemaSepChar: '',
         languages: [],
         locale: 0,
         backupForm: { password: '', busy: false, err: '' },
@@ -1779,26 +1767,21 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         return this.keyFields.map((f) => f.label).join(this.collFormSepStr);
       },
       // Ordered table columns. Concatenation groups (fields sharing a `concat`
-      // group id) are combined into one column and pulled to the front, ordered
-      // by group number; the emphasis title (when "combine at front" is on) leads.
-      // Then the remaining ungrouped fields follow in field order.
+      // group id) are combined into one column and pulled to the front, ordered by
+      // group number; then the remaining ungrouped fields follow in field order.
       tableColumns() {
         const fields = this.current ? this.current.fields.slice() : [];
         if (!fields.length) return [];
         const used = new Set();
         const cols = [];
-        if (this.keyHeadOn) {
-          cols.push({ kind: 'title', id: '__title', label: this.keyHeadLabel, secret: false, keycol: true });
-          this.keyFields.forEach((f) => used.add(f.key));
-        }
         const groups = {};
         fields.forEach((f) => { const g = f.concat || 0; if (g && !used.has(f.key)) (groups[g] = groups[g] || []).push(f); });
         Object.keys(groups).map(Number).sort((a, b) => a - b).forEach((g) => {
           const m = groups[g]; m.forEach((x) => used.add(x.key));
-          cols.push({ kind: 'concat', id: '__c' + g, members: m, label: m.map((x) => x.label).join(' / '), secret: m.length > 0 && m.every((x) => x.secret), keycol: m.some((x) => x.is_title) });
+          cols.push({ kind: 'concat', id: '__c' + g, members: m, label: '🔗 ' + m.map((x) => x.label).join(' / '), secret: m.length > 0 && m.every((x) => x.secret), keycol: m.some((x) => x.is_title) });
         });
         const rest = fields.filter((f) => !used.has(f.key));
-        if (!this.keyHeadOn && !Object.keys(groups).length) { const ti = rest.findIndex((f) => f.is_title); if (ti > 0) { const [tf] = rest.splice(ti, 1); rest.unshift(tf); } }
+        if (!Object.keys(groups).length) { const ti = rest.findIndex((f) => f.is_title); if (ti > 0) { const [tf] = rest.splice(ti, 1); rest.unshift(tf); } }
         rest.forEach((f) => cols.push({ kind: 'field', id: f.key, field: f, label: f.label, secret: !!f.secret, keycol: !!f.is_title }));
         return cols;
       },
@@ -2125,10 +2108,28 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const s = String(v);
         return s.length > 40 ? s.slice(0, 40) + '…' : s;
       },
-      // Combine several fields' values (in field order) with the collection separator.
+      // Resolve a saved field's own concat separator (placed after it in a group).
+      fieldSep(f) {
+        if (!f) return '';
+        switch (f.concat_sep) {
+          case 'none': return '';
+          case 'fullspace': return '　';
+          case 'custom': return f.concat_sep_char || '';
+          default: return ' ';
+        }
+      },
+      // Combine a group's field values (field order), each pair joined by the
+      // earlier field's own separator. Empty values are skipped.
       concatText(rec, members) {
-        const sep = this.keySepStr;
-        return members.map((m) => { const v = rec.data ? rec.data[m.key] : ''; if (v == null || v === '') return ''; return m.secret ? '••••••••' : String(v); }).filter((v) => v !== '').join(sep);
+        let out = ''; let prev = null;
+        for (const m of members) {
+          const v = rec.data ? rec.data[m.key] : '';
+          if (v == null || v === '') continue;
+          const val = m.secret ? '••••••••' : String(v);
+          out = (out === '') ? val : (out + this.fieldSep(prev) + val);
+          prev = m;
+        }
+        return out;
       },
       // Text shown for a table column (real field, concat group, or emphasis title).
       colText(rec, col) {
@@ -2917,7 +2918,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.modal = null; this.current = null; this.records = []; await this.loadCollections(); this.showToast(T('Deleted'));
       },
       fieldsToSchemaRows(fields) {
-        return (fields || []).map((f) => {
+        const rows = (fields || []).map((f) => {
           const o = (f.options && typeof f.options === 'object' && !Array.isArray(f.options)) ? f.options : {};
           return {
             ...f,
@@ -2932,11 +2933,52 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             _rmin: (RULE_TYPES.includes(f.type) && o.min > 0) ? o.min : '',
             _rmax: (RULE_TYPES.includes(f.type) && o.max > 0) ? o.max : '',
             _uid: this.uidCounter++,
+            _cnext: 0,                              // _uid of the next field to append (chain)
+            _csep: (f.concat_sep || 'space'),       // separator placed after this field
+            _csepChar: (f.concat_sep_char || ''),
           };
         });
+        // Rebuild the forward chain from stored group numbers: within each group,
+        // link every field to the next one in field order (A→B→C).
+        const groups = {};
+        rows.forEach((r) => { const g = r.concat || 0; if (g) (groups[g] = groups[g] || []).push(r); });
+        Object.values(groups).forEach((members) => {
+          for (let i = 0; i < members.length - 1; i++) members[i]._cnext = members[i + 1]._uid;
+        });
+        return rows;
+      },
+      // Fields row f can concatenate into: the fields AFTER it (a rear column).
+      concatTargets(f) {
+        const idx = this.schemaFields.indexOf(f);
+        return this.schemaFields.filter((g, gi) => gi > idx && (g.label || '').trim());
+      },
+      // Label of the field that concatenates INTO f (f is someone's next). "連結元".
+      concatSourceLabel(f) {
+        const src = this.schemaFields.find((g) => g._cnext === f._uid);
+        return src ? ((src.label || '').trim() || T('(no name)')) : '';
+      },
+      // Resolve a field's own separator (used before its _cnext target).
+      rowSep(f) {
+        switch (f._csep) {
+          case 'none': return '';
+          case 'fullspace': return '　';
+          case 'custom': return f._csepChar || '';
+          default: return ' ';
+        }
       },
       serializeSchemaFields() {
         const rows = this.schemaFields.filter((f) => (f.label || '').trim());
+        // Resolve concat chains (_cnext) into group numbers via union-find, so a
+        // field and everything it chains to share one group. Numbered by earliest
+        // column so the ids track column order.
+        const uf = {}; rows.forEach((r) => { uf[r._uid] = r._uid; });
+        const find = (u) => { while (uf[u] !== u) { u = uf[u] = uf[uf[u]]; } return u; };
+        rows.forEach((r) => { if (r._cnext && uf[r._cnext] !== undefined) { const a = find(r._uid), b = find(r._cnext); if (a !== b) uf[a] = b; } });
+        const byRoot = {}; rows.forEach((r) => { const root = find(r._uid); (byRoot[root] = byRoot[root] || []).push(r); });
+        const groupNum = {}; let gn = 0;
+        Object.values(byRoot).filter((g) => g.length >= 2)
+          .sort((a, b) => Math.min(...a.map((x) => rows.indexOf(x))) - Math.min(...b.map((x) => rows.indexOf(x))))
+          .forEach((g) => { gn++; g.forEach((x) => { groupNum[x._uid] = gn; }); });
         // Reserve every existing (non-empty) key up front, then emit it verbatim.
         // Reordering rows or adding a field must NEVER rename or reassign an
         // existing field's key: record data is stored under the field key, so a
@@ -2968,16 +3010,19 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           return {
             key: existing || freshKey(slug(f.label)),
             label: f.label.trim(), type: f.type, options,
-            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, concat: Number(f.concat) || 0, placeholder: f.placeholder || undefined,
+            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, concat: groupNum[f._uid] || 0,
+            concat_sep: f._csep || 'space', concat_sep_char: f._csepChar || undefined, placeholder: f.placeholder || undefined,
           };
         });
       },
       openSchemaEditor() {
         this.schemaMode = 'collection';
         this.schemaFields = this.fieldsToSchemaRows(this.current.fields);
+        this.schemaSep = this.current.key_sep || 'space';
+        this.schemaSepChar = this.current.key_sep_char || '';
         this.modal = { type: 'schema' };
       },
-      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, concat: 0, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++ }); },
+      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, concat: 0, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++, _cnext: 0, _csep: 'space', _csepChar: '' }); },
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
@@ -3036,6 +3081,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const a = this.schemaFields;
         const [it] = a.splice(from, 1);
         a.splice(to, 0, it);
+        // Concat chains only point forward (to a later field); drop any link that
+        // now points to an earlier-or-same position after the move.
+        a.forEach((f, i) => { if (f._cnext) { const ti = a.findIndex((g) => g._uid === f._cnext); if (ti <= i) f._cnext = 0; } });
       },
       // ---- sidebar collection hover: description popup ----
       showCollTip(c, e) {
@@ -3209,6 +3257,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       // to form the record title — e.g. tick "First name" + "Last name".
       setTitleField(i) { this.schemaFields[i].is_title = !this.schemaFields[i].is_title; },
       async saveSchema() {
+        // Field names are required — do not silently drop unnamed fields.
+        if (this.schemaFields.some((f) => !(f.label || '').trim())) { alert(T('Every field needs a name.')); return; }
         const newFields = this.serializeSchemaFields();
         if (!newFields.length) { alert(T('Keep at least one field')); return; }
         if (!newFields.some((f) => f.is_title)) newFields[0].is_title = true;

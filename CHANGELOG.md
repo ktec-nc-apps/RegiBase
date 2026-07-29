@@ -2,6 +2,25 @@
 
 All notable changes to RegiBase.
 
+## 0.16.0 — 2026-07-30
+
+### Concatenation (display combining) — reworked
+
+- In the collection editor, each field can pick a **Concatenate with** target — the next field to
+  show it combined with — and its own **separator** (none / half-width space / full-width space /
+  custom symbol) placed between them. Chain fields (A→B→C) for a 3-/4-way combine, e.g. last name →
+  first name → “Yamada Taro”, or furigana last → first as a second group.
+- The field being combined into shows a “Concatenated from …” note; combined columns are marked with
+  🔗 and pulled to the front in the table view, and appear as one item in the detailed list.
+- This only changes how records are **displayed** — the stored data is never merged. (Field names
+  are now required.)
+
+### Fixes
+
+- Deleting a whole collection can now be undone — the ↶ Undo button appears after a collection
+  delete.
+- Switching the view or sort order no longer fills up the change history.
+
 ## 0.15.1 — 2026-07-30
 
 ### Undo & change history

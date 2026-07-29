@@ -798,3 +798,14 @@
 #regibase-root .choice-field .choice-opt { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
 #regibase-root .choice-field .choice-opt input { flex: 0 0 auto; }
 #regibase-root .choice-field .choice-clear { margin-left: 4px; }
+
+/* concatenation (連結) editor UI */
+#regibase-root .concat-help { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 10px 12px; margin: 4px 0 10px; }
+#regibase-root .schema-row .concat-base { display: inline-flex; align-items: center; font-size: 13px; color: var(--accent); font-weight: 600; }
+#regibase-root .schema-row input.field-required-empty { border-color: var(--danger, #e5484d); }
+
+/* concat separator — prominent block */
+#regibase-root .concat-sep { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+#regibase-root .concat-sep-label { display: block; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+#regibase-root .concat-sep-opts { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+#regibase-root .concat-sep-opts label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
