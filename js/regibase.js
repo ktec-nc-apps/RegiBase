@@ -2798,14 +2798,22 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         });
       },
       serializeSchemaFields() {
+        const rows = this.schemaFields.filter((f) => (f.label || '').trim());
+        // Reserve every existing (non-empty) key up front, then emit it verbatim.
+        // Reordering rows or adding a field must NEVER rename or reassign an
+        // existing field's key: record data is stored under the field key, so a
+        // changed key makes the server-side migration treat the field as removed
+        // and prune its data. Only blank keys (brand-new fields) get a freshly
+        // generated, collision-free key derived from the label.
         const seen = new Set();
-        const uniqueKey = (k) => {
-          let key = k, n = 2;
-          while (seen.has(key)) { key = k + '_' + n; n++; }
+        rows.forEach((f) => { const k = (f.key || '').trim(); if (k) seen.add(k); });
+        const freshKey = (base) => {
+          let key = base, n = 2;
+          while (seen.has(key)) { key = base + '_' + n; n++; }
           seen.add(key);
           return key;
         };
-        return this.schemaFields.filter((f) => (f.label || '').trim()).map((f) => {
+        return rows.map((f) => {
           let options;
           if (f.type === 'select') options = (f.options || '').split('\n').map((s) => s.trim()).filter(Boolean);
           else if (f.type === 'image') options = { max: f._orig ? 0 : (Number(f._max) || 1600), format: f._format || 'jpeg' };
@@ -2818,8 +2826,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
             options = Object.keys(rule).length ? rule : undefined;
           }
+          const existing = (f.key || '').trim();
           return {
-            key: uniqueKey((f.key || '').trim() || slug(f.label)),
+            key: existing || freshKey(slug(f.label)),
             label: f.label.trim(), type: f.type, options,
             required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
           };
@@ -2834,6 +2843,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
+        // Commit and drop focus from any field being edited BEFORE the reorder.
+        // Dragging while an input is focused (e.g. right after renaming a field)
+        // lets the browser's blur/move reset that input as the DOM node is
+        // relocated, silently mangling the row — and on save, the mismatched
+        // field is treated as removed and its record data is pruned. Blurring
+        // flushes the pending value and detaches focus so the move is clean.
+        try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (_) { /* ignore */ }
         this.dragIndex = i;
         try {
           e.dataTransfer.effectAllowed = 'move';

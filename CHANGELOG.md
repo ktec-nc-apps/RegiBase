@@ -2,7 +2,7 @@
 
 All notable changes to RegiBase.
 
-## 0.14.11 — 2026-07-29
+## 0.14.13 — 2026-07-29
 
 ### Emphasis (record name) fields
 
@@ -24,6 +24,12 @@ All notable changes to RegiBase.
 ### Compatibility
 
 - Supports **Nextcloud 33**.
+
+### Fixes
+
+- Reordering fields by drag in the collection editor right after renaming one could, on save,
+  leave a field's data mismatched and prune it. Field keys are now kept pinned to their field
+  regardless of order, and the edited field is committed before a drag begins.
 
 ## 0.14.1 — 2026-07-28
 
