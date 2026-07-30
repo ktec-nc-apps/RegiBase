@@ -13,16 +13,20 @@ use OCA\RegiBase\Db\RecordMapper;
 use OCA\RegiBase\Db\ShareEntity;
 use OCA\RegiBase\Db\ShareMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\ISession;
+use OCP\IUserManager;
 
 class RegiBaseService {
-	private const ALLOWED_VIEWS = ['card', 'list', 'detail', 'image', 'table'];
+	private const ALLOWED_VIEWS = ['card', 'list', 'table'];
 	private const ALLOWED_SORTS = ['created_asc', 'created_desc', 'title_asc', 'title_desc'];
 	private const KEY_SEPS = ['none', 'space', 'fullspace', 'custom'];
 	/** Field concat separators: KEY_SEPS plus 'paren' (wrap the target in （ ）). */
 	private const CONCAT_SEPS = ['none', 'space', 'fullspace', 'custom', 'paren', 'parenfull'];
 	private const ATTACH_TYPES = ['image', 'image_crop', 'file'];
+	// Per-collection map service override; '' means "inherit the global setting".
+	private const MAP_PROVIDERS = ['', 'google', 'yahoo', 'osm', 'apple', 'bing'];
 	// recipient permission ranks; owner is implicitly above all of these
 	public const PERM_VIEW = 'view';
 	public const PERM_EDIT = 'edit';
@@ -38,7 +42,35 @@ class RegiBaseService {
 		private IL10N $l,
 		private ISession $session,
 		private HistoryService $history,
+		private IUserManager $userManager,
+		private IGroupManager $groupManager,
 	) {
+	}
+
+	/** Group ids the user belongs to (empty if the user is unknown). @return string[] */
+	private function userGroupIds(string $userId): array {
+		$u = $this->userManager->get($userId);
+		return $u ? $this->groupManager->getUserGroupIds($u) : [];
+	}
+
+	/**
+	 * The single most-privileged share granting $userId access to a collection,
+	 * considering both a direct user-share and any group-shares. Null if none.
+	 * On an equal permission level a direct user-share wins over a group-share.
+	 */
+	private function bestShare(int $collectionId, string $userId): ?ShareEntity {
+		$candidates = $this->shares->findForUserAccess($collectionId, $userId, $this->userGroupIds($userId));
+		$best = null;
+		$bestRank = -1;
+		foreach ($candidates as $s) {
+			$rank = self::PERM_RANK[$s->getPerm()] ?? 0;
+			$isUser = $s->getRecipientType() === 'user';
+			if ($best === null || $rank > $bestRank || ($rank === $bestRank && $isUser)) {
+				$best = $s;
+				$bestRank = $rank;
+			}
+		}
+		return $best;
 	}
 
 	/** Best-effort append to the undo/change-history journal (never blocks the op). */
@@ -77,7 +109,7 @@ class RegiBaseService {
 		} catch (DoesNotExistException $e) {
 			// fall through: maybe it is shared to this user
 		}
-		$share = $this->shares->findOne($id, $userId);
+		$share = $this->bestShare($id, $userId);
 		if ($share === null) {
 			throw new DoesNotExistException('no access to collection');
 		}
@@ -173,10 +205,23 @@ class RegiBaseService {
 			$j['record_count'] = $this->records->countForCollection((int)$c->getId());
 			$out[] = $this->decorateShare($j, true, null);
 		}
-		// collections other users have shared with me
-		foreach ($this->shares->findForRecipient($userId) as $share) {
+		// collections other users have shared with me — directly or via a group.
+		// A collection reachable through several shares appears once, at the
+		// highest permission level.
+		$bestByColl = [];
+		foreach ($this->shares->findAllForUserAccess($userId, $this->userGroupIds($userId)) as $share) {
+			$cid = (int)$share->getCollectionId();
+			$rank = self::PERM_RANK[$share->getPerm()] ?? 0;
+			$curRank = isset($bestByColl[$cid]) ? (self::PERM_RANK[$bestByColl[$cid]->getPerm()] ?? 0) : -1;
+			$isUser = $share->getRecipientType() === 'user';
+			if (!isset($bestByColl[$cid]) || $rank > $curRank
+				|| ($rank === $curRank && $isUser)) {
+				$bestByColl[$cid] = $share;
+			}
+		}
+		foreach ($bestByColl as $cid => $share) {
 			try {
-				$c = $this->collections->findById((int)$share->getCollectionId());
+				$c = $this->collections->findById($cid);
 			} catch (DoesNotExistException $e) {
 				continue; // stale share whose collection was deleted
 			}
@@ -256,6 +301,9 @@ class RegiBaseService {
 		$c->setKeyHead(!empty($input['key_head']));
 		$c->setKeySep(in_array($input['key_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$input['key_sep'] : 'space');
 		$c->setKeySepChar(mb_substr((string)($input['key_sep_char'] ?? ''), 0, 4));
+		// Default attachment folder for this collection: "<base>/<name>".
+		$c->setFilesFolder($this->images->getBaseFolder($userId) . '/' . $c->getName());
+		$c->setMapProvider('');
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -336,9 +384,10 @@ class RegiBaseService {
 	}
 
 	public function updateCollection(string $userId, int $id, array $patch): array {
-		// editing collection settings (name/icon/color/description/view/sort) needs
-		// ownership or the highest recipient level ('delete'); 'edit'/'view' cannot.
-		[$c] = $this->require($userId, $id, self::PERM_DELETE);
+		// Collection settings (name/icon/color/description/lock/key/view/sort) are
+		// owner-only. Share recipients — at any level, including 'delete' — cannot
+		// change them; their record-level rights are enforced elsewhere.
+		$c = $this->collections->findForUser($id, $userId); // owner only
 		// Don't clutter the undo history with pure display-preference switches
 		// (view / sort). Only real settings changes are worth an undo entry.
 		if (array_diff(array_keys($patch), ['view', 'record_sort'])) {
@@ -373,6 +422,12 @@ class RegiBaseService {
 		}
 		if (array_key_exists('key_sep_char', $patch)) {
 			$c->setKeySepChar(mb_substr((string)$patch['key_sep_char'], 0, 4));
+		}
+		if (array_key_exists('files_folder', $patch)) {
+			$c->setFilesFolder(mb_substr(trim((string)$patch['files_folder']), 0, 512));
+		}
+		if (isset($patch['map_provider']) && in_array((string)$patch['map_provider'], self::MAP_PROVIDERS, true)) {
+			$c->setMapProvider((string)$patch['map_provider']);
 		}
 		$c->setUpdatedAt($this->now());
 		$this->collections->update($c);
@@ -602,6 +657,9 @@ class RegiBaseService {
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
 			$e->setIsTitle(!empty($f['is_title']));
+			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
+			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
+			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort((int)($f['sort'] ?? 0));
 			$e->setConcat((int)($f['concat'] ?? 0));
@@ -723,6 +781,9 @@ class RegiBaseService {
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
 			$e->setIsTitle(!$hasTitle && $idx === 0 ? true : !empty($f['is_title']));
+			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
+			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
+			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort($idx);
 			$e->setConcat((int)($f['concat'] ?? 0));
@@ -902,6 +963,51 @@ class RegiBaseService {
 		return $this->getRecord($userId, $id);
 	}
 
+	/**
+	 * Update many records of one collection in a single call (used by find & replace).
+	 * The collection is permission-checked once and its fields loaded once, so this is
+	 * dramatically faster than one HTTP PUT per record. All edits share $grp for undo.
+	 * @param array $updates list of ['id' => int, 'data' => array]
+	 * @return int number of records actually updated
+	 */
+	public function bulkUpdateRecords(string $userId, int $collectionId, array $updates, ?string $grp = null): int {
+		$this->requireEditable($userId, $collectionId, self::PERM_EDIT); // owner/edit + not locked
+		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
+		$attach = array_values(array_filter($fieldsJson, fn ($f) => in_array($f['type'], self::ATTACH_TYPES, true)));
+		$now = $this->now();
+		$n = 0;
+		foreach ($updates as $u) {
+			$id = (int)($u['id'] ?? 0);
+			if ($id <= 0) {
+				continue;
+			}
+			$data = (isset($u['data']) && is_array($u['data'])) ? $u['data'] : [];
+			try {
+				$r = $this->records->find($id);
+			} catch (DoesNotExistException $e) {
+				continue;
+			}
+			if ((int)$r->getCollectionId() !== $collectionId) {
+				continue; // never touch a record outside the authorised collection
+			}
+			$oldData = json_decode($r->getData() ?: '{}', true) ?: [];
+			$this->rec($userId, 'record.update', $collectionId, $this->l->t('Edited: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
+			$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
+			$r->setUpdatedAt($now);
+			$this->records->update($r);
+			foreach ($attach as $f) {
+				$old = $oldData[$f['key']] ?? '';
+				$new = $data[$f['key']] ?? '';
+				if ($old !== '' && (string)$old !== (string)$new) {
+					$this->images->trashIfOwned($userId, (string)$old);
+				}
+			}
+			$n++;
+		}
+		return $n;
+	}
+
 	/** Permission-checked delete that returns the data needed to re-create it (for undo). */
 	private function deleteRecordCapture(string $userId, int $id): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_DELETE);
@@ -1017,6 +1123,9 @@ class RegiBaseService {
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
 			$e->setIsTitle(false);
+			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
+			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
+			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort($maxSort + $i);
 			$this->fields->insert($e);
@@ -1397,25 +1506,37 @@ class RegiBaseService {
 	}
 
 	/**
-	 * Share a collection with another user (owner only).
+	 * Share a collection with another user or a whole group (owner only).
+	 * $recipientType: 'user' | 'group'.
 	 * $encKey/$encSalt: the owner's key wrapped with the share password (optional; enables secret viewing).
 	 */
 	public function addShare(string $ownerUid, int $collectionId, string $recipientUid, string $perm,
-		?string $password, ?string $encKey, ?string $encSalt): array {
+		?string $password, ?string $encKey, ?string $encSalt, string $recipientType = 'user'): array {
 		$this->collections->findForUser($collectionId, $ownerUid); // owner only
-		if ($recipientUid === $ownerUid) {
-			throw new \RuntimeException('Cannot share with yourself');
+		$recipientType = ($recipientType === 'group') ? 'group' : 'user';
+		if ($recipientType === 'user') {
+			if ($recipientUid === $ownerUid) {
+				throw new \RuntimeException('Cannot share with yourself');
+			}
+			if ($this->userManager->get($recipientUid) === null) {
+				throw new \RuntimeException('No such user');
+			}
+		} else {
+			if (!$this->groupManager->groupExists($recipientUid)) {
+				throw new \RuntimeException('No such group');
+			}
 		}
 		if (!isset(self::PERM_RANK[$perm])) {
 			$perm = self::PERM_VIEW;
 		}
-		if ($this->shares->findOne($collectionId, $recipientUid) !== null) {
-			throw new \RuntimeException('Already shared with this user');
+		if ($this->shares->findOne($collectionId, $recipientUid, $recipientType) !== null) {
+			throw new \RuntimeException('Already shared');
 		}
 		$s = new ShareEntity();
 		$s->setCollectionId($collectionId);
 		$s->setOwnerUid($ownerUid);
 		$s->setRecipientUid($recipientUid);
+		$s->setRecipientType($recipientType);
 		$s->setPerm($perm);
 		$s->setPwHash(($password !== null && $password !== '') ? password_hash($password, PASSWORD_DEFAULT) : null);
 		$s->setEncKey(($encKey !== null && $encKey !== '') ? $encKey : null);
@@ -1425,9 +1546,9 @@ class RegiBaseService {
 	}
 
 	/** Change a share's permission / password / wrapped key (owner only). */
-	public function updateShare(string $ownerUid, int $collectionId, string $recipientUid, array $patch): array {
+	public function updateShare(string $ownerUid, int $collectionId, string $recipientUid, array $patch, string $recipientType = 'user'): array {
 		$this->collections->findForUser($collectionId, $ownerUid); // owner only
-		$s = $this->shares->findOne($collectionId, $recipientUid);
+		$s = $this->shares->findOne($collectionId, $recipientUid, $recipientType);
 		if ($s === null) {
 			throw new DoesNotExistException('no such share');
 		}
@@ -1447,9 +1568,9 @@ class RegiBaseService {
 	}
 
 	/** Remove a share (owner only). */
-	public function removeShare(string $ownerUid, int $collectionId, string $recipientUid): void {
+	public function removeShare(string $ownerUid, int $collectionId, string $recipientUid, string $recipientType = 'user'): void {
 		$this->collections->findForUser($collectionId, $ownerUid); // owner only
-		$s = $this->shares->findOne($collectionId, $recipientUid);
+		$s = $this->shares->findOne($collectionId, $recipientUid, $recipientType);
 		if ($s !== null) {
 			$this->shares->delete($s);
 		}
@@ -1461,7 +1582,7 @@ class RegiBaseService {
 	 * @return array{ok: bool, enc_key: ?string, enc_salt: ?string, perm: string}
 	 */
 	public function unlockShare(string $recipientUid, int $collectionId, string $password): array {
-		$s = $this->shares->findOne($collectionId, $recipientUid);
+		$s = $this->bestShare($collectionId, $recipientUid);
 		if ($s === null) {
 			throw new DoesNotExistException('not shared with you');
 		}

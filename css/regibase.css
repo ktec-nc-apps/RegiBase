@@ -19,8 +19,11 @@
    by one font or the sequences come apart. Collections get shared, so consistent rendering
    is the point anyway: everyone sees the icon the person who picked it saw.
 
-   AppEmojiSystem is kept behind it purely as a safety net for a failed download. U+FE0F is
-   deliberately absent from the ranges — including it made pages pull the font for nothing.
+   Startup speed: 'AppEmojiSystem' (the device's own colour-emoji font) is preferred, so the
+   1.8 MB bundled 'AppEmoji' woff2 is downloaded ONLY on devices that have no colour-emoji
+   font at all — virtually every desktop/mobile OS ships one, so most users never fetch it.
+   (Trade-off chosen 2026-07-30: faster load over pixel-identical emoji across devices.)
+   U+FE0F is deliberately absent from the ranges — including it made pages pull the font for nothing.
 
    Both faces are applied to the elements that display an icon, never to body text, so the
    ranges can cover every code point in the set — including ones like © ® ™ ↔ that have to
@@ -456,9 +459,9 @@
    stand out at the flush-left edge. */
 #regibase-root .settings-body .field { padding-left: 16px; }
 #regibase-root .settings-body .field > label { margin-left: -16px; }
-/* Share section: keep its toggle title flush, indent only the expanded body. */
-#regibase-root .settings-body .share-section { padding-left: 0; }
-#regibase-root .settings-body .share-section .share-body { padding-left: 16px; }
+/* Share section: it is a normal .field, so its checkbox toggle lines up with
+   the Edit-lock toggle above. The body keeps the field's own 16px indent. */
+#regibase-root .settings-body .share-section .share-body { padding-left: 0; }
 /* Two fields side by side, each 50% (e.g. Color + Icon). */
 #regibase-root .field-row { display: flex; gap: 12px; align-items: flex-start; }
 #regibase-root .field-row > .field { flex: 1 1 0; min-width: 0; margin-bottom: 14px; }
@@ -555,6 +558,7 @@
 #regibase-root .reorder-row.dragging { opacity: .45; }
 #regibase-root .reorder-row.dragover { outline: 2px dashed var(--primary); outline-offset: -2px; }
 #regibase-root .schema-row .flags label { display: inline-flex; align-items: center; gap: 4px; }
+#regibase-root .schema-row .flags .show-flags { display: inline-flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 8px; }
 #regibase-root .schema-row .flags .field-fill { margin-left: auto; color: var(--muted); opacity: .7; font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
 #regibase-root .schema-row input:not([type=checkbox]):not([type=radio]),
 #regibase-root .schema-row select,
@@ -741,14 +745,8 @@
 #regibase-root .hc-icon { position: relative; }
 #regibase-root .share-note { font-size: 13px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
 #regibase-root .share-section { border-top: 1px dashed var(--border); padding-top: 12px; }
-/* Collapsible share panel: ▶ collapsed / ▼ expanded. */
-#regibase-root .share-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
-#regibase-root .share-toggle:hover { color: var(--text); }
-#regibase-root .share-toggle .share-caret { font-size: 11px; flex: 0 0 auto; color: var(--muted); }
-#regibase-root .share-toggle .share-toggle-label { flex: 0 0 auto; }
-#regibase-root .share-toggle .share-hint { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 400; }
-#regibase-root .share-toggle:hover .share-hint { color: var(--primary); }
-#regibase-root .share-toggle .share-count { flex: 0 0 auto; margin-left: auto; min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 10px; background: var(--primary); color: #fff; font-size: 12px; }
+/* Share panel: a checkbox turns it on and expands the body (like the edit lock). */
+#regibase-root .share-section .share-count { flex: 0 0 auto; margin-left: auto; min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 10px; background: var(--primary); color: #fff; font-size: 12px; }
 #regibase-root .share-body { padding-top: 10px; }
 #regibase-root .share-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 #regibase-root .share-row { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
@@ -808,7 +806,7 @@
 #regibase-root .ic, #regibase-root .hc-icon, #regibase-root .big, #regibase-root .noimg,
 #regibase-root .emoji-btn, #regibase-root .emoji-tab, #regibase-root .iconpick-cur,
 #regibase-root .iconpick-btn {
-  font-family: 'AppEmoji', 'AppEmojiSystem', -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
+  font-family: 'AppEmojiSystem', 'AppEmoji', -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
 }
 
 /* undo / change history */

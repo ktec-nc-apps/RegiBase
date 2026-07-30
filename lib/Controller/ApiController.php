@@ -25,6 +25,7 @@ use OCP\AppFramework\Http\DataDisplayResponse;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
+use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\IRequest;
 use OCP\ITempManager;
@@ -44,6 +45,7 @@ class ApiController extends Controller {
 		private IL10N $l,
 		private IFactory $l10nFactory,
 		private IUserManager $userManager,
+		private IGroupManager $groupManager,
 		private ITempManager $tempManager,
 		private IContactsManager $contactsManager,
 		private CardDavBackend $cardDavBackend,
@@ -454,6 +456,26 @@ class ApiController extends Controller {
 		}
 	}
 
+	/** Bulk-update many records of one collection in a single request (find & replace). */
+	#[NoAdminRequired]
+	public function bulkUpdateRecords(int $id): JSONResponse {
+		$updates = $this->request->getParam('updates', []);
+		$grp = $this->request->getParam('_undoGroup');
+		if (!is_array($updates)) {
+			$updates = [];
+		}
+		try {
+			$n = $this->service->bulkUpdateRecords($this->uid(), $id, $updates, is_string($grp) ? $grp : null);
+			return new JSONResponse(['updated' => $n]);
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
 	#[NoAdminRequired]
 	public function deleteRecord(int $id): JSONResponse {
 		try {
@@ -548,11 +570,8 @@ class ApiController extends Controller {
 		$dataUrl = (string)$this->request->getParam('dataUrl', '');
 		$collectionId = (int)$this->request->getParam('collection_id', 0);
 		try {
-			$name = $this->l->t('Uncategorized');
-			if ($collectionId > 0) {
-				$name = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? $this->l->t('Uncategorized'));
-			}
-			return new JSONResponse(['id' => (string)$this->images->saveDataUrl($this->uid(), $name, $dataUrl)]);
+			$folder = $this->attachmentFolder($collectionId);
+			return new JSONResponse(['id' => (string)$this->images->saveDataUrl($this->uid(), $folder, $dataUrl)]);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
 		} catch (\RuntimeException $e) {
@@ -687,7 +706,7 @@ class ApiController extends Controller {
 		}
 		if (array_key_exists('map_provider', $params)) {
 			$mp = (string)$params['map_provider'];
-			if (in_array($mp, ['google', 'osm', 'apple'], true)) {
+			if (in_array($mp, ['google', 'yahoo', 'osm', 'apple', 'bing'], true)) {
 				$this->config->setUserValue($uid, Application::APP_ID, 'map_provider', $mp);
 			}
 		}
@@ -858,11 +877,8 @@ class ApiController extends Controller {
 			$base64 = substr($dataUrl, $p + 7);
 		}
 		try {
-			$collName = 'Uncategorized';
-			if ($collectionId > 0) {
-				$collName = (string)($this->service->getCollection($this->uid(), $collectionId)['name'] ?? 'Uncategorized');
-			}
-			$out = $this->images->saveDocument($this->uid(), $collName, $name, $base64);
+			$folder = $this->attachmentFolder($collectionId);
+			$out = $this->images->saveDocument($this->uid(), $folder, $name, $base64);
 			return new JSONResponse(['id' => (string)$out['id'], 'name' => $out['name']]);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
@@ -924,19 +940,47 @@ class ApiController extends Controller {
 
 	// ---- internal sharing ----
 
+	/**
+	 * The Files-relative folder where a collection's attachments are stored.
+	 * Empty (user cleared it) throws so the record editor's warning is enforced.
+	 * @throws DoesNotExistException|\RuntimeException
+	 */
+	private function attachmentFolder(int $collectionId): string {
+		if ($collectionId <= 0) {
+			return $this->images->getBaseFolder($this->uid()) . '/' . $this->l->t('Uncategorized');
+		}
+		$coll = $this->service->getCollection($this->uid(), $collectionId);
+		$folder = trim((string)($coll['files_folder'] ?? ''));
+		if ($folder === '') {
+			throw new \RuntimeException('Set a save folder in the collection settings first.');
+		}
+		return $folder;
+	}
+
 	/** Display name for a uid, falling back to the uid itself. */
 	private function displayName(string $uid): string {
 		$u = $this->userManager->get($uid);
 		return $u ? $u->getDisplayName() : $uid;
 	}
 
-	/** Search users to share with (by uid or display name), excluding self. */
+	/** Display name for a group id, falling back to the gid itself. */
+	private function groupDisplayName(string $gid): string {
+		$g = $this->groupManager->get($gid);
+		return $g ? $g->getDisplayName() : $gid;
+	}
+
+	/** Recipient display name honoring the share type. */
+	private function recipientName(string $id, string $type): string {
+		return $type === 'group' ? $this->groupDisplayName($id) : $this->displayName($id);
+	}
+
+	/** Search users and groups to share with, excluding self. */
 	#[NoAdminRequired]
 	public function searchUsers(): JSONResponse {
 		$q = trim((string)$this->request->getParam('q', ''));
 		$me = $this->uid();
 		if (mb_strlen($q) < 1) {
-			return new JSONResponse(['users' => []]);
+			return new JSONResponse(['users' => [], 'groups' => []]);
 		}
 		$found = [];
 		foreach ($this->userManager->searchDisplayName($q, 25) as $u) {
@@ -950,12 +994,19 @@ class ApiController extends Controller {
 			if ($uid === $me) {
 				continue;
 			}
-			$users[] = ['uid' => $uid, 'name' => $name];
+			$users[] = ['type' => 'user', 'uid' => $uid, 'name' => $name];
 			if (count($users) >= 20) {
 				break;
 			}
 		}
-		return new JSONResponse(['users' => $users]);
+		$groups = [];
+		foreach ($this->groupManager->search($q, 25) as $g) {
+			$groups[] = ['type' => 'group', 'uid' => $g->getGID(), 'name' => $g->getDisplayName()];
+			if (count($groups) >= 20) {
+				break;
+			}
+		}
+		return new JSONResponse(['users' => $users, 'groups' => $groups]);
 	}
 
 	/** List a collection's shares (owner only). */
@@ -967,30 +1018,38 @@ class ApiController extends Controller {
 			return $this->notFound();
 		}
 		foreach ($shares as &$s) {
-			$s['recipient_name'] = $this->displayName((string)$s['recipient_uid']);
+			$s['recipient_name'] = $this->recipientName((string)$s['recipient_uid'], (string)($s['recipient_type'] ?? 'user'));
 		}
 		return new JSONResponse(['shares' => $shares]);
 	}
 
-	/** Share a collection with a user (owner only). */
+	/** Share a collection with a user or a group (owner only). */
 	#[NoAdminRequired]
 	public function addShare(int $id): JSONResponse {
 		$recipient = trim((string)$this->request->getParam('recipient', ''));
+		$type = ((string)$this->request->getParam('recipient_type', 'user') === 'group') ? 'group' : 'user';
 		$perm = (string)$this->request->getParam('perm', 'view');
 		$password = $this->request->getParam('password');
 		$encKey = $this->request->getParam('enc_key');
 		$encSalt = $this->request->getParam('enc_salt');
 		$l = $this->appL10n();
-		if ($recipient === '' || $this->userManager->get($recipient) === null) {
+		if ($recipient === '') {
 			return new JSONResponse(['error' => $l->t('No such user')], Http::STATUS_BAD_REQUEST);
+		}
+		if ($type === 'user' && $this->userManager->get($recipient) === null) {
+			return new JSONResponse(['error' => $l->t('No such user')], Http::STATUS_BAD_REQUEST);
+		}
+		if ($type === 'group' && !$this->groupManager->groupExists($recipient)) {
+			return new JSONResponse(['error' => $l->t('No such group')], Http::STATUS_BAD_REQUEST);
 		}
 		try {
 			$s = $this->service->addShare($this->uid(), $id, $recipient,
 				$perm,
 				is_string($password) ? $password : null,
 				is_string($encKey) ? $encKey : null,
-				is_string($encSalt) ? $encSalt : null);
-			$s['recipient_name'] = $this->displayName($recipient);
+				is_string($encSalt) ? $encSalt : null,
+				$type);
+			$s['recipient_name'] = $this->recipientName($recipient, $type);
 			return new JSONResponse($s, Http::STATUS_CREATED);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
@@ -1002,6 +1061,7 @@ class ApiController extends Controller {
 	/** Update a share (owner only). */
 	#[NoAdminRequired]
 	public function updateShare(int $id, string $uid): JSONResponse {
+		$type = ((string)$this->request->getParam('recipient_type', 'user') === 'group') ? 'group' : 'user';
 		$patch = [];
 		foreach (['perm', 'password', 'enc_key', 'enc_salt'] as $k) {
 			if ($this->request->getParam($k) !== null) {
@@ -1009,8 +1069,8 @@ class ApiController extends Controller {
 			}
 		}
 		try {
-			$s = $this->service->updateShare($this->uid(), $id, $uid, $patch);
-			$s['recipient_name'] = $this->displayName($uid);
+			$s = $this->service->updateShare($this->uid(), $id, $uid, $patch, $type);
+			$s['recipient_name'] = $this->recipientName($uid, $type);
 			return new JSONResponse($s);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
@@ -1020,8 +1080,9 @@ class ApiController extends Controller {
 	/** Remove a share (owner only). */
 	#[NoAdminRequired]
 	public function removeShare(int $id, string $uid): JSONResponse {
+		$type = ((string)$this->request->getParam('recipient_type', 'user') === 'group') ? 'group' : 'user';
 		try {
-			$this->service->removeShare($this->uid(), $id, $uid);
+			$this->service->removeShare($this->uid(), $id, $uid, $type);
 			return new JSONResponse(['ok' => true]);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();

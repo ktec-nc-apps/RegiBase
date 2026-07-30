@@ -64,6 +64,21 @@ class ImageService {
 		return implode('/', $parts);
 	}
 
+	/** Ensure a multi-segment Files-relative folder exists (e.g. "RegiBase/Cards"); returns it. */
+	private function ensurePath(string $userId, string $folderPath): Folder {
+		$dir = $this->rootFolder->getUserFolder($userId);
+		$path = $this->sanitizePath($folderPath);
+		if ($path === '') {
+			$path = self::DEFAULT_FOLDER;
+		}
+		foreach (explode('/', $path) as $seg) {
+			if ($seg !== '') {
+				$dir = $this->ensureFolder($dir, $seg);
+			}
+		}
+		return $dir;
+	}
+
 	private function ensureFolder(Folder $parent, string $name): Folder {
 		$name = $this->sanitizeName($name);
 		if ($parent->nodeExists($name)) {
@@ -81,10 +96,10 @@ class ImageService {
 	}
 
 	/**
-	 * Save a data URL into "<base>/<collectionName>/" and return the fileId.
+	 * Save a data URL into the given Files-relative folder and return the fileId.
 	 * @throws \RuntimeException on invalid data / unsupported type
 	 */
-	public function saveDataUrl(string $userId, string $collectionName, string $dataUrl): int {
+	public function saveDataUrl(string $userId, string $folderPath, string $dataUrl): int {
 		if (!preg_match('/^data:([^;]+);base64,(.+)$/s', $dataUrl, $m)) {
 			throw new \RuntimeException('The image data is invalid');
 		}
@@ -102,12 +117,7 @@ class ImageService {
 		}
 
 		try {
-			$userFolder = $this->rootFolder->getUserFolder($userId);
-			$base = $userFolder;
-			foreach (explode('/', $this->getBaseFolder($userId)) as $seg) {
-				$base = $this->ensureFolder($base, $seg);
-			}
-			$dir = $this->ensureFolder($base, $collectionName !== '' ? $collectionName : 'Uncategorized');
+			$dir = $this->ensurePath($userId, $folderPath);
 
 			$name = 'image-' . bin2hex(random_bytes(4)) . '.' . $ext;
 			while ($dir->nodeExists($name)) {
@@ -177,7 +187,7 @@ class ImageService {
 	 * "<base>/<collectionName>/" keeping its original filename. Returns fileId + name.
 	 * @return array{id: int, name: string}
 	 */
-	public function saveDocument(string $userId, string $collectionName, string $filename, string $base64): array {
+	public function saveDocument(string $userId, string $folderPath, string $filename, string $base64): array {
 		$name = $this->safeFilename($filename);
 		$ext = $this->extOf($name);
 		if (!isset(self::DOC_EXT[$ext])) {
@@ -191,11 +201,7 @@ class ImageService {
 			throw new \RuntimeException('The file is too large (max 50MB)');
 		}
 		try {
-			$dir = $this->rootFolder->getUserFolder($userId);
-			foreach (explode('/', $this->getBaseFolder($userId)) as $seg) {
-				$dir = $this->ensureFolder($dir, $seg);
-			}
-			$dir = $this->ensureFolder($dir, $collectionName !== '' ? $collectionName : 'Uncategorized');
+			$dir = $this->ensurePath($userId, $folderPath);
 			$stem = substr($name, 0, strlen($name) - strlen($ext) - 1);
 			$fname = $name;
 			$n = 2;

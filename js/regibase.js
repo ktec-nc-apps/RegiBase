@@ -330,7 +330,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <template v-if="current">
         <div class="topbar-actions">
           <div class="viewswitch">
-            <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: current.view===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
+            <button v-for="v in views" :key="v.key" class="vbtn" :class="{on: curView===v.key}" :title="t(v.label)" @click="setView(v.key)" v-html="v.icon"></button>
           </div>
           <button v-if="isOwner && !isLocked" class="btn sm" @click="openSchemaEditor" :title="t('Edit fields (form)')">{{ t('🧩 Edit collection') }}</button>
           <button class="btn sm" @click="openCollSettings" :title="t('Collection name, description, color, etc.')">{{ t('⚙️ Collection settings') }}</button>
@@ -340,7 +340,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       </template>
     </div>
 
-    <div class="content" :class="{'content-table': current && current.view==='table' && records.length}" @scroll="onScrollNearBottom">
+    <div class="content" :class="{'content-table': current && curView==='table' && records.length}" @scroll="onScrollNearBottom">
       <div v-if="!current" class="home">
         <div v-if="collections.length" class="home-grid">
           <button v-for="c in collections" :key="c.id" class="home-card" @click="selectCollection(c.id)">
@@ -434,45 +434,30 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
         <template v-else>
           <!-- カード型 -->
-          <div v-if="current.view==='card'" class="rec-grid">
+          <div v-if="curView==='card'" class="rec-grid">
             <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap card" :class="{sel: isSelected(r.id)}">
               <input type="checkbox" class="rec-check" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
               <button class="rec-copy" @click.stop="copyRecord(r)" :title="t('Copy the whole card')">⧉</button>
               <button class="rec-card" @click="openRecord(r)">
                 <div class="rt">{{ r.title }}</div>
-                <div class="rl"><span>{{ subtitle(r) }}</span></div>
+                <div class="rl"><span>{{ summary(r) }}</span></div>
               </button>
             </div>
           </div>
-          <!-- リスト型 -->
-          <div v-else-if="current.view==='list'" class="rec-list">
+          <!-- リスト型（既定・detail/image からのフォールバック先） -->
+          <div v-else-if="curView==='list'" class="rec-list">
             <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap row" :class="{sel: isSelected(r.id)}">
               <input type="checkbox" class="rec-check inline" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
               <button class="rec-row" @click="openRecord(r)">
                 <span class="rr-title">{{ r.title }}</span>
-                <span class="rr-sub">{{ subtitle(r) }}</span>
+                <span class="rr-sub">{{ summary(r) }}</span>
                 <span class="rr-chev">›</span>
               </button>
               <button class="rec-copy inline" @click.stop="copyRecord(r)" :title="t('Copy the whole card')">⧉</button>
             </div>
           </div>
-          <!-- リスト詳細型 -->
-          <div v-else-if="current.view==='detail'" class="rec-dlist">
-            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap row" :class="{sel: isSelected(r.id)}">
-              <input type="checkbox" class="rec-check inline" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
-              <button class="rec-drow" @click="openRecord(r)">
-                <div class="rr-title">{{ r.title }}</div>
-                <div class="rr-fields">
-                  <span v-for="col in listGroups" :key="col.id" v-show="colText(r, col)!==''" class="rr-field">
-                    <b>{{ col.label }}:</b> {{ colText(r, col) }}
-                  </span>
-                </div>
-              </button>
-              <button class="rec-copy inline" @click.stop="copyRecord(r)" :title="t('Copy the whole card')">⧉</button>
-            </div>
-          </div>
           <!-- 表計算型（左端の項目を固定／2列目以降はドラッグで横スクロール） -->
-          <div v-else-if="current.view==='table'" class="rec-table-wrap" :class="{dragging: tableDrag.active}"
+          <div v-else-if="curView==='table'" class="rec-table-wrap" :class="{dragging: tableDrag.active}"
                @scroll="onScrollNearBottom"
                @pointerdown="tableDown" @pointermove="tableMove" @pointerup="tableUp" @pointercancel="tableUp">
             <table class="rec-table">
@@ -500,18 +485,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
                 </tr>
               </tbody>
             </table>
-          </div>
-          <!-- 画像リスト型 -->
-          <div v-else class="rec-imggrid">
-            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap img" :class="{sel: isSelected(r.id)}">
-              <input type="checkbox" class="rec-check" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
-              <button class="rec-copy" @click.stop="copyRecord(r)" :title="t('Copy the whole card')">⧉</button>
-              <button class="rec-imgcard" @click="openRecord(r)">
-                <div class="thumb"><img v-if="imageSrc(r)" :src="imageSrc(r)" loading="lazy" /><span v-else class="noimg">{{ current.icon }}</span></div>
-                <div class="rr-title">{{ r.title }}</div>
-                <div class="rr-sub">{{ subtitle(r) }}</div>
-              </button>
-            </div>
           </div>
         </template>
       </template>
@@ -555,6 +528,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     <form class="modal" @submit.prevent="saveRecord">
       <div class="modal-head"><h3>{{ editingRecordId ? t('Edit record') : t('New record') }}</h3><button type="button" class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
+        <div v-if="attachWarn" style="font-size:13px;background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);padding:8px 10px;border-radius:8px;margin-bottom:12px">⚠️ {{ t('Please set a save folder for images and files in this collection’s settings.') }}</div>
         <div v-for="f in current.fields" :key="f.key" class="field">
           <label>{{ f.label }} <span v-if="f.required" class="req">*</span> <span v-if="f.secret" class="chip">{{ t('Secret') }}</span></label>
           <textarea v-if="f.type==='textarea'" v-model="form[f.key]" :placeholder="f.placeholder||''" :maxlength="ruleMax(f)"></textarea>
@@ -752,6 +726,11 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" :checked="f.is_title" @change="setTitleField(i)" /> {{ t('🏷️ Emphasis') }}</label>
             <label><input type="checkbox" v-model="f.required" /> {{ t('Required') }}</label>
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
+            <span v-if="!f.is_title && !f.secret && f.type!=='image' && f.type!=='image_crop' && f.type!=='file' && !concatSourceLabel(f)" class="show-flags">{{ t('Show in') }}:
+              <label><input type="checkbox" v-model="f.list_show" /> {{ t('List') }}</label>
+              <label><input type="checkbox" v-model="f.table_show" /> {{ t('Table') }}</label>
+              <label><input type="checkbox" v-model="f.card_show" /> {{ t('Cards') }}</label>
+            </span>
             <span v-if="concatSourceLabel(f)" class="concat-base">🔗 {{ t('Concatenated from') }}: {{ concatSourceLabel(f) }}</span>
             <label>🔗 {{ t('Concatenate with') }} <select :value="f._cnext||0" @change="f._cnext = Number($event.target.value)"><option :value="0">{{ t('Do not concatenate') }}</option><template v-for="g in concatTargets(f)" :key="g._uid"><option :value="g._uid">{{ g.label }}</option></template></select></label>
             <label v-if="f._cnext" class="concat-sep-inline">{{ t('Separator') }} <select v-model="f._csep"><option value="none">{{ t('None') }}</option><option value="space">{{ t('Half-width space') }}</option><option v-if="isCjkUi || f._csep==='fullspace'" value="fullspace">{{ t('Full-width space') }}</option><option value="custom">{{ t('Custom symbol') }}</option><option value="paren">{{ t('Half-width parentheses ( )') }}</option><option v-if="isCjkUi || f._csep==='parenfull'" value="parenfull">{{ t('Full-width parentheses （ ）') }}</option></select><input v-if="f._csep==='custom'" v-model="f._csepChar" maxlength="4" :placeholder="t('e.g. / , -')" style="width:70px;margin-left:4px" /></label>
@@ -849,6 +828,26 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
         </div>
 
+        <div class="field">
+          <label>📁 {{ t('Attachment folder (this collection)') }}</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input v-model="collForm.files_folder" :placeholder="t('e.g. RegiBase/Cards')" spellcheck="false" autocorrect="off" autocapitalize="off" style="flex:1;min-width:0" />
+            <button type="button" class="btn sm" @click="openFolderPicker()">📁 {{ t('Browse…') }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Folder (under Files) where this collection’s images and files are saved. Type a path or use Browse. Default: RegiBase/collection name. If left blank, editing a record warns you to set it.') }}</div>
+        </div>
+        <div class="field">
+          <label>🌐 {{ t('Map service (this collection)') }}</label>
+          <select v-model="collForm.map_provider">
+            <option value="">{{ t('Default (Google Maps)') }}</option>
+            <option value="google">{{ t('Google Maps') }}</option>
+            <option value="yahoo">{{ t('Yahoo! Maps (Japan)') }}</option>
+            <option value="osm">{{ t('OpenStreetMap') }}</option>
+            <option value="apple">{{ t('Apple Maps') }}</option>
+            <option value="bing">{{ t('Bing Maps') }}</option>
+          </select>
+        </div>
+
         </template>
 
         <div v-if="isOwner" class="field">
@@ -860,15 +859,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         </div>
 
         <div v-if="isOwner" class="field share-section" :class="{open: shareExpanded}">
-          <button type="button" class="share-toggle" :aria-expanded="shareExpanded ? 'true' : 'false'" @click="shareExpanded = !shareExpanded">
-            <span class="share-toggle-label">👥 {{ t('Share settings') }}</span>
-            <span class="share-hint"><span class="share-caret">{{ shareExpanded ? '▼' : '▶' }}</span><span v-if="!shareExpanded" class="share-hint-text">{{ t('Click to expand') }}</span></span>
+          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="shareExpanded" style="width:18px;height:18px" />
+            <span>👥 {{ t('Share settings') }}</span>
             <span v-if="sharePanel.shares.length" class="share-count">{{ sharePanel.shares.length }}</span>
-          </button>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Turn on to share this collection with other users, or to review and change existing shares.') }}</div>
           <div v-show="shareExpanded" class="share-body">
           <div v-if="sharePanel.shares.length" class="share-list">
-            <div v-for="s in sharePanel.shares" :key="s.recipient_uid" class="share-row">
-              <span class="share-user">{{ s.recipient_name || s.recipient_uid }}</span>
+            <div v-for="s in sharePanel.shares" :key="(s.recipient_type||'user') + ':' + s.recipient_uid" class="share-row">
+              <span class="share-user">{{ s.recipient_type === 'group' ? '👥' : '👤' }} {{ s.recipient_name || s.recipient_uid }}</span>
               <select class="share-perm" :value="s.perm" @change="changeSharePerm(s, $event.target.value)">
                 <option value="view">{{ t('View') }}</option>
                 <option value="edit">{{ t('Edit') }}</option>
@@ -882,13 +882,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div class="share-add">
             <div class="share-top">
               <div v-if="!sharePanel.recipient" class="share-search">
-                <input v-model="sharePanel.q" @input="searchShareUsers" :placeholder="t('Search users to share with…')" autocomplete="off" />
+                <input v-model="sharePanel.q" @input="searchShareUsers" :placeholder="t('Search users or groups to share with…')" autocomplete="off" />
                 <div v-if="sharePanel.results.length" class="share-results">
-                  <button type="button" v-for="u in sharePanel.results" :key="u.uid" class="share-result" @click="pickShareUser(u)">{{ u.name }} <span class="muted">({{ u.uid }})</span></button>
+                  <button type="button" v-for="u in sharePanel.results" :key="(u.type||'user') + ':' + u.uid" class="share-result" @click="pickShareUser(u)">{{ u.type === 'group' ? '👥' : '👤' }} {{ u.name }} <span class="muted">({{ u.uid }})</span></button>
                 </div>
               </div>
               <div v-else class="share-picked">
-                <span class="share-user">{{ sharePanel.recipientName }} <span class="muted">({{ sharePanel.recipient }})</span></span>
+                <span class="share-user">{{ sharePanel.recipientType === 'group' ? '👥' : '👤' }} {{ sharePanel.recipientName }} <span class="muted">({{ sharePanel.recipient }})</span></span>
                 <button type="button" class="icon-btn" @click="clearShareRecipient">✕</button>
               </div>
               <div class="perm-wrap" :class="{open: permOpen}" :title="t('Permission')" @click.stop="permOpen = !permOpen">
@@ -952,6 +952,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <span style="font-size:13px;color:var(--muted)">{{ t('changes') }}</span>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)') }}</div>
+        </div>
+
+        <div class="field">
+          <label>🎲 {{ t('Password generator defaults') }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn sm" @click="openPwGenDefaults()">{{ t('Set default values') }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The length, character types and options used when you open the 🎲 generator. Applies to every collection.') }}</div>
         </div>
       </div>
       <div class="modal-foot">
@@ -1185,11 +1193,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </select>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The display language switches when you press “Save”.') }}</div>
         </div>
-        <div class="field" style="margin-top:16px">
-          <label>📁 {{ t('Folder for images and files (path relative to your Files root)') }}</label>
-          <input v-model="settingsForm.files_folder" placeholder="RegiBase" />
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A subfolder is created per collection and files are stored in plain text. You can also view them in the Files app.') }}<br><code>{{ (settingsForm.files_folder || 'RegiBase') }}/…/</code></div>
-        </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>{{ t('🔒 Encryption (secret fields) — optional') }}</label>
           <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
@@ -1213,15 +1216,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <b>{{ t('Disabled (default)') }}</b>{{ t(': Secret fields are stored in plain text. If you enable it, secret fields are encrypted with your master key and become unreadable even to the server and the administrator.') }}
             <div style="margin-top:8px"><button type="button" class="btn sm primary" @click="openEncSetup">{{ t('Set master key') }}</button></div>
           </div>
-        </div>
-        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>🌐 {{ t('Map service (for address links)') }}</label>
-          <select v-model="settingsForm.map_provider">
-            <option value="google">{{ t('Google Maps') }}</option>
-            <option value="osm">{{ t('OpenStreetMap') }}</option>
-            <option value="apple">{{ t('Apple Maps') }}</option>
-          </select>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🌐 button on address fields opens the value in this map service.') }}</div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>💾 {{ t('Backup / Restore') }}</label>
@@ -1468,7 +1462,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
   <!-- ファイル選択（自前ブラウザ：未選択では「選択」を押せない） -->
   <div v-if="filePicker.open" class="modal-mask cropper-mask" @click.self="fpCancel()">
     <div class="modal">
-      <div class="modal-head"><h3>📂 {{ filePicker.mode==='image' ? t('Choose an image') : t('Choose a file') }}</h3><button class="icon-btn" @click="fpCancel()">✕</button></div>
+      <div class="modal-head"><h3>📂 {{ filePicker.mode==='folder' ? t('Choose a folder') : (filePicker.mode==='image' ? t('Choose an image') : t('Choose a file')) }}</h3><button class="icon-btn" @click="fpCancel()">✕</button></div>
       <div class="modal-body">
         <div class="fp-path">
           <button type="button" class="btn sm" :disabled="filePicker.parent===null || filePicker.loading" @click="fpUp()">{{ t('⬆ Up') }}</button>
@@ -1488,7 +1482,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       </div>
       <div class="modal-foot">
         <button type="button" class="btn" @click="fpCancel()">{{ t('Cancel') }}</button>
-        <button type="button" class="btn primary" :disabled="!filePicker.selected" @click="fpConfirm()">{{ t('Select') }}</button>
+        <button v-if="filePicker.mode==='folder'" type="button" class="btn primary" @click="fpConfirmFolder()">{{ t('Select this folder') }}</button>
+        <button v-else type="button" class="btn primary" :disabled="!filePicker.selected" @click="fpConfirm()">{{ t('Select') }}</button>
       </div>
     </div>
   </div>
@@ -1521,7 +1516,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
   <template v-if="pwgen.open">
     <div class="emoji-backdrop" @click="closePwGen()"></div>
     <div class="pwgen-popup" @click.stop>
-      <div class="pwgen-head"><span>🎲 {{ t('Password generator') }}</span><button type="button" class="icon-btn" @click="closePwGen()">✕</button></div>
+      <div class="pwgen-head"><span>🎲 {{ t(pwgen.target === 'defaults' ? 'Password generator defaults' : 'Password generator') }}</span><button type="button" class="icon-btn" @click="closePwGen()">✕</button></div>
       <div class="pwgen-out">
         <input class="pwgen-val" v-model="pwgen.value" spellcheck="false" autocorrect="off" autocapitalize="off"
                autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" />
@@ -1531,7 +1526,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="pwgen-meter"><div class="pwgen-bar" :class="pwgenStrength.cls" :style="{width: pwgenStrength.pct + '%'}"></div></div>
       <div class="pwgen-strength">
         <span :class="pwgenStrength.cls">{{ t(pwgenStrength.label) }}</span>
-        <span class="muted">{{ t('{bits} bits of entropy', {bits: pwgenStrength.bits}) }}</span>
+        <span class="muted">{{ t('{bits} bits of entropy', {bits: pwgenStrength.bits}) }}<span v-if="pwgenCombos"> {{ pwgenCombos }}</span></span>
       </div>
       <div class="pwgen-row">
         <span class="sub">{{ t('Length') }}</span>
@@ -1569,6 +1564,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </div>
         </div>
         <div class="pwgen-opts">
+          <label :class="{dis: !pwgenFirstAlphaUsable}">
+            <input type="checkbox" v-model="pwgen.firstAlpha" :disabled="!pwgenFirstAlphaUsable" @change="pwgenMake()" /> {{ t('Start the first character with a letter (not a digit or symbol)') }}
+          </label>
           <label :class="{dis: !pwgenLookalikeUsable}">
             <input type="checkbox" v-model="pwgen.noLookalike" :disabled="!pwgenLookalikeUsable" @change="pwgenReconcile(); pwgenMake()" /> {{ t('Exclude look-alike characters (0 O 1 l I |)') }}
           </label>
@@ -1578,7 +1576,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div v-if="pwgen.err" class="pwgen-err">⚠️ {{ pwgen.err }}</div>
       <div class="pwgen-foot">
         <button type="button" class="btn sm" @click="closePwGen()">{{ t('Cancel') }}</button>
-        <button type="button" class="btn sm primary" :disabled="!pwgen.value" @click="pwgenApply()">{{ t('Use this password') }}</button>
+        <button type="button" class="btn sm primary" :disabled="!pwgen.value" @click="pwgenApply()">{{ t(pwgen.target === 'defaults' ? 'Save as defaults' : 'Use this password') }}</button>
       </div>
     </div>
   </template>
@@ -1598,7 +1596,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         schemaMode: 'collection',
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
-        collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '' },
+        collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '', files_folder: '', map_provider: '' },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100 },
         undoTop: null, history: [],
         schemaSep: 'space', schemaSepChar: '',
@@ -1615,7 +1613,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         enc: { enabled: false, unlocked: false, salt: '', verifier: '' },
         openDecrypted: {},
         // internal sharing (owner-side panel inside collection settings)
-        sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false },
+        sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false },
         // recipient-side unlock prompt for a password-protected shared collection
         shareUnlock: { open: false, cid: null, name: '', hasSecrets: false, password: '', err: '', busy: false, next: null },
         // reactive mirror of sharedKeys presence (cid -> true) so the UI reacts to unlock
@@ -1632,11 +1630,11 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         // `symbolSet` is exactly which symbols may appear (chosen from PWGEN_SETS.symbols).
         pwgen: {
           open: false, target: null, field: null, value: '', err: '', capWarn: false,
-          len: 20, prefLen: 20,
-          upper: true, lower: true, digits: true, symbols: true,
-          min: { upper: 1, lower: 1, digits: 1, symbols: 1 },
+          len: 12, prefLen: 12,
+          upper: true, lower: true, digits: true, symbols: false,
+          min: { upper: 2, lower: 2, digits: 2, symbols: 2 },
           max: { upper: null, lower: null, digits: null, symbols: null },
-          symbolSet: PWGEN_SETS.symbols, noLookalike: true, loaded: false,
+          symbolSet: PWGEN_SETS.symbols, noLookalike: true, firstAlpha: true, loaded: false,
         },
         shareExpanded: false,
         unlockKey: '', unlockErr: '', unlockRemember: true,
@@ -1649,10 +1647,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         importColl: { name: '', icon: '', color: '' }, importCols: [], importBusy: false,
         views: [
           { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
-          { key: 'detail', label: 'Detailed list', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
-          { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17"/><path d="M12 3.5v17M3.5 12h17"/></svg>' },
+          { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
           { key: 'card', label: 'Cards', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7.4" height="7.4"/><rect x="13.1" y="3.5" width="7.4" height="7.4"/><rect x="3.5" y="13.1" width="7.4" height="7.4"/><rect x="13.1" y="13.1" width="7.4" height="7.4"/></svg>' },
-          { key: 'image', label: 'Cards with thumbnails', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17"/><rect x="6" y="6" width="6.4" height="6.4" fill="currentColor" stroke="none"/><path stroke-width="1.6" stroke-linecap="round" d="M14.6 7h3.9M14.6 10h3.9M6 15h12.5M6 18h12.5"/></svg>' },
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
@@ -1700,6 +1696,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       // ---- sharing permissions for the current collection ----
       curPerm() { return this.current ? (this.current.perm || 'owner') : 'owner'; },
+      // Effective view. Only card / list / table remain; any older stored value
+      // (detailed list, thumbnail cards) falls back to the plain list.
+      curView() { const v = this.current ? this.current.view : 'list'; return (v === 'card' || v === 'table') ? v : 'list'; },
       isOwner() { return this.current ? this.current.is_owner !== false : true; },
       // Edit lock: when a collection is locked it is view-only for everyone
       // (owner included). Only collection settings can still be changed — that's
@@ -1707,9 +1706,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       isLocked() { return !!(this.current && this.current.locked); },
       canEdit() { return !this.isLocked && ['owner', 'edit', 'delete'].includes(this.curPerm); },
       canDelete() { return !this.isLocked && ['owner', 'delete'].includes(this.curPerm); },
-      // editing collection settings/title needs ownership or the 'delete' level
-      canSettings() { return ['owner', 'delete'].includes(this.curPerm); },
+      // editing collection settings/title is owner-only; share recipients (even
+      // at the 'delete' level) cannot change them
+      canSettings() { return this.isOwner; },
       collectionHasSecret() { return !!(this.current && this.current.fields && this.current.fields.some((f) => f.secret)); },
+      // Warn in the record editor when this collection has image/file fields but no
+      // save folder set (the user cleared it). Attachments cannot be saved until set.
+      attachWarn() {
+        if (!this.current || String(this.current.files_folder || '').trim() !== '') return false;
+        return (this.current.fields || []).some((f) => f.type === 'image' || f.type === 'image_crop' || f.type === 'file');
+      },
       // recipient viewing a shared collection whose secrets were not shared/unlocked
       secretsMasked() { return !!(this.current && this.current.is_owner === false && !this.secretUnlocked[this.current.id]); },
       shareAccessNote() {
@@ -1752,22 +1758,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!this.current) return [];
         return this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file').slice(0, 4);
       },
-      // Detailed-list "label: value" items, with concat groups merged into one item.
-      listGroups() {
-        if (!this.current) return [];
-        const eligible = this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file');
-        const groups = {};
-        eligible.forEach((f) => { const g = f.concat || 0; if (g) (groups[g] = groups[g] || []).push(f); });
-        const used = new Set();
-        const cols = [];
-        for (const f of eligible) {
-          if (used.has(f.key)) continue;
-          const g = f.concat || 0;
-          if (g) { const m = groups[g]; m.forEach((x) => used.add(x.key)); cols.push({ kind: 'concat', id: '__c' + g, members: m, label: m.map((x) => x.label).join(' / ') }); }
-          else { used.add(f.key); cols.push({ kind: 'field', id: f.key, field: f, label: f.label }); }
-        }
-        return cols.slice(0, 4);
-      },
+      // Fields for the list summary (list_show) and card summary (card_show).
+      listGroups() { return this.buildSummaryGroups('list_show'); },
+      cardGroups() { return this.buildSummaryGroups('card_show'); },
       // Fields that can be used to sort the registration order (values must be
       // readable/comparable: no encrypted secrets, no attachment references).
       reorderFields() {
@@ -1831,7 +1824,18 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       // group id) are combined into one column and pulled to the front, ordered by
       // group number; then the remaining ungrouped fields follow in field order.
       tableColumns() {
-        const fields = this.current ? this.current.fields.slice() : [];
+        const ATT = ['image', 'image_crop', 'file'];
+        const all = this.current ? this.current.fields : [];
+        const isDisp = (f) => !f.is_title && !f.secret && !ATT.includes(f.type);
+        // For a concat group the LEADING member (連結元) governs Table visibility.
+        const hiddenGroups = new Set(); const seenGroup = {};
+        for (const f of all) { const g = f.concat || 0; if (g && seenGroup[g] === undefined) { seenGroup[g] = true; if (isDisp(f) && f.table_show === false) hiddenGroups.add(g); } }
+        // Hide a plain field when its Table flag is off; hide a concat group when its
+        // 連結元 is off. Title / secret / attachment (standalone) always show.
+        const fields = all.filter((f) => {
+          const g = f.concat || 0;
+          return g ? !hiddenGroups.has(g) : !(isDisp(f) && f.table_show === false);
+        });
         if (!fields.length) return [];
         const used = new Set();
         const cols = [];
@@ -1950,7 +1954,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       // hard bounds on total length, from the field rule (never below sum of the mins)
       pwgenHardMin() { const o = this.pwgenRule; return Math.max(1, (o && o.min) ? o.min : 1); },
-      pwgenHardMax() { const o = this.pwgenRule; return Math.max(this.pwgenHardMin, Math.min(128, (o && o.max) ? o.max : 128)); },
+      pwgenHardMax() { const o = this.pwgenRule; return Math.max(this.pwgenHardMin, Math.min(30, (o && o.max) ? o.max : 30)); },
       pwgenMinSum() { return this.pwgenActive.reduce((s, c) => s + (Number(this.pwgen.min[c.k]) || 0), 0); },
       pwgenMaxSum() {
         // sum of caps; a class with no cap contributes the whole length budget
@@ -1973,6 +1977,30 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         else if (bits >= 90) { cls = 'w3'; label = 'Strong'; }
         else if (bits >= 60) { cls = 'w2'; label = 'Fair'; }
         return { bits, cls, label, pct: Math.max(3, Math.min(100, Math.round((bits / 128) * 100))) };
+      },
+      // Whether "first character is a letter" can apply: at least one letter class is active.
+      pwgenFirstAlphaUsable() { return this.pwgenActive.some((c) => c.k === 'upper' || c.k === 'lower'); },
+      // Approximate number of possible passwords, shown in parentheses after the entropy.
+      // Japanese UI gets myriad units (億/兆/垓…); other locales get a compact ×10ⁿ form.
+      pwgenCombos() {
+        let pool = 0;
+        for (const c of this.pwgenActive) pool += c.set.length;
+        if (this.pwgenIsHex) pool = 16;
+        const len = (this.pwgen.value || '').length;
+        if (pool < 2 || len < 1) return '';
+        const combos = Math.pow(pool, len);
+        if (!isFinite(combos) || combos < 2) return '';
+        void this.locale; // re-evaluate when the in-app language changes
+        let lang = (this.settingsForm && this.settingsForm.language) || 'auto';
+        if (lang === 'auto') {
+          lang = (typeof OC !== 'undefined' && OC.getLanguage && OC.getLanguage())
+            || (document.documentElement && document.documentElement.lang) || 'en';
+        }
+        if (/^ja/.test(String(lang).toLowerCase())) return '（' + this.pwgenJaMyriad(combos) + '）';
+        const exp = Math.floor(Math.log10(combos));
+        const mant = combos / Math.pow(10, exp);
+        const sup = String(exp).split('').map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d] || d).join('');
+        return '(≈ ' + mant.toFixed(1) + '×10' + sup + ')';
       },
       pwgenNote() { return this.pwgen.field ? this.ruleHint(this.pwgen.field) : ''; },
     },
@@ -2044,6 +2072,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         return move ? T('Move {n} items', { n }) : T('Copy {n} items', { n });
       },
       async boot() {
+        // Fire the collections request up front so it overlaps with settings /
+        // language loading instead of waiting for them (one fewer round-trip on boot).
+        const collectionsP = api('collections').catch(() => null);
         try {
           const s = await api('settings'); this.settingsForm = s; this.theme = s.theme || 'auto';
           if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false, calendar: s.apps.calendar !== false };
@@ -2062,7 +2093,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         } catch (e) { /* ignore */ }
         // templates power only the "New collection" picker; fetch them lazily
         // when that picker opens so the home screen appears as soon as collections load.
-        await this.loadCollections();
+        const cols = await collectionsP;
+        if (cols) { this.collections = cols; this.refreshUndo(); } else { await this.loadCollections(); }
       },
       // ---- theme (follow Nextcloud, or force dark/light) ----
       parseColor(s) {
@@ -2461,6 +2493,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       fpSelectable(x) {
         if (x.is_dir) return false;
+        if (this.filePicker.mode === 'folder') return false; // folder mode: pick a location, not a file
         if (this.filePicker.mode === 'image') return !!x.is_image;
         const ext = (x.name.split('.').pop() || '').toLowerCase();
         return ['pdf', 'odt', 'ods', 'odp', 'docx', 'xlsx', 'md', 'txt'].includes(ext);
@@ -2479,6 +2512,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       fpClick(x) { if (x.is_dir) this.fpLoad(x.path); else this.filePicker.selected = x; },
       fpDbl(x) { if (!x.is_dir) { this.filePicker.selected = x; this.fpConfirm(); } },
       fpCancel() { this.filePicker.open = false; this.filePicker.selected = null; },
+      // Browse Files to pick this collection's attachment folder (fills collForm.files_folder).
+      openFolderPicker() {
+        this.filePicker = { open: true, field: null, mode: 'folder', path: '', parent: null, entries: [], selected: null, loading: true, error: '' };
+        this.fpLoad('');
+      },
+      fpConfirmFolder() {
+        this.collForm.files_folder = this.filePicker.path || '';
+        this.filePicker.open = false;
+      },
       async fpConfirm() {
         const x = this.filePicker.selected;
         if (!x || x.is_dir) return;
@@ -2988,8 +3030,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (push) this.pushNav({ cid: null });
       },
       openCollSettings() {
-        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '' };
-        this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
+        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '', files_folder: this.current.files_folder || '', map_provider: this.current.map_provider || '' };
+        this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
         this.iconPickerOpen = false;
@@ -3030,8 +3072,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       shareBadge(c) { if (!c) return ''; if (c.shared_by_me) return '🔗'; if (c.shared_with_me) return '👥'; return ''; },
       shareBadgeTitle(c) { if (!c) return ''; if (c.shared_by_me) return T('Shared by you'); if (c.shared_with_me) return T('Shared with you'); return ''; },
       async loadShares() {
-        try { const r = await api('collections/' + this.current.id + '/shares'); this.sharePanel.shares = r.shares || []; }
-        catch (e) { /* not owner or none */ }
+        try {
+          const r = await api('collections/' + this.current.id + '/shares');
+          this.sharePanel.shares = r.shares || [];
+          // Already-shared collection: start expanded (checkbox on), like the edit-lock state
+          if (this.sharePanel.shares.length) this.shareExpanded = true;
+        } catch (e) { /* not owner or none */ }
       },
       async searchShareUsers() {
         const q = this.sharePanel.q.trim();
@@ -3039,13 +3085,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.sharePanel.searching = true;
         try {
           const r = await api('users/search?q=' + encodeURIComponent(q));
-          const already = new Set(this.sharePanel.shares.map((s) => s.recipient_uid));
-          this.sharePanel.results = (r.users || []).filter((u) => !already.has(u.uid));
+          const already = new Set(this.sharePanel.shares.map((s) => (s.recipient_type || 'user') + ':' + s.recipient_uid));
+          const all = [...(r.users || []), ...(r.groups || [])];
+          this.sharePanel.results = all.filter((u) => !already.has((u.type || 'user') + ':' + u.uid));
         } catch (e) { this.sharePanel.results = []; }
         finally { this.sharePanel.searching = false; }
       },
-      pickShareUser(u) { this.sharePanel.recipient = u.uid; this.sharePanel.recipientName = u.name; this.sharePanel.results = []; this.sharePanel.q = ''; },
-      clearShareRecipient() { this.sharePanel.recipient = null; this.sharePanel.recipientName = ''; },
+      pickShareUser(u) { this.sharePanel.recipient = u.uid; this.sharePanel.recipientName = u.name; this.sharePanel.recipientType = u.type || 'user'; this.sharePanel.results = []; this.sharePanel.q = ''; },
+      clearShareRecipient() { this.sharePanel.recipient = null; this.sharePanel.recipientName = ''; this.sharePanel.recipientType = 'user'; },
       async addShare() {
         const sp = this.sharePanel;
         sp.err = '';
@@ -3063,7 +3110,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         }
         sp.busy = true;
         try {
-          const body = { recipient: sp.recipient, perm: sp.perm, password: sp.password || '' };
+          const body = { recipient: sp.recipient, recipient_type: sp.recipientType || 'user', perm: sp.perm, password: sp.password || '' };
           if (encKeyWrapped) { body.enc_key = encKeyWrapped; body.enc_salt = encSalt; }
           const s = await api('collections/' + this.current.id + '/shares', { method: 'POST', body: JSON.stringify(body) });
           this.sharePanel.shares.push(s);
@@ -3075,14 +3122,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         finally { sp.busy = false; }
       },
       async changeSharePerm(s, perm) {
-        try { const r = await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid), { method: 'PATCH', body: JSON.stringify({ perm }) }); s.perm = r.perm; }
+        const qs = '?recipient_type=' + encodeURIComponent(s.recipient_type || 'user');
+        try { const r = await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid) + qs, { method: 'PATCH', body: JSON.stringify({ perm }) }); s.perm = r.perm; }
         catch (e) { this.showToast(e.message || String(e)); }
       },
       async removeShare(s) {
         if (!confirm(T('Stop sharing with {name}?', { name: s.recipient_name || s.recipient_uid }))) return;
+        const type = s.recipient_type || 'user';
         try {
-          await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid), { method: 'DELETE' });
-          this.sharePanel.shares = this.sharePanel.shares.filter((x) => x.recipient_uid !== s.recipient_uid);
+          await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid) + '?recipient_type=' + encodeURIComponent(type), { method: 'DELETE' });
+          this.sharePanel.shares = this.sharePanel.shares.filter((x) => !(x.recipient_uid === s.recipient_uid && (x.recipient_type || 'user') === type));
           await this.loadCollections();
         } catch (e) { this.showToast(e.message || String(e)); }
       },
@@ -3142,6 +3191,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           const o = (f.options && typeof f.options === 'object' && !Array.isArray(f.options)) ? f.options : {};
           return {
             ...f,
+            list_show: f.list_show !== false,
+            table_show: f.table_show !== false,
+            card_show: f.card_show !== false,
             options: (CHOICE_TYPES.includes(f.type) && Array.isArray(f.options)) ? f.options.join('\n') : '',
             _orig: f.type === 'image' ? o.max === 0 : false,
             _max: (f.type === 'image' && o.max > 0) ? o.max : 1600,
@@ -3230,7 +3282,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           return {
             key: existing || freshKey(slug(f.label)),
             label: f.label.trim(), type: f.type, options,
-            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, concat: groupNum[f._uid] || 0,
+            required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, list_show: f.list_show !== false, table_show: f.table_show !== false, card_show: f.card_show !== false, concat: groupNum[f._uid] || 0,
             concat_sep: f._csep || 'space', concat_sep_char: f._csepChar || undefined, placeholder: f.placeholder || undefined,
           };
         });
@@ -3242,7 +3294,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.schemaSepChar = this.current.key_sep_char || '';
         this.modal = { type: 'schema' };
       },
-      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, concat: 0, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++, _cnext: 0, _csep: 'space', _csepChar: '' }); },
+      addSchemaField() { this.schemaFields.push({ key: '', label: '', type: 'text', options: '', required: false, secret: false, is_title: false, list_show: true, table_show: true, card_show: true, concat: 0, placeholder: '', _orig: false, _max: 1600, _ratio: '1:1', _out: 600, _format: 'jpeg', _charset: 'none', _pattern: '', _rmin: '', _rmax: '', _uid: this.uidCounter++, _cnext: 0, _csep: 'space', _csepChar: '' }); },
       removeSchemaField(i) { this.schemaFields.splice(i, 1); },
       moveField(i, d) { const j = i + d; if (j < 0 || j >= this.schemaFields.length) return; const a = this.schemaFields; [a[i], a[j]] = [a[j], a[i]]; },
       onFieldDragStart(i, e) {
@@ -3912,9 +3964,9 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!p.loaded) { // remembered options, like KeePass keeps its profile
           p.loaded = true;
           try {
-            const o = JSON.parse(localStorage.getItem('regibase.pwgen') || 'null');
+            const o = JSON.parse(localStorage.getItem('regibase.pwgen2') || 'null');
             if (o && typeof o === 'object') {
-              for (const k of PWGEN_CLASSES.concat('noLookalike')) if (typeof o[k] === 'boolean') p[k] = o[k];
+              for (const k of PWGEN_CLASSES.concat('noLookalike', 'firstAlpha')) if (typeof o[k] === 'boolean') p[k] = o[k];
               if (Number(o.len) > 0) p.prefLen = Number(o.len);
               if (o.min && typeof o.min === 'object') for (const k of PWGEN_CLASSES) if (Number.isFinite(Number(o.min[k]))) p.min[k] = Math.max(0, Math.floor(Number(o.min[k])));
               if (o.max && typeof o.max === 'object') for (const k of PWGEN_CLASSES) p.max[k] = (o.max[k] == null ? null : Math.max(0, Math.floor(Number(o.max[k]) || 0)));
@@ -3983,12 +4035,43 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         // caps so low that the length floor cannot be met (extreme misconfig)
         p.capWarn = this.pwgenMaxSum < lo;
       },
+      // Reorder so the first character is a letter (upper/lower), preserving every
+      // character-class count (it only swaps position 0 with another letter's slot).
+      pwgenEnforceFirstAlpha(s) {
+        const letters = (this.pwgen.upper ? this.pwgenClassSet('upper') : '') + (this.pwgen.lower ? this.pwgenClassSet('lower') : '');
+        if (!letters || !s) return s;
+        const isL = (ch) => letters.indexOf(ch) >= 0;
+        const arr = s.split('');
+        if (isL(arr[0])) return s;
+        for (let i = 1; i < arr.length; i++) {
+          if (isL(arr[i])) { const t = arr[0]; arr[0] = arr[i]; arr[i] = t; break; }
+        }
+        return arr.join('');
+      },
+      // Format a large count into rough Japanese myriad units (約…通り).
+      pwgenJaMyriad(n) {
+        const units = ['', '万', '億', '兆', '京', '垓', '秭', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
+        if (n < 10000) return '約' + Math.round(n).toLocaleString() + '通り';
+        let i = Math.floor(Math.log10(n) / 4);
+        if (i >= units.length) i = units.length - 1;
+        const topDiv = Math.pow(10, i * 4);
+        const topVal = Math.floor(n / topDiv);
+        let s = String(topVal) + units[i];
+        if (i >= 1) {
+          const secVal = Math.floor((n - topVal * topDiv) / Math.pow(10, (i - 1) * 4));
+          if (secVal > 0) s += String(secVal) + units[i - 1];
+        }
+        return '約' + s + '通り';
+      },
+      // Open the generator in "set defaults" mode (from Collection settings).
+      openPwGenDefaults() { this.openPwGen('defaults'); },
       pwgenMake() {
         const p = this.pwgen;
         if (this.pwgenIsHex) { p.value = makePassword([{ set: PWGEN_HEX, min: 0, cap: null }], p.len); p.err = ''; return; }
         const classes = this.pwgenActive.map((c) => ({ set: c.set, min: Number(p.min[c.k]) || 0, cap: p.max[c.k] == null ? null : Number(p.max[c.k]) }));
         if (!classes.length) { p.value = ''; p.err = T('Select at least one character type'); return; }
         p.value = makePassword(classes, p.len);
+        if (p.firstAlpha && this.pwgenFirstAlphaUsable) { p.value = this.pwgenEnforceFirstAlpha(p.value); }
         if (p.capWarn) { p.err = T('The maximum counts are too low for this length.'); return; }
         // a custom regex rule cannot be generated against — warn instead of silently failing on save
         p.err = (p.field && this.validateField(p.field, p.value)) ? T('This field has a format rule the generator cannot match. Please check the value.') : '';
@@ -3996,19 +4079,22 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       pwgenApply() {
         const p = this.pwgen;
         if (!p.value) return;
-        if (p.target === 'share') { this.sharePanel.password = p.value; }
-        else if (p.field) {
-          this.form[p.field.key] = p.value;
-          this.reveal = { ...this.reveal, [p.field.key]: true }; // show it once so it can be checked/copied
+        const defaultsMode = (p.target === 'defaults');
+        if (!defaultsMode) {
+          if (p.target === 'share') { this.sharePanel.password = p.value; }
+          else if (p.field) {
+            this.form[p.field.key] = p.value;
+            this.reveal = { ...this.reveal, [p.field.key]: true }; // show it once so it can be checked/copied
+          }
         }
         try {
-          localStorage.setItem('regibase.pwgen', JSON.stringify({
+          localStorage.setItem('regibase.pwgen2', JSON.stringify({
             len: p.prefLen, upper: p.upper, lower: p.lower, digits: p.digits, symbols: p.symbols,
-            noLookalike: p.noLookalike, min: p.min, max: p.max, symbolSet: p.symbolSet,
+            noLookalike: p.noLookalike, firstAlpha: p.firstAlpha, min: p.min, max: p.max, symbolSet: p.symbolSet,
           }));
         } catch (e) { /* prefs are a convenience only */ }
         this.closePwGen();
-        this.showToast(T('Password generated'));
+        this.showToast(defaultsMode ? T('Default values saved') : T('Password generated'));
       },
       toggleReveal(key) { this.reveal = { ...this.reveal, [key]: !this.reveal[key] }; },
       async copyVal(v) { try { await navigator.clipboard.writeText(String(v)); this.showToast(T('Copied')); } catch { this.showToast(T('Copy failed')); } },
@@ -4038,9 +4124,13 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       mapUrl(address) {
         const q = encodeURIComponent(String(address).trim());
         if (!q) return null;
-        switch (this.settingsForm && this.settingsForm.map_provider) {
+        // per-collection override wins; empty means the default (Google Maps)
+        const provider = (this.current && this.current.map_provider) || 'google';
+        switch (provider) {
+          case 'yahoo': return 'https://map.yahoo.co.jp/search?q=' + q;
           case 'osm': return 'https://www.openstreetmap.org/search?query=' + q;
           case 'apple': return 'https://maps.apple.com/?q=' + q;
+          case 'bing': return 'https://www.bing.com/maps?q=' + q;
           default: return 'https://www.google.com/maps/search/?api=1&query=' + q;
         }
       },
@@ -4068,7 +4158,44 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         }
         return null;
       },
-      subtitle(rec) { const f = this.current.fields.find((x) => !x.is_title && !x.secret && x.type !== 'image' && x.type !== 'image_crop' && x.type !== 'file' && rec.data[x.key]); return f ? String(rec.data[f.key]) : ''; },
+      // One-line summary for the compact views (list / card / image). Composed
+      // exactly like the table: concat groups are merged with their paren /
+      // separator settings, then the eligible values are joined into one line.
+      // (Replaces the old single-raw-field subtitle so concat & parentheses show.)
+      summary(rec) {
+        const groups = this.curView === 'card' ? this.cardGroups : this.listGroups;
+        const parts = [];
+        for (const col of groups) {
+          const t = this.colText(rec, col);
+          if (t !== '' && t != null) parts.push(t);
+        }
+        return parts.join(' · ');
+      },
+      // Fields for a summary line, filtered by the given per-view flag, with concat
+      // groups merged. Excludes title / secret / attachment (not text-representable).
+      buildSummaryGroups(flag) {
+        if (!this.current) return [];
+        // Don't pre-filter by the flag: for a concat group the LEADING member
+        // (連結元 — first in field order) governs the whole group's visibility,
+        // not each member individually (otherwise a 連結先 could control it).
+        const displayable = this.current.fields.filter((f) => !f.is_title && !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file');
+        const groups = {};
+        displayable.forEach((f) => { const g = f.concat || 0; if (g) (groups[g] = groups[g] || []).push(f); });
+        const used = new Set();
+        const cols = [];
+        for (const f of displayable) {
+          if (used.has(f.key)) continue;
+          const g = f.concat || 0;
+          if (g) {
+            const m = groups[g]; m.forEach((x) => used.add(x.key));
+            if (m[0][flag] !== false) cols.push({ kind: 'concat', id: '__c' + g, members: m, label: m.map((x) => x.label).join(' / ') });
+          } else {
+            used.add(f.key);
+            if (f[flag] !== false) cols.push({ kind: 'field', id: f.key, field: f, label: f.label });
+          }
+        }
+        return cols;
+      },
       showToast(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ''), 1900); },
       onSearchInput() { this.selectedIds = []; clearTimeout(this._s); this._s = setTimeout(() => this.loadRecords(), 250); },
       // Find & replace across the currently-matched records. Normal mode does a
@@ -4103,8 +4230,10 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.replaceBusy = true;
         const grp = 'replace-' + cid + '-' + (this.uidCounter++);
         try {
-          let n = 0;
-          for (const t of targets) { await api('records/' + t.id, { method: 'PUT', body: JSON.stringify({ data: t.data, _undoGroup: grp }) }); n++; }
+          // one request for the whole batch — the server updates every record in a
+          // single pass, instead of one HTTP round-trip per record.
+          const r = await api('collections/' + cid + '/records/bulk', { method: 'POST', body: JSON.stringify({ updates: targets, _undoGroup: grp }) });
+          const n = (r && typeof r.updated === 'number') ? r.updated : targets.length;
           this.showToast(T('Replaced in {n} record(s)', { n }));
           await this.loadRecords();
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }

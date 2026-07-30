@@ -13,6 +13,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setOwnerUid(string $v)
  * @method string getRecipientUid()
  * @method void setRecipientUid(string $v)
+ * @method string getRecipientType()
+ * @method void setRecipientType(string $v)
  * @method string getPerm()
  * @method void setPerm(string $v)
  * @method ?string getPwHash()
@@ -28,6 +30,7 @@ class ShareEntity extends Entity implements \JsonSerializable {
 	protected $collectionId = 0;
 	protected $ownerUid = '';
 	protected $recipientUid = '';
+	protected $recipientType = 'user';
 	protected $perm = 'view';
 	protected $pwHash = null;
 	protected $encKey = null;
@@ -44,6 +47,7 @@ class ShareEntity extends Entity implements \JsonSerializable {
 			'collection_id' => (int)$this->collectionId,
 			'owner_uid' => $this->ownerUid,
 			'recipient_uid' => $this->recipientUid,
+			'recipient_type' => $this->recipientType,
 			'perm' => $this->perm,
 			// never expose the hash or wrapped key material; only whether they exist
 			'has_password' => $this->pwHash !== null && $this->pwHash !== '',

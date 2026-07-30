@@ -2,6 +2,45 @@
 
 All notable changes to RegiBase.
 
+## 0.17.5 — 2026-07-30
+
+### Sharing
+
+- Collections can now be shared with **groups**, not only individual users (the picker searches both;
+  users and groups are shown with distinct icons).
+- Share recipients can no longer edit a collection's **fields or settings** (owner only). Their
+  record-level rights (view / edit / delete) are unchanged.
+
+### Per-collection settings
+
+- **Attachment folder per collection** — choose, by typing a path or browsing Files, where each
+  collection's images and files are saved. Default: `RegiBase/<collection name>`. The record editor
+  warns you if it is left blank.
+- **Map service per collection** — override the default per collection. Added **Yahoo! Maps (Japan)**
+  and **Bing Maps**. The old global folder and map settings were removed (now per collection; the map
+  default is Google Maps).
+
+### Views & fields
+
+- Per-field **Show in: List / Table / Cards** toggles — pick which fields appear in each view. For a
+  concatenated group, its leading field governs the whole group.
+- Removed the "detailed list" and "thumbnail cards" views; the list and card summaries now follow the
+  per-field toggles and show a concatenation/parentheses-aware one-line summary.
+
+### Password generator
+
+- New defaults: 12 characters, no symbols, at least 2 of each selected character type, maximum length 30.
+- New option "start the first character with a letter" (on by default); the approximate number of
+  possible passwords is shown after the entropy.
+- The generator defaults can be set from Collection settings.
+
+### Performance
+
+- **Find & replace** now applies every change in a single request instead of one request per record —
+  dramatically faster on large collections.
+- The bundled emoji font is no longer downloaded on devices that already have a colour-emoji font,
+  for a faster first load.
+
 ## 0.17.0 — 2026-07-30
 
 ### Encryption (master key)

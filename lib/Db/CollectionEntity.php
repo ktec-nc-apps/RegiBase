@@ -35,6 +35,10 @@ use OCP\AppFramework\Db\Entity;
  * @method void setKeySep(string $v)
  * @method string getKeySepChar()
  * @method void setKeySepChar(string $v)
+ * @method string getFilesFolder()
+ * @method void setFilesFolder(string $v)
+ * @method string getMapProvider()
+ * @method void setMapProvider(string $v)
  */
 class CollectionEntity extends Entity implements \JsonSerializable {
 	protected $userId = '';
@@ -49,6 +53,8 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 	protected $keyHead = false;
 	protected $keySep = 'space';
 	protected $keySepChar = '';
+	protected $filesFolder = '';
+	protected $mapProvider = '';
 	protected $createdAt = '';
 	protected $updatedAt = '';
 
@@ -71,6 +77,8 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 			'key_head' => (bool)$this->keyHead,
 			'key_sep' => $this->keySep,
 			'key_sep_char' => $this->keySepChar,
+			'files_folder' => $this->filesFolder ?? '',
+			'map_provider' => $this->mapProvider ?? '',
 			'created_at' => $this->createdAt,
 			'updated_at' => $this->updatedAt,
 		];

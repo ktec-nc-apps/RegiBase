@@ -6,7 +6,7 @@
 	<summary lang="ja">個人用データベース ― テンプレート・共有・暗号化・Tables連携・複数の表示形式に対応</summary>
 	<description><![CDATA[RegiBase is a lightweight personal database for the information you want to keep — credit cards, bank accounts, online accounts, memberships, licenses, contacts and anything else.
 
-Design your own fields (or start from a template), then browse records as a list, detailed list, spreadsheet-style table (with a frozen first column), cards, or an image gallery.
+Design your own fields (or start from a template), then browse records as a list, a spreadsheet-style table (with a frozen first column), or cards, and choose per field which of those views it appears in.
 
 RegiBase works together with your other Nextcloud apps — Contacts, Tables, Files, Notes and Calendar — using each one when it is installed.
 
@@ -14,19 +14,19 @@ Features:
 - Custom form fields with per-field input rules, built from reusable templates
 - Save your own templates, and edit the built-in ones (per-user override, resettable to default)
 - Duplicate a collection — optionally including all of its records
-- Share a collection with other Nextcloud users at three levels (view / edit / delete), with an optional access password and optional secret-field sharing
+- Share a collection with Nextcloud users or groups at three levels (view / edit / delete), with an optional access password and optional secret-field sharing
 - Optional client-side encryption (AES-GCM) for secret fields — the server never sees the key or the plaintext
 - Nextcloud Tables integration: import a table into a new collection, or export a collection to a new Tables table
 - Import from CSV / JSON (e.g. Google Password Manager), or from your Nextcloud Contacts (including photos)
 - Attach images and files from Nextcloud Files or Notes
-- Add reminders to Nextcloud Calendar from date fields, and open addresses in a map (Google Maps / OpenStreetMap / Apple Maps)
+- Add reminders to Nextcloud Calendar from date fields, and open addresses in a map (Google Maps / Yahoo! Maps / OpenStreetMap / Apple Maps / Bing Maps), configurable per collection
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
 - Command-line access via occ — list / get / export / find (with regex), plus master-key management (set / change / remove) — with opt-in secret decryption
 - Available in 12 languages]]></description>
 	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
 
-項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・リスト詳細・表計算風テーブル（先頭列固定）・カード・画像ギャラリーの各表示形式で閲覧できます。
+項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・表計算風テーブル（先頭列固定）・カードの表示形式で閲覧でき、項目ごとにどの表示に出すかを選べます。
 
 RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files・Notes・Calendar）と連携し、導入されているものを活用します。
 
@@ -34,17 +34,17 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - 項目ごとに入力規則を設定できるカスタムフォーム項目。再利用可能なテンプレートから作成
 - 自分のテンプレートを保存でき、初期テンプレートも編集可能（ユーザーごとの上書き、既定への復元も可能）
 - コレクションの複製（レコードを含めるかどうか選択可）
-- 他のNextcloudユーザーとのコレクション共有（閲覧／編集／削除の3段階、任意のアクセスパスワード、秘密項目の共有にも対応）
+- Nextcloudユーザーまたはグループとのコレクション共有（閲覧／編集／削除の3段階、任意のアクセスパスワード、秘密項目の共有にも対応）
 - 秘密項目のクライアント側暗号化（AES-GCM、任意）― サーバーは鍵も平文も一切関知しません
 - Nextcloud Tables連携 ― テーブルを新規コレクションとして取込、またはコレクションをTablesへ書出
 - CSV / JSON（Googleパスワードマネージャーのエクスポート等）や、Nextcloud連絡先（写真含む）からのインポート
 - Nextcloud FilesやNotesからの画像・ファイル添付
-- 日付項目から Nextcloud Calendar にリマインダー追加、住所を地図（Google マップ／OpenStreetMap／Apple マップ）で開く
+- 日付項目から Nextcloud Calendar にリマインダー追加、住所を地図（Google マップ／Yahoo!地図／OpenStreetMap／Apple マップ／Bing マップ、コレクション毎に選択可）で開く
 - レコードのコレクション間での移動・コピー・マージ
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
 - 12言語対応]]></description>
-	<version>0.17.0</version>
+	<version>0.17.5</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

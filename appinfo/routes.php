@@ -43,6 +43,7 @@ return [
 		['name' => 'api#updateRecord', 'url' => '/api/records/{id}', 'verb' => 'PUT'],
 		['name' => 'api#deleteRecord', 'url' => '/api/records/{id}', 'verb' => 'DELETE'],
 		['name' => 'api#deleteRecords', 'url' => '/api/records/delete', 'verb' => 'POST'],
+		['name' => 'api#bulkUpdateRecords', 'url' => '/api/collections/{id}/records/bulk', 'verb' => 'POST'],
 
 		// transfer (move/copy between collections)
 		['name' => 'api#transfer', 'url' => '/api/transfer', 'verb' => 'POST'],

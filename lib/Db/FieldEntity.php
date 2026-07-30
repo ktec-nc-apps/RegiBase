@@ -23,6 +23,12 @@ use OCP\AppFramework\Db\Entity;
  * @method void setSecret(bool $v)
  * @method bool getIsTitle()
  * @method void setIsTitle(bool $v)
+ * @method bool getListShow()
+ * @method void setListShow(bool $v)
+ * @method bool getTableShow()
+ * @method void setTableShow(bool $v)
+ * @method bool getCardShow()
+ * @method void setCardShow(bool $v)
  * @method ?string getPlaceholder()
  * @method void setPlaceholder(?string $v)
  * @method int getSort()
@@ -43,6 +49,9 @@ class FieldEntity extends Entity implements \JsonSerializable {
 	protected $required = false;
 	protected $secret = false;
 	protected $isTitle = false;
+	protected $listShow = true;
+	protected $tableShow = true;
+	protected $cardShow = true;
 	protected $placeholder = null;
 	protected $sort = 0;
 	protected $concat = 0;
@@ -54,6 +63,9 @@ class FieldEntity extends Entity implements \JsonSerializable {
 		$this->addType('required', 'boolean');
 		$this->addType('secret', 'boolean');
 		$this->addType('isTitle', 'boolean');
+		$this->addType('listShow', 'boolean');
+		$this->addType('tableShow', 'boolean');
+		$this->addType('cardShow', 'boolean');
 		$this->addType('sort', 'integer');
 		$this->addType('concat', 'integer');
 	}
@@ -69,6 +81,9 @@ class FieldEntity extends Entity implements \JsonSerializable {
 			'required' => (bool)$this->required,
 			'secret' => (bool)$this->secret,
 			'is_title' => (bool)$this->isTitle,
+			'list_show' => $this->listShow === null ? true : (bool)$this->listShow,
+			'table_show' => $this->tableShow === null ? true : (bool)$this->tableShow,
+			'card_show' => $this->cardShow === null ? true : (bool)$this->cardShow,
 			'placeholder' => $this->placeholder,
 			'sort' => (int)$this->sort,
 			'concat' => (int)$this->concat,
