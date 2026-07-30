@@ -326,7 +326,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="title" v-if="current"><span v-if="shareBadge(current)" class="share-badge" :title="shareBadgeTitle(current)">{{ shareBadge(current) }}</span><span class="ic">{{ current.icon }}</span><span class="nm">{{ current.name }}</span></div>
       <div class="title" v-else><span class="nm">{{ t('All collections') }}</span></div>
       <div class="spacer"></div>
-      <button v-if="undoTop" class="btn ghost sm rb-undo" @click="doUndo" :title="t('Undo: {what}', {what: undoTop})">↶ {{ t('Undo') }}</button>
+      <button v-if="current && undoTop" class="btn ghost sm rb-undo" @click="doUndo" :title="t('Undo: {what}', {what: undoTop})">↶ {{ t('Undo') }}</button>
       <template v-if="current">
         <div class="topbar-actions">
           <div class="viewswitch">
@@ -367,10 +367,51 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <span class="lt-count" v-if="records.length">{{ t('{shown} / {total} items', {shown: visibleRecords.length, total: records.length}) }}</span>
           </div>
           <div class="lt-tools" v-show="selectionMode">
-          <div class="lt-search">
-            <input class="searchinput" v-model="search" @input="onSearchInput" :placeholder="t('🔍 Search in this collection')" />
+          <div class="sr-box">
+            <div class="sr-row">
+              <input class="searchinput" v-model="search" @input="onSearchInput" :placeholder="t('🔍 Search in this collection')" />
+              <label class="search-mode" :title="t('Treat the search text as a regular expression')"><input type="checkbox" v-model="searchRegex" @change="onSearchInput" /> {{ t('Regex') }}</label>
+              <button v-if="searchRegex" type="button" class="rx-help-btn" :class="{on: showRegexHelp}" @click="showRegexHelp = !showRegexHelp" :title="t('Show usable regular-expression syntax')" :aria-expanded="showRegexHelp ? 'true' : 'false'">?</button>
+              <label v-if="canEdit && !isLocked" class="replace-toggle" :title="t('Find & replace text across the matched records')"><input type="checkbox" v-model="replaceOn" /> {{ t('Replace') }}</label>
+              <template v-if="canEdit && !isLocked && replaceOn">
+                <input class="searchinput replaceinput" v-model="replaceWith" :placeholder="t('Replace with…')" />
+                <span v-if="search" class="replace-info">{{ t('{n} matched', {n: records.length}) }}</span>
+                <button class="btn sm sr-apply" :disabled="!search || replaceBusy" @click="applyReplace">{{ replaceBusy ? t('Replacing…') : t('Replace all') }}</button>
+              </template>
+            </div>
+            <div v-if="searchRegex && showRegexHelp" class="rx-help">
+              <div class="rx-help-hd">
+                <span>{{ regexHelpPage === 1 ? t('Usable regular expressions') : t('Examples') }}</span>
+                <span class="rx-pager">
+                  <button type="button" class="rx-nav" :disabled="regexHelpPage === 1" @click="regexHelpPage = 1" :title="t('Previous')">‹</button>
+                  <span class="rx-pg">{{ regexHelpPage }} / 2</span>
+                  <button type="button" class="rx-nav" :disabled="regexHelpPage === 2" @click="regexHelpPage = 2" :title="t('Next')">›</button>
+                </span>
+              </div>
+              <table class="rx-tbl">
+                <tr v-for="row in (regexHelpPage === 1 ? regexHelpRows : regexExampleRows)" :key="row.p">
+                  <td class="rx-p"><code>{{ row.p }}</code></td>
+                  <td class="rx-d">{{ row.d }}</td>
+                  <td class="rx-e"><code>{{ row.e }}</code></td>
+                </tr>
+              </table>
+              <ul v-if="regexHelpPage === 1" class="rx-notes">
+                <li>{{ t('Matching is case-sensitive. Put (?i) at the start of the pattern to ignore case.') }}</li>
+                <li>{{ t('Unicode text such as Japanese is supported.') }}</li>
+                <li>{{ t('In the replacement text, $1 $2 … insert the captured groups.') }}</li>
+              </ul>
+              <ul v-else class="rx-notes">
+                <li>{{ t('The right column shows text that would match.') }}</li>
+              </ul>
+            </div>
+          </div>
+          <div class="lt-actions">
+            <span class="selcount">{{ selectedIds.length ? t('{n} selected', {n: selectedIds.length}) : t('Select records') }}</span>
+            <button class="btn sm ghost" @click="selectAll" :disabled="!records.length">{{ t('Select all') }}</button>
+            <button class="btn sm ghost" :disabled="!selectedIds.length" @click="clearSelection">{{ t('Clear') }}</button>
+            <span class="selspacer"></span>
             <span class="sortgroup" :title="t('Display order — only changes how records are shown here')">
-              <span class="sortgroup-lbl">👁 {{ t('View') }}</span>
+              <span class="sortgroup-lbl">👁 {{ t('Sort') }}</span>
               <select class="sortselect" :value="normSort(current.record_sort)" @change="setSort($event.target.value)" :title="t('Display order — only changes how records are shown here')">
                 <option value="created_asc">{{ t('Registration order (oldest first)') }}</option>
                 <option value="created_desc">{{ t('Registration order (newest first)') }}</option>
@@ -379,12 +420,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               </select>
             </span>
             <button v-if="canEdit && records.length>1" class="btn sm reorder-open" @click="openReorder" :title="t('Edit the saved registration order of the records (drag, or sort by up to 5 fields)')">⇅ {{ t('Edit saved order') }}</button>
-          </div>
-          <div class="lt-actions">
-            <span class="selcount">{{ selectedIds.length ? t('{n} selected', {n: selectedIds.length}) : t('Select records') }}</span>
-            <button class="btn sm ghost" @click="selectAll" :disabled="!records.length">{{ t('Select all') }}</button>
-            <button class="btn sm ghost" :disabled="!selectedIds.length" @click="clearSelection">{{ t('Clear') }}</button>
-            <span class="selspacer"></span>
             <button v-if="canEdit" class="btn sm" :disabled="!selectedIds.length" @click="duplicateInPlace" :title="t('Duplicate within this collection')">{{ t('Duplicate') }}</button>
             <button v-if="isOwner && !isLocked" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('copy')">{{ t('Copy to collection') }}</button>
             <button v-if="isOwner && !isLocked" class="btn sm" :disabled="!selectedIds.length" @click="openTransferBulk('move')">{{ t('Move to collection') }}</button>
@@ -443,8 +478,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <table class="rec-table">
               <thead>
                 <tr>
-                  <th class="rt-frozen" :class="{'rt-keycol': tableFrozenCol && tableFrozenCol.keycol}"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="tableFrozenCol">{{ tableFrozenCol.label }}</span></label></th>
-                  <th v-for="col in tableScrollCols" :key="col.id" :class="{'rt-keycol': col.keycol}">{{ col.label }}</th>
+                  <th class="rt-frozen" :class="{'rt-keycol': tableFrozenCol && tableFrozenCol.keycol, 'rt-emptycol': tableFrozenCol && emptyColumnIds.has(tableFrozenCol.id)}"><label class="rt-fhead"><input type="checkbox" :checked="allSelected" @change="allSelected ? clearSelection() : selectAll()" /><span v-if="tableFrozenCol">{{ tableFrozenCol.label }}</span></label></th>
+                  <th v-for="col in tableScrollCols" :key="col.id" :class="{'rt-keycol': col.keycol, 'rt-emptycol': emptyColumnIds.has(col.id)}">{{ col.label }}</th>
                   <th class="rt-actions"></th>
                 </tr>
               </thead>
@@ -719,7 +754,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <label><input type="checkbox" v-model="f.secret" /> {{ t('Secret (masked)') }}</label>
             <span v-if="concatSourceLabel(f)" class="concat-base">🔗 {{ t('Concatenated from') }}: {{ concatSourceLabel(f) }}</span>
             <label>🔗 {{ t('Concatenate with') }} <select :value="f._cnext||0" @change="f._cnext = Number($event.target.value)"><option :value="0">{{ t('Do not concatenate') }}</option><template v-for="g in concatTargets(f)" :key="g._uid"><option :value="g._uid">{{ g.label }}</option></template></select></label>
-            <label v-if="f._cnext" class="concat-sep-inline">{{ t('Separator') }} <select v-model="f._csep"><option value="none">{{ t('None') }}</option><option value="space">{{ t('Half-width space') }}</option><option v-if="isCjkUi || f._csep==='fullspace'" value="fullspace">{{ t('Full-width space') }}</option><option value="custom">{{ t('Custom symbol') }}</option></select><input v-if="f._csep==='custom'" v-model="f._csepChar" maxlength="4" :placeholder="t('e.g. / , -')" style="width:70px;margin-left:4px" /></label>
+            <label v-if="f._cnext" class="concat-sep-inline">{{ t('Separator') }} <select v-model="f._csep"><option value="none">{{ t('None') }}</option><option value="space">{{ t('Half-width space') }}</option><option v-if="isCjkUi || f._csep==='fullspace'" value="fullspace">{{ t('Full-width space') }}</option><option value="custom">{{ t('Custom symbol') }}</option><option value="paren">{{ t('Half-width parentheses ( )') }}</option><option v-if="isCjkUi || f._csep==='parenfull'" value="parenfull">{{ t('Full-width parentheses （ ）') }}</option></select><input v-if="f._csep==='custom'" v-model="f._csepChar" maxlength="4" :placeholder="t('e.g. / , -')" style="width:70px;margin-left:4px" /></label>
+            <span v-if="schemaMode !== 'template'" class="field-fill" :title="t('Records with data / total records')">{{ fieldFill(f) }}</span>
           </div>
         </div>
         <button class="btn block" @click="addSchemaField">{{ t('＋ Add field') }}</button>
@@ -902,6 +938,20 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('JSON includes field definitions and can be re-imported into RegiBase directly.') }}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">{{ t('Export to Tables creates a new table. Secret and attachment fields are skipped.') }}</div>
+        </div>
+
+        <div class="field">
+          <label>🕐 {{ t('Snapshots (change history)') }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn sm" @click="openHistory">↶ {{ t('Open snapshots') }}</button>
+            <span v-if="history.length" style="font-size:12px;color:var(--muted)">{{ t('{n} snapshots', {n: history.length}) }}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
+            <input type="number" min="0" max="1000" v-model.number="settingsForm.undo_limit" @change="saveSnapLimit" style="width:88px" />
+            <span style="font-size:13px;color:var(--muted)">{{ t('changes') }}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)') }}</div>
         </div>
       </div>
       <div class="modal-foot">
@@ -1145,23 +1195,23 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
             <b style="color:var(--accent)">{{ t('Enabled') }}</b>{{ t(': Secret fields such as passwords are encrypted with the master key you entered on this device.') }}<span v-if="hasRemembered()">{{ t('(remembered on this device)') }}</span>
             <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm" style="min-width:190px" @click="openEncChange">{{ t('Change master key') }}</button>
-                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Changes the master key and re-encrypts all secret fields.') }}</span>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm" style="min-width:190px" @click="openEncChange">{{ t('Set master key') }}</button>
+                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Sets or changes the master key and re-encrypts all secret fields.') }}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm" style="min-width:190px" @click="reEncryptPlaintext">{{ t('Re-encrypt secret fields') }}</button>
-                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Re-encrypts secret fields that are stored in plain text.') }}</span>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm danger" style="min-width:190px" @click="openEncRemove">{{ t('Remove master key') }}</button>
+                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Decrypts all secret fields back to plain text and turns off encryption.') }}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm" style="min-width:190px" @click="lockNow">{{ t('🔒 Lock now (forget key)') }}</button>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn sm" style="min-width:190px" @click="lockNow">{{ t('Sign out') }}</button>
                 <span style="flex:1;min-width:200px;font-size:12px">{{ t('Forgets the master key on this device (locks secret fields).') }}</span>
               </div>
             </div>
           </div>
           <div v-else style="font-size:13px;color:var(--muted)">
             <b>{{ t('Disabled (default)') }}</b>{{ t(': Secret fields are stored in plain text. If you enable it, secret fields are encrypted with your master key and become unreadable even to the server and the administrator.') }}
-            <div style="margin-top:8px"><button type="button" class="btn sm primary" @click="openEncSetup">{{ t('🔒 Enable encryption') }}</button></div>
+            <div style="margin-top:8px"><button type="button" class="btn sm primary" @click="openEncSetup">{{ t('Set master key') }}</button></div>
           </div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
@@ -1172,16 +1222,6 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
             <option value="apple">{{ t('Apple Maps') }}</option>
           </select>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('A 🌐 button on address fields opens the value in this map service.') }}</div>
-        </div>
-        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>↶ {{ t('Undo / change history') }}</label>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
-            <input type="number" min="0" max="1000" v-model.number="settingsForm.undo_limit" style="width:96px" />
-            <span style="font-size:13px;color:var(--muted)">{{ t('changes') }}</span>
-            <button type="button" class="btn sm" @click="openHistory">{{ t('View change history') }}</button>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change is recorded so you can undo it (Ctrl+Z, or the ↶ button). Set 0 to turn history off. Changes beyond the limit are discarded oldest-first.') }}</div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>💾 {{ t('Backup / Restore') }}</label>
@@ -1199,22 +1239,25 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     </div>
   </div>
 
-  <!-- 変更履歴 / アンドウ -->
+  <!-- スナップショット（コレクション単位の変更履歴） -->
   <div v-if="modal && modal.type==='history'" class="modal-mask" @click.self="modal=null">
     <div class="modal">
-      <div class="modal-head"><h3>↶ {{ t('Change history') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-head"><h3>🕐 {{ t('Snapshots') }}<span v-if="current" style="font-weight:400;font-size:14px;color:var(--muted)"> — {{ current.icon }} {{ current.name }}</span></h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
           <button class="btn sm" :disabled="!undoTop || busy" @click="doUndo">↶ {{ t('Undo last change') }}</button>
           <span style="flex:1"></span>
-          <button v-if="history.length" class="btn sm danger" @click="clearHistoryConfirm">{{ t('Clear history') }}</button>
+          <button v-if="history.length" class="btn sm danger" @click="clearHistoryConfirm">{{ t('Clear snapshots') }}</button>
         </div>
-        <div v-if="!history.length" class="empty"><p>{{ t('No changes recorded yet.') }}</p></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Newest first. “Restore to here” undoes that change and every change above it.') }}</div>
+        <div v-if="!history.length" class="empty"><p>{{ t('No snapshots recorded yet.') }}</p></div>
         <div v-else class="hist-list">
-          <div v-for="h in history" :key="h.id" class="hist-row" :class="{done: h.undone}">
+          <div v-for="h in history" :key="h.id" class="hist-row" :class="{done: h.undone}" :title="snapDetail(h)">
+            <span class="hist-icon">{{ snapIcon(h.op) }}</span>
             <span class="hist-when">{{ fmtHistTime(h.created_at) }}</span>
             <span class="hist-sum">{{ h.summary }}</span>
             <span v-if="h.undone" class="hist-tag">{{ t('undone') }}</span>
+            <button v-else class="btn xs" :disabled="busy" @click="restoreTo(h)" :title="t('Undo this change and everything newer')">↶ {{ t('Restore to here') }}</button>
           </div>
         </div>
       </div>
@@ -1306,6 +1349,24 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       <div class="modal-foot">
         <button class="btn" :disabled="encForm.busy" @click="modal=null">{{ t('Cancel') }}</button>
         <button class="btn primary" :disabled="encForm.busy" @click="changeMasterKey">{{ t('Change') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- マスターパスワード削除（平文化して暗号化を解除） -->
+  <div v-if="modal && modal.type==='encRemove'" class="modal-mask" @click.self="!encForm.busy && (modal=null)">
+    <div class="modal">
+      <div class="modal-head"><h3>{{ t('🗝️ Remove master key') }}</h3><button class="icon-btn" :disabled="encForm.busy" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <p style="margin-top:0;font-size:13px">{{ t('All secret fields are decrypted and saved back as plain text, then encryption is turned off. Enter your current master key to continue.') }}</p>
+        <p style="color:var(--danger);font-size:13px;background:color-mix(in srgb,var(--danger) 12%,transparent);padding:8px 10px;border-radius:8px">⚠️ {{ t('After this, secret fields are stored in plain text and become readable by the server and the administrator.') }}</p>
+        <div class="field"><label>{{ t('Current master key') }}</label><input type="password" v-model="encForm.cur" autocomplete="off" /></div>
+        <div v-if="encForm.err" style="color:var(--danger);font-size:13px">{{ encForm.err }}</div>
+        <div v-if="encForm.busy" style="font-size:13px;color:var(--muted)">{{ t('Decrypting…') }} {{ encForm.progress }}</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" :disabled="encForm.busy" @click="modal=null">{{ t('Cancel') }}</button>
+        <button class="btn danger" :disabled="encForm.busy" @click="removeEncryption">{{ t('Remove and decrypt') }}</button>
       </div>
     </div>
   </div>
@@ -1530,7 +1591,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     data() {
       return {
         authenticated: null,
-        collections: [], current: null, records: [], search: '',
+        collections: [], current: null, records: [], search: '', searchRegex: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
         sidebarOpen: false, modal: null,
         form: {}, editingRecordId: null, reveal: {},
         templates: [], templatesLoading: false, schemaFields: [],
@@ -1787,6 +1848,18 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       tableFrozenCol() { const c = this.tableColumns; return c.length ? c[0] : null; },
       tableScrollCols() { return this.tableColumns.slice(1); },
+      // ids of table columns whose cells are all empty across the loaded records —
+      // their header is rendered extra-faint (see .rt-emptycol)
+      emptyColumnIds() {
+        const s = new Set();
+        if (!this.records.length) return s;
+        for (const col of this.tableColumns) {
+          const keys = col.kind === 'concat' ? col.members.map((m) => m.key) : [col.field.key];
+          const hasData = this.records.some((r) => { const d = r.data || {}; return keys.some((k) => { const v = d[k]; return v != null && v !== ''; }); });
+          if (!hasData) s.add(col.id);
+        }
+        return s;
+      },
       allSelected() {
         return this.records.length > 0 && this.selectedIds.length === this.records.length;
       },
@@ -1797,6 +1870,40 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         return this.xfer.target ? this.xfer.target.fields.filter((f) => f.type === 'textarea') : [];
       },
       visibleRecords() { return this.records.slice(0, this.renderLimit); },
+      // Quick-reference of the regex tokens that work in BOTH the server-side
+      // search (PCRE, /u) and the client-side replace (JS RegExp).
+      regexHelpRows() {
+        return [
+          { p: '.', d: T('Any single character'), e: 'a.c' },
+          { p: '^  $', d: T('Start / end of the text'), e: '^AB' },
+          { p: '*', d: T('0 or more of the previous'), e: 'ab*' },
+          { p: '+', d: T('1 or more of the previous'), e: 'ab+' },
+          { p: '?', d: T('0 or 1 of the previous'), e: 'ab?' },
+          { p: '{n,m}', d: T('Between n and m repeats'), e: 'a{2,4}' },
+          { p: '[ … ]', d: T('Any one listed character'), e: '[abc]' },
+          { p: '[^ … ]', d: T('Any character not listed'), e: '[^0-9]' },
+          { p: '[a-z]', d: T('A character range'), e: '[A-Z0-9]' },
+          { p: '\\d  \\D', d: T('Digit / non-digit'), e: '\\d{3}' },
+          { p: '\\w  \\W', d: T('Word char / non-word'), e: '\\w+' },
+          { p: '\\s  \\S', d: T('Whitespace / non-whitespace'), e: 'a\\sb' },
+          { p: 'a|b', d: T('Either a or b'), e: 'cat|dog' },
+          { p: '( … )', d: T('Group (for |, repeats, $1)'), e: '(ab)+' },
+          { p: '\\', d: T('Treat a special char literally'), e: '\\.  \\+  \\*' },
+        ];
+      },
+      // Page 2 of the regex help: practical examples (pattern / meaning / a
+      // string it would match). Uses only tokens valid in search and replace.
+      regexExampleRows() {
+        return [
+          { p: '^090', d: T('Starts with “090”'), e: '090-1234-5678' },
+          { p: '\\d{3}-\\d{4}', d: T('3 digits – 4 digits'), e: '123-4567' },
+          { p: '@gmail\\.com$', d: T('A gmail.com address'), e: 'taro@gmail.com' },
+          { p: '(?i)yahoo', d: T('“yahoo” in any case'), e: 'Yahoo / YAHOO' },
+          { p: '田中|佐藤', d: T('Either of the two'), e: '田中花子' },
+          { p: '.{12,}', d: T('12 characters or more'), e: 'long-passphrase' },
+          { p: '\\.(jpg|png)$', d: T('Ends with .jpg or .png'), e: 'photo.png' },
+        ];
+      },
       fpVisible() {
         return this.filePicker.entries.filter((x) => x.is_dir || this.fpSelectable(x));
       },
@@ -2001,11 +2108,14 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!this.current) return;
         const params = [];
         if (this.search) params.push('q=' + encodeURIComponent(this.search));
+        if (this.search && this.searchRegex) params.push('regex=1');
         if (this.current.record_sort) params.push('sort=' + encodeURIComponent(this.normSort(this.current.record_sort)));
         const qs = params.length ? '?' + params.join('&') : '';
         this.records = await api('collections/' + this.current.id + '/records' + qs);
         this.renderLimit = 200;
         this.refreshUndo();
+        // encrypt any import-left plaintext secrets in the background (no await)
+        this.autoEncryptCurrent();
       },
       toggleSelectionMode() {
         this.selectionMode = !this.selectionMode;
@@ -2119,16 +2229,34 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         }
       },
       // Combine a group's field values (field order), each pair joined by the
-      // earlier field's own separator. Empty values are skipped.
+      // earlier field's own separator. Empty values are skipped, but a paren
+      // separator ('paren' = half-width, 'parenfull' = full-width) is carried
+      // forward even when its own field is empty — so 名 being blank still yields
+      // 姓（ふりがなせいふりがなめい）. Open brackets are closed (LIFO) at the end,
+      // and a bracket replaces any pending text separator in front of it.
       concatText(rec, members) {
-        let out = ''; let prev = null;
+        let out = ''; let started = false;
+        let pendingText = '';       // text separator to place before the next value
+        const pendingParens = [];   // paren separators to open before the next value
+        const closers = [];
         for (const m of members) {
           const v = rec.data ? rec.data[m.key] : '';
-          if (v == null || v === '') continue;
-          const val = m.secret ? '••••••••' : String(v);
-          out = (out === '') ? val : (out + this.fieldSep(prev) + val);
-          prev = m;
+          const isParen = (m.concat_sep === 'paren' || m.concat_sep === 'parenfull');
+          if (v != null && v !== '') {
+            const val = m.secret ? '••••••••' : String(v);
+            if (!started) { out = val; started = true; }
+            else if (pendingParens.length) {
+              for (const t of pendingParens) { out += (t === 'parenfull' ? '（' : '('); closers.push(t === 'parenfull' ? '）' : ')'); }
+              out += val;
+            } else { out += pendingText + val; }
+            pendingParens.length = 0; pendingText = '';
+            // this field's own separator becomes the baseline for the next value
+            if (isParen) pendingParens.push(m.concat_sep); else pendingText = this.fieldSep(m);
+          } else if (isParen) {
+            pendingParens.push(m.concat_sep); // empty field: still honour its paren
+          }
         }
+        while (closers.length) out += closers.pop();
         return out;
       },
       // Text shown for a table column (real field, concat group, or emphasis title).
@@ -2484,6 +2612,33 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       openEncSetup() { this.encForm = { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true }; this.modal = { type: 'encSetup' }; },
       openEncChange() { this.encForm = { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true }; this.modal = { type: 'encChange' }; },
+      openEncRemove() { this.encForm = { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: false }; this.modal = { type: 'encRemove' }; },
+      async removeEncryption() {
+        this.encForm.err = '';
+        const cur = this.encForm.cur;
+        if (!cur) { this.encForm.err = T('Enter your current master key'); return; }
+        this.encForm.busy = true;
+        try {
+          const key = await rbcrypto.deriveKey(cur, this.enc.salt);
+          if (await rbcrypto.decrypt(key, this.enc.verifier) !== 'regibase-ok') { this.encForm.err = T('Current master key is incorrect'); this.encForm.busy = false; return; }
+          // decrypt every secret field back to plain text
+          const plans = await this.collectSecretPlans();
+          let done = 0;
+          for (const p of plans) {
+            const data = { ...p.data }; let changed = false;
+            for (const k of p.sk) { const v = data[k]; if (rbcrypto.isEnc(v)) { const pl = await rbcrypto.decrypt(key, v); if (pl != null) { data[k] = pl; changed = true; } } }
+            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
+            done++; this.encForm.progress = done + ' / ' + plans.length;
+          }
+          // turn encryption off (back to the initial, no-master-password state)
+          await api('settings', { method: 'PUT', body: JSON.stringify({ enc_enabled: false, enc_salt: '', enc_verifier: '' }) });
+          this.forgetKey(); encKey = null; sharedKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.openDecrypted = {};
+          this.enc = { enabled: false, unlocked: false, salt: '', verifier: '' };
+          if (this.current) await this.loadRecords();
+          this.modal = null; this.showToast(T('Master key removed (secret fields are now plain text)'));
+        } catch (e) { this.encForm.err = T('Failed') + ': ' + (e.message || e); }
+        finally { this.encForm.busy = false; }
+      },
       async collectSecretPlans() {
         const colls = await api('collections');
         const plans = [];
@@ -2514,7 +2669,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           for (const p of plans) {
             const data = { ...p.data }; let changed = false;
             for (const key2 of p.sk) { const v = data[key2]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[key2] = await rbcrypto.encrypt(key, String(v)); changed = true; } }
-            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data }) });
+            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
             done++; this.encForm.progress = done + ' / ' + plans.length;
           }
           if (this.encForm.remember) await this.rememberKey(key); else this.forgetKey();
@@ -2539,7 +2694,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           for (const p of plans) {
             const data = { ...p.data }; let changed = false;
             for (const key2 of p.sk) { const v = data[key2]; if (rbcrypto.isEnc(v)) { data[key2] = await rbcrypto.encrypt(newKey, await rbcrypto.decrypt(oldKey, v)); changed = true; } }
-            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data }) });
+            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
             done++; this.encForm.progress = done + ' / ' + plans.length;
           }
           await api('settings', { method: 'PUT', body: JSON.stringify({ enc_salt: newSalt, enc_verifier: newVerifier }) });
@@ -2552,21 +2707,24 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       // Sweep every collection and encrypt any secret-field value still saved as
       // plain text (e.g. imported server-side, or secreted after the fact).
-      async reEncryptPlaintext() {
-        if (!this.enc.enabled) { alert(T('Encryption is not enabled')); return; }
-        if (!encKey) { alert(T('Unlock encryption first')); return; }
-        if (!confirm(T('Re-encrypt every secret field that is still stored as plain text?'))) return;
-        try {
-          const plans = await this.collectSecretPlans();
-          let n = 0;
-          for (const p of plans) {
-            const data = { ...p.data }; let changed = false;
-            for (const k of p.sk) { const v = data[k]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[k] = await rbcrypto.encrypt(encKey, String(v)); changed = true; } }
-            if (changed) { await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data }) }); n++; }
-          }
-          if (this.current) await this.loadRecords();
-          this.showToast(n ? T('Encrypted {n} record(s)', { n }) : T('No plain-text secret values to encrypt'));
-        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+      // Silently encrypt any secret-field value in the current collection that is
+      // still stored as plain text (e.g. written by a server-side import: CSV/JSON,
+      // Tables, Contacts, occ). Runs on load while encryption is unlocked, so no
+      // manual "re-encrypt" action is needed. The checkbox-toggle case (secret
+      // turned on/off in the collection editor) is handled in commitSchema.
+      async autoEncryptCurrent() {
+        if (!this.current || this.current.is_owner === false) return;
+        if (!this.enc.enabled || !encKey) return;
+        const sk = (this.current.fields || []).filter((f) => f.secret).map((f) => f.key);
+        if (!sk.length) return;
+        let n = 0;
+        for (const r of this.records) {
+          if (!r || !r.data) continue;
+          const data = { ...r.data }; let changed = false;
+          for (const k of sk) { const v = data[k]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[k] = await rbcrypto.encrypt(encKey, String(v)); changed = true; } }
+          if (changed) { try { await api('records/' + r.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) }); r.data = data; n++; } catch (e) { /* leave plaintext; will retry next load */ } }
+        }
+        if (n) this.showToast(T('Encrypted {n} record(s)', { n }));
       },
       async saveSettings() {
         try {
@@ -2577,35 +2735,85 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           this.modal = null; this.showToast(T('Settings saved'));
         } catch (e) { alert(T('Failed to save') + ': ' + e.message); }
       },
-      // ---- undo / change history ----
+      // Save just the snapshot retention limit (edited from Collection settings).
+      async saveSnapLimit() {
+        try {
+          const n = Math.max(0, Math.min(1000, parseInt(this.settingsForm.undo_limit, 10) || 0));
+          this.settingsForm.undo_limit = n;
+          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ undo_limit: n }) });
+          if (s) this.settingsForm = s;
+          this.showToast(T('Settings saved'));
+          this.refreshUndo();
+        } catch (e) { alert(T('Failed to save') + ': ' + (e.message || e)); }
+      },
+      // ---- snapshots (per-collection change history / undo) ----
       async refreshUndo() {
-        try { const h = await api('history'); this.history = h.entries || []; const a = this.history.find((e) => !e.undone); this.undoTop = a ? a.summary : null; }
-        catch (e) { /* history is best-effort */ }
+        try {
+          const cid = this.current && this.current.id;
+          if (!cid) { this.history = []; this.undoTop = null; return; }
+          const h = await api('history?collection=' + cid);
+          this.history = h.entries || [];
+          const a = this.history.find((e) => !e.undone);
+          this.undoTop = a ? a.summary : null;
+        } catch (e) { /* snapshots are best-effort */ }
       },
       async doUndo() {
         if (this.busy) return;
+        const cid = this.current && this.current.id;
+        if (!cid) return;
         this.busy = true;
         try {
-          const r = await api('history/undo', { method: 'POST' });
+          const r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid }) });
           if (!r || !r.undone) { this.undoTop = null; this.showToast(T('Nothing to undo')); return; }
           this.showToast(T('Undone: {what}', { what: r.summary || '' }));
-          await this.loadCollections();
-          const targetId = r.collection_id || (this.current && this.current.id);
-          if (targetId && this.collections.some((c) => c.id === targetId)) {
-            try { await this.selectCollection(targetId); } catch (e) { this.current = null; this.records = []; }
-          } else { this.current = null; this.records = []; }
-          await this.refreshUndo();
+          await this.afterUndo(cid);
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
         finally { this.busy = false; }
       },
+      async restoreTo(h) {
+        if (this.busy) return;
+        const cid = this.current && this.current.id;
+        if (!cid || !h) return;
+        if (!confirm(T('Undo “{what}” and every change newer than it? This cannot be redone.', { what: h.summary || '' }))) return;
+        this.busy = true;
+        try {
+          const r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid, downTo: h.id }) });
+          this.showToast(T('Reverted {n} change(s)', { n: (r && r.undone) || 0 }));
+          await this.afterUndo(cid);
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+        finally { this.busy = false; }
+      },
+      // Reload the collection (or drop it if the undo removed it) and refresh the list.
+      async afterUndo(cid) {
+        await this.loadCollections();
+        if (this.collections.some((c) => c.id === cid)) {
+          try { await this.selectCollection(cid); } catch (e) { /* keep going */ }
+        } else if (this.current && this.current.id === cid) {
+          this.current = null; this.records = []; if (this.modal && this.modal.type === 'history') this.modal = null;
+        }
+        await this.refreshUndo();
+      },
       async openHistory() { await this.refreshUndo(); this.modal = { type: 'history' }; },
+      snapIcon(op) {
+        return { 'record.create': '➕', 'record.update': '✏️', 'record.delete': '🗑', 'record.delete_many': '🗑', 'record.reorder': '⇅', 'records.bulk_add': '📥', 'record.transfer': '↔', 'fields.replace': '🧩', 'fields.append': '🧩', 'collection.create': '🗂️', 'collection.update': '⚙️', 'collection.delete': '🗑', 'collection.duplicate': '📄' }[op] || '•';
+      },
+      snapOpLabel(op) {
+        return { 'record.create': T('Add record'), 'record.update': T('Edit record'), 'record.delete': T('Delete record'), 'record.delete_many': T('Delete records'), 'record.reorder': T('Reorder records'), 'records.bulk_add': T('Import records'), 'record.transfer': T('Move / copy records'), 'fields.replace': T('Edit fields'), 'fields.append': T('Add fields'), 'collection.create': T('Create collection'), 'collection.update': T('Collection settings'), 'collection.delete': T('Delete collection'), 'collection.duplicate': T('Duplicate collection') }[op] || op;
+      },
+      snapDetail(h) {
+        let dt = h.created_at;
+        try { const d = new Date(h.created_at); if (!isNaN(d)) dt = d.toLocaleString(); } catch (e) { /* keep raw */ }
+        return this.snapOpLabel(h.op) + ' — ' + (h.summary || '') + '\n' + dt + (h.undone ? '\n(' + T('undone') + ')' : '');
+      },
       fmtHistTime(s) {
         try { const d = new Date(s); if (isNaN(d)) return s; return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
         catch (e) { return s; }
       },
       async clearHistoryConfirm() {
-        if (!confirm(T('Clear all change history? Undo will no longer be possible for past changes.'))) return;
-        try { await api('history', { method: 'DELETE' }); this.history = []; this.undoTop = null; this.showToast(T('History cleared')); }
+        const cid = this.current && this.current.id;
+        if (!cid) return;
+        if (!confirm(T('Delete all snapshots for this collection? Undo will no longer be possible for past changes.'))) return;
+        try { await api('history?collection=' + cid, { method: 'DELETE' }); this.history = []; this.undoTop = null; this.showToast(T('Snapshots cleared')); }
         catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
       },
       // ---- full backup / restore ----
@@ -2787,6 +2995,8 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.iconPickerOpen = false;
         this.shareExpanded = false;
         if (this.isOwner) this.loadShares();
+        this.refreshUndo(); // load this collection's snapshot count
+        api('settings').then((s) => { if (s) this.settingsForm = s; }).catch(() => {}); // for the keep-limit field
       },
       // ---- icon (emoji) picker ----
       // The Unicode set is ~150 KB with its names, so it is loaded on first use only.
@@ -2916,6 +3126,16 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         if (!confirm(T('Delete the collection “{name}” and all its records. Are you sure?', { name: this.current.name }))) return;
         await api('collections/' + this.current.id, { method: 'DELETE' });
         this.modal = null; this.current = null; this.records = []; await this.loadCollections(); this.showToast(T('Deleted'));
+      },
+      // "records with data / total" for a field, shown at the bottom-right of its
+      // editor row. Unsaved fields (no key yet) count as 0.
+      fieldFill(f) {
+        const total = this.records.length;
+        const k = f.key;
+        if (!k) return '0/' + total;
+        let n = 0;
+        for (const r of this.records) { const v = r.data ? r.data[k] : null; if (v != null && v !== '') n++; }
+        return n + '/' + total;
       },
       fieldsToSchemaRows(fields) {
         const rows = (fields || []).map((f) => {
@@ -3851,6 +4071,45 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       subtitle(rec) { const f = this.current.fields.find((x) => !x.is_title && !x.secret && x.type !== 'image' && x.type !== 'image_crop' && x.type !== 'file' && rec.data[x.key]); return f ? String(rec.data[f.key]) : ''; },
       showToast(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ''), 1900); },
       onSearchInput() { this.selectedIds = []; clearTimeout(this._s); this._s = setTimeout(() => this.loadRecords(), 250); },
+      // Find & replace across the currently-matched records. Normal mode does a
+      // case-insensitive literal replace; regex mode uses the pattern (global).
+      // Secret and attachment fields are never touched. All edits share one undo
+      // group so a single snapshot revert undoes the whole replace.
+      async applyReplace() {
+        const cid = this.current && this.current.id;
+        if (!cid || !this.search || this.replaceBusy) return;
+        let re;
+        try {
+          re = this.searchRegex
+            ? new RegExp(this.search, 'g')
+            : new RegExp(this.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        } catch (e) { alert(T('Invalid regular expression') + ': ' + (e.message || e)); return; }
+        const repl = this.replaceWith != null ? String(this.replaceWith) : '';
+        const skip = new Set(['image', 'image_crop', 'file']);
+        const fields = (this.current.fields || []).filter((f) => !f.secret && !skip.has(f.type));
+        const targets = [];
+        for (const r of this.records) {
+          const d = r.data || {}; const nd = { ...d }; let hit = false;
+          for (const f of fields) {
+            const v = d[f.key];
+            if (typeof v !== 'string' || v === '') continue;
+            re.lastIndex = 0;
+            if (re.test(v)) { re.lastIndex = 0; nd[f.key] = v.replace(re, repl); hit = true; }
+          }
+          if (hit) targets.push({ id: r.id, data: nd });
+        }
+        if (!targets.length) { this.showToast(T('No matches to replace')); return; }
+        if (!confirm(T('Replace in {n} record(s)? This can be undone from snapshots.', { n: targets.length }))) return;
+        this.replaceBusy = true;
+        const grp = 'replace-' + cid + '-' + (this.uidCounter++);
+        try {
+          let n = 0;
+          for (const t of targets) { await api('records/' + t.id, { method: 'PUT', body: JSON.stringify({ data: t.data, _undoGroup: grp }) }); n++; }
+          this.showToast(T('Replaced in {n} record(s)', { n }));
+          await this.loadRecords();
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+        finally { this.replaceBusy = false; }
+      },
     },
     template: TEMPLATE,
   }).mount('#regibase-root');

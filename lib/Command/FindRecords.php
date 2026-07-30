@@ -7,14 +7,16 @@ namespace OCA\RegiBase\Command;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class FindRecords extends Base {
 	protected function configure(): void {
 		$this->setName('regibase:find')
-			->setDescription('Search records of a collection by field value (case-insensitive)')
+			->setDescription('Search records of a collection by field value (case-insensitive, or --regex)')
 			->addArgument('collection', InputArgument::REQUIRED, 'Collection id or name')
-			->addArgument('query', InputArgument::REQUIRED, 'Text to look for')
+			->addArgument('query', InputArgument::REQUIRED, 'Text to look for (a PCRE pattern with --regex)')
+			->addOption('regex', null, InputOption::VALUE_NONE, 'Treat the query as a regular expression (PCRE, case-sensitive)')
 			->addUserOption()
 			->addRevealOptions();
 	}
@@ -22,7 +24,20 @@ class FindRecords extends Base {
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$c = $this->resolveCollection($input);
 		$key = $this->secretKey($c->getUserId(), $input, $output);
-		$query = mb_strtolower((string)$input->getArgument('query'));
+		$rawQuery = (string)$input->getArgument('query');
+		$regex = (bool)$input->getOption('regex');
+		$re = null;
+		if ($regex) {
+			$re = '~' . str_replace('~', '\\~', $rawQuery) . '~u';
+			if (@preg_match($re, '') === false) {
+				$output->writeln('<error>Invalid regular expression.</error>');
+				return 1;
+			}
+		}
+		$query = mb_strtolower($rawQuery);
+		$match = function (string $val) use ($regex, $re, $query): bool {
+			return $regex ? (bool)preg_match($re, $val) : (mb_strpos(mb_strtolower($val), $query) !== false);
+		};
 
 		$fields = $this->fields->findForCollection((int)$c->getId());
 		$fieldsByKey = [];
@@ -41,7 +56,7 @@ class FindRecords extends Base {
 					continue;
 				}
 				$val = $this->reveal($key, $data[$f->getFieldKey()] ?? '');
-				if ($val !== null && $val !== '' && mb_strpos(mb_strtolower($val), $query) !== false) {
+				if ($val !== null && $val !== '' && $match($val)) {
 					$table->addRow([
 						$r->getId(),
 						$this->titleOf($fieldsByKey, $data, $key),

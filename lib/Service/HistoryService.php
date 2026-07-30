@@ -64,14 +64,14 @@ class HistoryService {
 		$this->mapper->pruneToLimit($userId, $limit);
 	}
 
-	/** @return array<int,array> history rows (json) newest first */
-	public function listForUser(string $userId): array {
+	/** @return array<int,array> history rows (json) newest first, optionally scoped to one collection */
+	public function listForUser(string $userId, ?int $collectionId = null): array {
 		$limit = max(self::DEFAULT_LIMIT, $this->getLimit($userId));
-		return array_map(fn (HistoryEntity $h) => $h->jsonSerialize(), $this->mapper->listForUser($userId, $limit));
+		return array_map(fn (HistoryEntity $h) => $h->jsonSerialize(), $this->mapper->listForUser($userId, $limit, $collectionId));
 	}
 
-	public function clearForUser(string $userId): void {
-		$this->mapper->deleteAllForUser($userId);
+	public function clearForUser(string $userId, ?int $collectionId = null): void {
+		$this->mapper->deleteAllForUser($userId, $collectionId);
 	}
 
 	public function activeCount(string $userId): int {
@@ -84,8 +84,8 @@ class HistoryService {
 	 * apply the inverses in reverse chronological order).
 	 * @return HistoryEntity[]
 	 */
-	public function nextUndoBatch(string $userId): array {
-		$latest = $this->mapper->latestActive($userId);
+	public function nextUndoBatch(string $userId, ?int $collectionId = null): array {
+		$latest = $this->mapper->latestActive($userId, $collectionId);
 		if ($latest === null) {
 			return [];
 		}

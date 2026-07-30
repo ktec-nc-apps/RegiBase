@@ -92,17 +92,18 @@ Then open **RegiBase** from the Nextcloud app menu.
 
 ### Command line (occ)
 
-RegiBase can be read from the server console — useful for scripts and backups:
+RegiBase can be driven from the server console — useful for scripts and backups:
 
 ```bash
 occ regibase:collections [--user=UID]              # list collections
 occ regibase:records <collection> [--user=UID]     # list a collection's records
 occ regibase:get <collection> <record> [--field=KEY] [-o json]
 occ regibase:export <collection> [--format=json|csv]
-occ regibase:find <collection> <query>             # search by field value
+occ regibase:find <collection> <query> [--regex]   # search by field value
+occ regibase:master <status|set|change|remove> --user=UID   # manage the master key
 ```
 
-`<collection>` is an id or a name. All commands are **read-only**. Secret fields
+`<collection>` is an id or a name. Everything except `regibase:master` is **read-only**. Secret fields
 are masked unless you pass `--reveal`, in which case the master password is read
 from the `REGIBASE_PASSWORD` environment variable or an interactive hidden prompt
 (the server-side decrypt mirrors the browser's PBKDF2 / AES-GCM and verifies the
@@ -186,17 +187,18 @@ sudo -u www-data php ../occ app:enable regibase
 
 ### コマンドライン（occ）
 
-RegiBase はサーバーのコンソールから読み取れます。スクリプトやバックアップに便利です:
+RegiBase はサーバーのコンソールから操作できます。スクリプトやバックアップに便利です:
 
 ```bash
 occ regibase:collections [--user=UID]              # コレクション一覧
 occ regibase:records <collection> [--user=UID]     # コレクションのレコード一覧
 occ regibase:get <collection> <record> [--field=KEY] [-o json]
 occ regibase:export <collection> [--format=json|csv]
-occ regibase:find <collection> <query>             # 値で検索
+occ regibase:find <collection> <query> [--regex]   # 値で検索（正規表現も可）
+occ regibase:master <status|set|change|remove> --user=UID   # マスターキー管理
 ```
 
-`<collection>` は id か名前で指定します。すべて**読み取り専用**です。秘密フィールドは
+`<collection>` は id か名前で指定します。`regibase:master` 以外は**読み取り専用**です。秘密フィールドは
 既定でマスクされ、`--reveal` を付けたときだけ復号します。その際のマスターパスワードは
 環境変数 `REGIBASE_PASSWORD` または対話式の隠し入力から読み取ります（サーバー側の復号は
 ブラウザと同じ PBKDF2 / AES-GCM を再現し、事前にパスワードを検証します）。例 —

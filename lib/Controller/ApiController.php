@@ -390,7 +390,8 @@ class ApiController extends Controller {
 		try {
 			$q = $this->request->getParam('q');
 			$sort = $this->request->getParam('sort');
-			return new JSONResponse($this->service->listRecords($this->uid(), $id, $q, $sort));
+			$regex = in_array($this->request->getParam('regex'), ['1', 'true', true], true);
+			return new JSONResponse($this->service->listRecords($this->uid(), $id, $q, $sort, $regex));
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (DoesNotExistException $e) {
@@ -442,7 +443,8 @@ class ApiController extends Controller {
 		try {
 			$data = $this->request->getParam('data', []);
 			$grp = $this->request->getParam('_undoGroup');
-			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : [], is_string($grp) ? $grp : null));
+			$noHistory = in_array($this->request->getParam('_noHistory'), ['1', 'true', true], true);
+			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : [], is_string($grp) ? $grp : null, $noHistory));
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (ForbiddenException $e) {
@@ -479,17 +481,27 @@ class ApiController extends Controller {
 
 	#[NoAdminRequired]
 	public function history(): JSONResponse {
-		return new JSONResponse(['entries' => $this->service->history($this->uid())]);
+		$cid = $this->request->getParam('collection');
+		$cid = ($cid !== null && $cid !== '') ? (int)$cid : null;
+		return new JSONResponse(['entries' => $this->service->history($this->uid(), $cid)]);
 	}
 
 	#[NoAdminRequired]
 	public function undo(): JSONResponse {
-		return new JSONResponse($this->service->undo($this->uid()));
+		$cid = $this->request->getParam('collection');
+		$cid = ($cid !== null && $cid !== '') ? (int)$cid : null;
+		$downTo = $this->request->getParam('downTo');
+		if ($downTo !== null && $downTo !== '' && $cid !== null) {
+			return new JSONResponse($this->service->undoDownTo($this->uid(), $cid, (int)$downTo));
+		}
+		return new JSONResponse($this->service->undo($this->uid(), $cid));
 	}
 
 	#[NoAdminRequired]
 	public function clearHistory(): JSONResponse {
-		$this->service->clearHistory($this->uid());
+		$cid = $this->request->getParam('collection');
+		$cid = ($cid !== null && $cid !== '') ? (int)$cid : null;
+		$this->service->clearHistory($this->uid(), $cid);
 		return new JSONResponse(['ok' => true]);
 	}
 

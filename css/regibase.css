@@ -242,16 +242,43 @@
 #regibase-root .lt-collname .ic { flex: 0 0 auto; }
 #regibase-root .lt-count { flex: 0 0 auto; font-size: 12px; color: var(--muted); font-weight: 600; }
 #regibase-root .lt-tools { display: flex; flex-direction: column; gap: 10px; }
-#regibase-root .lt-search { display: flex; gap: 10px; }
-/* Search box and sort select share the exact same box (height/border/font) so
-   they line up; the search box is roomier than before. */
-#regibase-root .lt-search .searchinput, #regibase-root .lt-search .sortselect {
-  height: 46px; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface-2); color: var(--text); outline: none; font-size: 15px;
+/* Search + replace grouped in one panel so it reads as a unit; both input rows
+   share the same left edge (inputs are flex:1 from x=0) and the same box style. */
+#regibase-root .sr-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+/* One flex row that wraps: search + toggles stay on line 1; when the row is
+   narrower than the two inputs need, the replace input flows to a second line. */
+#regibase-root .sr-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#regibase-root .sr-box .searchinput {
+  flex: 1 1 240px; min-width: 200px; height: 44px; box-sizing: border-box; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  outline: none; font-size: 15px; padding: 0 16px;
 }
-#regibase-root .lt-search .searchinput { flex: 1; min-width: 0; padding: 0 16px; }
-#regibase-root .lt-search .sortselect { flex: 0 0 auto; padding: 0 12px; cursor: pointer; }
-#regibase-root .lt-search .searchinput:focus, #regibase-root .lt-search .sortselect:focus { border-color: var(--primary); }
+#regibase-root .sr-box .searchinput:focus { border-color: var(--primary); }
+#regibase-root .sr-box .search-mode, #regibase-root .sr-box .replace-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+#regibase-root .sr-box .search-mode { color: var(--muted); }
+#regibase-root .sr-box .replace-toggle { color: var(--text); }
+#regibase-root .sr-box .replace-info { flex: 0 0 auto; font-size: 12px; color: var(--muted); min-width: 56px; text-align: right; }
+/* Regex quick-reference: help chip next to the Regex checkbox opens a panel. */
+#regibase-root .rx-help-btn { flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; box-sizing: border-box; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-weight: 700; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+#regibase-root .rx-help-btn:hover { border-color: var(--primary); color: var(--primary); }
+#regibase-root .rx-help-btn.on { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+#regibase-root .rx-help { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px; }
+#regibase-root .rx-help-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+#regibase-root .rx-pager { display: inline-flex; align-items: center; gap: 6px; }
+#regibase-root .rx-pager .rx-pg { font-weight: 600; font-size: 12px; color: var(--muted); min-width: 30px; text-align: center; }
+#regibase-root .rx-nav { width: 24px; height: 24px; min-width: 24px; min-height: 24px; padding: 0; box-sizing: border-box; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 15px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+#regibase-root .rx-nav:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+#regibase-root .rx-nav:disabled { opacity: .35; cursor: default; }
+#regibase-root .rx-tbl { border-collapse: collapse; width: 100%; }
+#regibase-root .rx-tbl td { padding: 3px 8px 3px 0; vertical-align: top; font-size: 13px; border-bottom: 1px solid var(--border); }
+#regibase-root .rx-tbl tr:last-child td { border-bottom: none; }
+#regibase-root .rx-tbl .rx-p { white-space: nowrap; }
+#regibase-root .rx-tbl .rx-d { color: var(--muted); width: 100%; }
+#regibase-root .rx-tbl .rx-e { white-space: nowrap; text-align: right; color: var(--muted); }
+#regibase-root .rx-tbl code, #regibase-root .rx-help code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; color: var(--text); }
+#regibase-root .rx-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+#regibase-root .rx-notes li { margin: 2px 0; }
+#regibase-root .sr-box .sr-apply { flex: 0 0 auto; }
 /* Selection-mode toggle: shows/hides the checkboxes + bulk action bar. */
 #regibase-root .lt-toggle { height: 40px; box-sizing: border-box; flex: 0 0 auto; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 18px; cursor: pointer; }
 #regibase-root .lt-toggle.on { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
@@ -260,9 +287,6 @@
 #regibase-root .selspacer { flex: 1; }
 #regibase-root .btn:disabled, #regibase-root .btn[disabled] { opacity: .4; cursor: default; pointer-events: none; box-shadow: none; }
 @media (max-width: 780px) {
-  /* Stack search over sort so neither gets squished into a tiny square. */
-  #regibase-root .lt-search { flex-direction: column; }
-  #regibase-root .lt-search .searchinput, #regibase-root .lt-search .sortselect { flex: 0 0 auto; width: 100%; }
   #regibase-root .lt-actions { gap: 6px; }
   #regibase-root .lt-actions .btn.sm { padding: 6px 8px; font-size: 12px; }
 }
@@ -506,9 +530,10 @@
 #regibase-root .schema-row.dragover { outline: 2px dashed var(--primary); outline-offset: 1px; }
 #regibase-root .schema-row .flags { display: flex; gap: 10px; grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); align-items: center; flex-wrap: wrap; }
 /* ---- record reorder (edit saved order) ---- */
-#regibase-root .sortgroup { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 0 2px 0 8px; background: var(--surface-2); }
+#regibase-root .sortgroup { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 0 2px 0 8px; background: var(--surface-2); height: 30px; box-sizing: border-box; }
 #regibase-root .sortgroup-lbl { font-size: 12px; color: var(--muted); white-space: nowrap; }
-#regibase-root .sortgroup .sortselect { border: none; background: transparent; }
+#regibase-root .sortgroup .sortselect { border: none; background: transparent; color: var(--text); height: 28px; min-height: 28px; box-sizing: border-box; padding: 0 4px; cursor: pointer; font-size: 12px; }
+#regibase-root .sortgroup .sortselect option { background: var(--surface); color: var(--text); }
 #regibase-root .btn.reorder-open { border: 1px solid var(--primary); color: var(--primary); background: transparent; white-space: nowrap; }
 #regibase-root .reorder-byfield { margin-bottom: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 #regibase-root .reorder-byfield-head { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
@@ -530,6 +555,7 @@
 #regibase-root .reorder-row.dragging { opacity: .45; }
 #regibase-root .reorder-row.dragover { outline: 2px dashed var(--primary); outline-offset: -2px; }
 #regibase-root .schema-row .flags label { display: inline-flex; align-items: center; gap: 4px; }
+#regibase-root .schema-row .flags .field-fill { margin-left: auto; color: var(--muted); opacity: .7; font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
 #regibase-root .schema-row input:not([type=checkbox]):not([type=radio]),
 #regibase-root .schema-row select,
 #regibase-root .schema-row textarea {
@@ -608,6 +634,8 @@
 #regibase-root .rec-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; white-space: nowrap; }
 #regibase-root .rec-table th, #regibase-root .rec-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 #regibase-root .rec-table thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-weight: 600; z-index: 1; }
+/* columns with no data in any row: fade the header text further */
+#regibase-root .rec-table thead th.rt-emptycol { opacity: 0.4; font-weight: 500; }
 /* 2nd+ columns: grab-to-scroll cursor (on the cells directly, so hover shows it);
    frozen 1st column + actions stay clickable. */
 #regibase-root .rec-table td, #regibase-root .rec-table th { cursor: -webkit-grab; cursor: grab; }
@@ -792,6 +820,9 @@
 #regibase-root .hist-when { flex: 0 0 auto; font-size: 12px; color: var(--muted); min-width: 96px; }
 #regibase-root .hist-sum { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
 #regibase-root .hist-tag { flex: 0 0 auto; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+#regibase-root .hist-icon { flex: 0 0 auto; font-size: 14px; width: 1.4em; text-align: center; }
+#regibase-root .hist-row .btn.xs { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; }
+#regibase-root .btn.xs { font-size: 11px; padding: 2px 8px; line-height: 1.4; }
 
 /* radio / checkbox choice fields */
 #regibase-root .choice-field { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 4px 0; }

@@ -20,6 +20,8 @@ class RegiBaseService {
 	private const ALLOWED_VIEWS = ['card', 'list', 'detail', 'image', 'table'];
 	private const ALLOWED_SORTS = ['created_asc', 'created_desc', 'title_asc', 'title_desc'];
 	private const KEY_SEPS = ['none', 'space', 'fullspace', 'custom'];
+	/** Field concat separators: KEY_SEPS plus 'paren' (wrap the target in （ ）). */
+	private const CONCAT_SEPS = ['none', 'space', 'fullspace', 'custom', 'paren', 'parenfull'];
 	private const ATTACH_TYPES = ['image', 'image_crop', 'file'];
 	// recipient permission ranks; owner is implicitly above all of these
 	public const PERM_VIEW = 'view';
@@ -403,9 +405,9 @@ class RegiBaseService {
 
 	// ---- undo / change history ----
 
-	/** List the user's change history (newest first). */
-	public function history(string $userId): array {
-		return $this->history->listForUser($userId);
+	/** List the user's snapshot history (newest first), optionally scoped to one collection. */
+	public function history(string $userId, ?int $collectionId = null): array {
+		return $this->history->listForUser($userId, $collectionId);
 	}
 
 	public function undoLimit(string $userId): int {
@@ -416,16 +418,16 @@ class RegiBaseService {
 		return $this->history->setLimit($userId, $n);
 	}
 
-	public function clearHistory(string $userId): void {
-		$this->history->clearForUser($userId);
+	public function clearHistory(string $userId, ?int $collectionId = null): void {
+		$this->history->clearForUser($userId, $collectionId);
 	}
 
 	/**
 	 * Revert the most recent change (or the whole most-recent grouped action).
 	 * @return array{undone:int, summary?:string, collection_id?:?int}
 	 */
-	public function undo(string $userId): array {
-		$batch = $this->history->nextUndoBatch($userId); // newest-first
+	public function undo(string $userId, ?int $collectionId = null): array {
+		$batch = $this->history->nextUndoBatch($userId, $collectionId); // newest-first
 		if (!$batch) {
 			return ['undone' => 0];
 		}
@@ -445,6 +447,32 @@ class RegiBaseService {
 			$done++;
 		}
 		return ['undone' => $done, 'summary' => $summary, 'collection_id' => $collectionId];
+	}
+
+	/**
+	 * Revert a collection back to the state it was in *before* the given snapshot
+	 * entry: undo every not-yet-undone change in that collection whose id is >=
+	 * $targetId, newest first (group batches applied atomically).
+	 * @return array{undone:int, collection_id:int}
+	 */
+	public function undoDownTo(string $userId, int $collectionId, int $targetId): array {
+		$done = 0;
+		for ($i = 0; $i < 100000; $i++) { // hard cap; the id guard is the real terminator
+			$batch = $this->history->nextUndoBatch($userId, $collectionId);
+			if (!$batch || (int)$batch[0]->getId() < $targetId) {
+				break;
+			}
+			foreach ($batch as $entry) {
+				try {
+					$this->applyInverse($userId, $this->history->decode($entry));
+				} catch (\Throwable $e) {
+					// keep going; still mark undone so we never loop on a bad entry
+				}
+				$this->history->markUndone($entry);
+				$done++;
+			}
+		}
+		return ['undone' => $done, 'collection_id' => $collectionId];
 	}
 
 	/** Apply a single inverse payload. Returns the affected collection id if known. */
@@ -577,7 +605,7 @@ class RegiBaseService {
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort((int)($f['sort'] ?? 0));
 			$e->setConcat((int)($f['concat'] ?? 0));
-			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$f['concat_sep'] : 'space');
+			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::CONCAT_SEPS, true) ? (string)$f['concat_sep'] : 'space');
 			$e->setConcatSepChar(mb_substr((string)($f['concat_sep_char'] ?? ''), 0, 4));
 			$this->fields->insert($e);
 		}
@@ -698,7 +726,7 @@ class RegiBaseService {
 			$e->setPlaceholder($f['placeholder'] ?? null);
 			$e->setSort($idx);
 			$e->setConcat((int)($f['concat'] ?? 0));
-			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$f['concat_sep'] : 'space');
+			$e->setConcatSep(in_array($f['concat_sep'] ?? 'space', self::CONCAT_SEPS, true) ? (string)$f['concat_sep'] : 'space');
 			$e->setConcatSepChar(mb_substr((string)($f['concat_sep_char'] ?? ''), 0, 4));
 			$this->fields->insert($e);
 		}
@@ -751,7 +779,7 @@ class RegiBaseService {
 		return function_exists('mb_strtolower') ? mb_strtolower($s) : strtolower($s);
 	}
 
-	public function listRecords(string $userId, int $collectionId, ?string $q, ?string $sort): array {
+	public function listRecords(string $userId, int $collectionId, ?string $q, ?string $sort, bool $regex = false): array {
 		[$c] = $this->resolve($userId, $collectionId); // any recipient level may read
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$mode = ($sort && in_array($sort, self::ALLOWED_SORTS, true)) ? $sort : $c->getRecordSort();
@@ -765,11 +793,26 @@ class RegiBaseService {
 		}
 
 		if ($q !== null && trim($q) !== '') {
-			$needle = mb_strtolower(trim($q));
-			$rows = array_values(array_filter($rows, function ($r) use ($needle) {
-				return str_contains(mb_strtolower($r['title']), $needle)
-					|| str_contains(mb_strtolower(json_encode($r['data'], JSON_UNESCAPED_UNICODE)), $needle);
-			}));
+			if ($regex) {
+				// Build a case-sensitive PCRE from the user's pattern. On an invalid
+				// pattern, leave the rows unfiltered (the client flags it too).
+				$re = '~' . str_replace('~', '\\~', $q) . '~u';
+				if (@preg_match($re, '') !== false) {
+					$rows = array_values(array_filter($rows, function ($r) use ($re) {
+						$subject = (string)$r['title'];
+						foreach ((array)$r['data'] as $v) {
+							$subject .= "\n" . (is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE));
+						}
+						return (bool)preg_match($re, $subject);
+					}));
+				}
+			} else {
+				$needle = mb_strtolower(trim($q));
+				$rows = array_values(array_filter($rows, function ($r) use ($needle) {
+					return str_contains(mb_strtolower($r['title']), $needle)
+						|| str_contains(mb_strtolower(json_encode($r['data'], JSON_UNESCAPED_UNICODE)), $needle);
+				}));
+			}
 		}
 
 		// Name sort = Unicode code-point order (language-neutral / multilingual).
@@ -827,16 +870,21 @@ class RegiBaseService {
 		$e->setCreatedAt($this->now());
 		$e->setUpdatedAt($this->now());
 		$e = $this->records->insert($e);
-		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Add a record'), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
+		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Added: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
 		return $this->getRecord($userId, (int)$e->getId());
 	}
 
-	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null): array {
+	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null, bool $noHistory = false): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
 		$this->assertEditable($c);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$oldData = json_decode($r->getData() ?: '{}', true) ?: [];
-		$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edit a record'), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+		// Silent updates (automatic re-encryption of secret fields) are not user
+		// edits and must not enter the snapshot history — undoing one would revert
+		// the encryption and expose the plaintext.
+		if (!$noHistory) {
+			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+		}
 		$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 		$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
 		$r->setUpdatedAt($this->now());
@@ -867,7 +915,8 @@ class RegiBaseService {
 
 	public function deleteRecord(string $userId, int $id): void {
 		$snap = $this->deleteRecordCapture($userId, $id);
-		$this->rec($userId, 'record.delete', $snap['collectionId'], $this->l->t('Delete a record'), ['kind' => 'reinsert', 'record' => $snap]);
+		$fj = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$snap['collectionId']));
+		$this->rec($userId, 'record.delete', $snap['collectionId'], $this->l->t('Deleted: %s', [$this->titleFor($fj, $snap['data'])]), ['kind' => 'reinsert', 'record' => $snap]);
 	}
 
 	public function deleteRecords(string $userId, array $ids): int {

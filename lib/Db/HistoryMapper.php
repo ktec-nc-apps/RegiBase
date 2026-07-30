@@ -16,18 +16,21 @@ class HistoryMapper extends QBMapper {
 		parent::__construct($db, 'regibase_history', HistoryEntity::class);
 	}
 
-	/** @return HistoryEntity[] newest first */
-	public function listForUser(string $userId, int $limit = 200): array {
+	/** @return HistoryEntity[] newest first (optionally scoped to one collection) */
+	public function listForUser(string $userId, int $limit = 200, ?int $collectionId = null): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
 			->orderBy('id', 'DESC')
 			->setMaxResults($limit);
+		if ($collectionId !== null) {
+			$qb->andWhere($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+		}
 		return $this->findEntities($qb);
 	}
 
-	/** The newest not-yet-undone entry, or null. */
-	public function latestActive(string $userId): ?HistoryEntity {
+	/** The newest not-yet-undone entry (optionally within one collection), or null. */
+	public function latestActive(string $userId, ?int $collectionId = null): ?HistoryEntity {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
@@ -37,6 +40,9 @@ class HistoryMapper extends QBMapper {
 			))
 			->orderBy('id', 'DESC')
 			->setMaxResults(1);
+		if ($collectionId !== null) {
+			$qb->andWhere($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+		}
 		$rows = $this->findEntities($qb);
 		return $rows[0] ?? null;
 	}
@@ -89,10 +95,13 @@ class HistoryMapper extends QBMapper {
 		$del->executeStatement();
 	}
 
-	public function deleteAllForUser(string $userId): void {
+	public function deleteAllForUser(string $userId, ?int $collectionId = null): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+		if ($collectionId !== null) {
+			$qb->andWhere($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+		}
 		$qb->executeStatement();
 	}
 }

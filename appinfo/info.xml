@@ -22,7 +22,7 @@ Features:
 - Add reminders to Nextcloud Calendar from date fields, and open addresses in a map (Google Maps / OpenStreetMap / Apple Maps)
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
-- Read-only command-line access via occ (list / get / export / find), with opt-in secret decryption
+- Command-line access via occ — list / get / export / find (with regex), plus master-key management (set / change / remove) — with opt-in secret decryption
 - Available in 12 languages]]></description>
 	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
 
@@ -42,9 +42,9 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - 日付項目から Nextcloud Calendar にリマインダー追加、住所を地図（Google マップ／OpenStreetMap／Apple マップ）で開く
 - レコードのコレクション間での移動・コピー・マージ
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
-- occによる読み取り専用のコマンドライン操作（一覧／取得／エクスポート／検索）、秘密項目の復号はオプトイン
+- occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
 - 12言語対応]]></description>
-	<version>0.16.0</version>
+	<version>0.17.0</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
@@ -78,5 +78,6 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 		<command>OCA\RegiBase\Command\GetRecord</command>
 		<command>OCA\RegiBase\Command\ExportCollection</command>
 		<command>OCA\RegiBase\Command\FindRecords</command>
+		<command>OCA\RegiBase\Command\MasterKey</command>
 	</commands>
 </info>

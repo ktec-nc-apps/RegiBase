@@ -2,6 +2,44 @@
 
 All notable changes to RegiBase.
 
+## 0.17.0 — 2026-07-30
+
+### Encryption (master key)
+
+- Reworked master-key management: set/change, remove (back to plain text), and sign-out are now
+  clearly separated; terminology unified to "master key".
+- Secret fields are now encrypted automatically when a collection's secret flag changes (background
+  sweep) — the manual re-encrypt option was removed.
+- New occ command `regibase:master` (status | set | change | remove).
+
+### Search & replace
+
+- In-collection search can now use regular expressions (server-side PCRE: case-sensitive, `(?i)`
+  supported, Unicode-aware).
+- New Replace: bulk-replace text across matched records (`$1` group references, undoable from
+  Snapshots).
+- Regex help ("?" chip): a two-page reference — token list plus worked examples.
+- New occ option `regibase:find --regex`.
+
+### Snapshots (formerly Undo)
+
+- "Undo" renamed to "Snapshots"; scope changed from a single global timeline to per-collection.
+  Opened from ⚙️ Collection settings; roll back to any point. Richer summaries with icons and hover
+  detail.
+
+### Display & editor
+
+- Columns with no data are shown with a faint header in the list view.
+- Each field shows a "filled / total" record count in the collection editor.
+- Concatenation can wrap the target in parentheses (half- or full-width); fixed parentheses
+  disappearing when a field was empty.
+
+### Layout & fixes
+
+- The sort control ("Sort") moved next to Duplicate; search/replace box relaid out (aligned left
+  edges, wraps on narrow widths).
+- Fixed dark-mode select text being invisible and an oversized hover box.
+
 ## 0.16.0 — 2026-07-30
 
 ### Concatenation (display combining) — reworked
