@@ -2,6 +2,13 @@
 
 All notable changes to RegiBase.
 
+## 0.17.6 — 2026-08-06
+
+### Compatibility
+
+- Declared support for **Nextcloud 34** (verified on Nextcloud 34.0.2 with PHP 8.5 — install,
+  migrations, records, sharing, search and the occ commands all pass). No code changes.
+
 ## 0.17.5 — 2026-07-30
 
 ### Sharing
