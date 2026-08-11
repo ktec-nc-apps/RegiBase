@@ -40,6 +40,9 @@
   let sharedKeys = {};
   // Collection ids whose share password has been unlocked this session.
   let sharedUnlocked = {};
+  // 6-digit keys entered this session to reveal secret collections. Held in
+  // memory only (never persisted); cleared on reload or when hiding again.
+  let secretPins = new Set();
 
   async function api(path, opts = {}) {
     const res = await fetch(BASE + 'api/' + path, {
@@ -304,7 +307,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
       <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
-        <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span v-if="c.locked" class="ci-lock" :title="t('Edit lock (view only)')">🔒</span><span class="ct">{{ c.record_count }}</span>
+        <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span v-if="c.secret" class="ci-lock" :title="t('Secret collection')">🕶️</span><span v-if="c.locked" class="ci-lock" :title="t('Edit lock (view only)')">🔒</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
         <div>{{ t('No collections yet') }}</div>
@@ -316,6 +319,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
     </div>
     <div class="sidebar-foot">
       <button class="btn primary block" @click="openTemplatePicker">{{ t('＋ New collection') }}</button>
+      <button class="btn sm block secret-toggle" :class="{on: secretShown}" @click="openSecretToggle" :title="t('Show or hide secret collections')">{{ secretShown ? t('🕶️ Hide secret collections') : t('🕶️ Secret toggle') }}</button>
       <button class="btn sm block" @click="openSettings" :title="t('Theme, storage location, etc.')">{{ t('⚙️ Settings') }}</button>
     </div>
   </aside>
@@ -340,7 +344,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       </template>
     </div>
 
-    <div class="content" :class="{'content-table': current && curView==='table' && records.length}" @scroll="onScrollNearBottom">
+    <div class="content" :class="{'content-table': current && curView==='table' && records.length, 'content-note': current && curView==='note' && records.length}" @scroll="onScrollNearBottom">
       <div v-if="!current" class="home">
         <div v-if="collections.length" class="home-grid">
           <button v-for="c in collections" :key="c.id" class="home-card" @click="selectCollection(c.id)">
@@ -486,10 +490,59 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
               </tbody>
             </table>
           </div>
+          <!-- ノート形式（本体は「タイトル一覧｜内容」の2列。コレクション一覧＝左サイドバーが
+               Notes のグループ列に相当し、全体で3ペインになる） -->
+          <div v-else-if="curView==='note'" class="note-view">
+            <div class="note-pane note-titles">
+              <div class="note-list">
+                <button v-for="r in visibleRecords" :key="r.id" type="button" class="note-titem" :class="{on: note.id===r.id}" @click="selNoteRec(r)">
+                  <span class="nt-title">{{ r.title }}</span>
+                  <span class="nt-sub" v-if="summary(r)">{{ summary(r) }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="note-pane note-content">
+              <template v-if="noteCur">
+                <div class="note-chead">
+                  <h3 class="nc-title">{{ noteCur.title }}</h3>
+                  <div class="nc-acts">
+                    <button type="button" class="btn sm" @click="copyRecord(noteCur)" :title="t('⧉ Copy all')">⧉</button>
+                    <button v-if="isOwner && !isLocked" type="button" class="btn sm" @click="openTransfer(noteCur)" :title="t('↔ Move / Copy')">↔</button>
+                    <button v-if="canEdit" type="button" class="btn sm primary" @click="editRecord(noteCur)">{{ t('Edit') }}</button>
+                    <button v-if="canDelete" type="button" class="btn sm danger" @click="deleteRecord(noteCur)">{{ t('Delete') }}</button>
+                  </div>
+                </div>
+                <div class="note-cbody">
+                  <div v-for="f in current.fields" :key="f.key" class="detail-row" v-show="noteCur.data[f.key] != null && noteCur.data[f.key] !== ''">
+                    <div class="dk">{{ f.label }}</div>
+                    <div class="dv" v-if="f.type==='image' || f.type==='image_crop'"><img :src="imgUrl(noteCur.data[f.key])" class="imgpreview lg" /></div>
+                    <div class="dv" v-else-if="f.type==='file'">
+                      <span class="fa-ic">{{ fileIcon(noteCur.data[f.key]) }}</span>
+                      <span class="val">{{ fileName(noteCur.data[f.key]) }}</span>
+                      <button type="button" class="btn sm" @click="openAttachment(noteCur.data[f.key])">{{ t('Open') }}</button>
+                      <button type="button" class="btn sm" @click="downloadAttachment(noteCur.data[f.key])" :title="t('Download')">⬇</button>
+                    </div>
+                    <div class="dv" v-else>
+                      <a v-if="linkFor(f, noteCur.data[f.key])" class="val link" :href="linkFor(f, noteCur.data[f.key])" target="_blank" rel="noopener noreferrer">{{ displayVal(noteCur, f) }}</a>
+                      <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(noteCur, f) }}</span>
+                      <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
+                      <button v-if="f.type==='date' || f.type==='month'" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(noteCur, f)">📅</button>
+                      <button v-if="fieldHasMap(f) && noteCur.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(noteCur.data[f.key])">🌐</button>
+                      <button v-if="!(f.secret && secretsMasked)" type="button" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : noteCur.data[f.key])" :title="t('Copy')">⧉</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div v-else class="note-placeholder">
+                <div class="big">📄</div>
+                <p>{{ t('Select a record on the left to see its contents.') }}</p>
+              </div>
+            </div>
+          </div>
         </template>
       </template>
     </div>
-    <div v-if="current && records.length && current.view!=='table'" class="scrollnav">
+    <div v-if="current && records.length && curView!=='table' && curView!=='note'" class="scrollnav">
       <button class="scrollnav-btn" @click="scrollToTop" :title="t('To top')">▲</button>
       <button class="scrollnav-btn" @click="scrollToBottom" :title="t('To bottom')">▼</button>
     </div>
@@ -858,6 +911,20 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('When on, this collection is view-only: records and fields cannot be added, edited or deleted. A 🔒 mark appears in the collection list. Turn it off here to edit again.') }}</div>
         </div>
 
+        <div v-if="isOwner" class="field">
+          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="collForm.secret" style="width:18px;height:18px" />
+            <span>🕶️ {{ t('Make this collection secret') }}</span>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('When on, this collection is hidden from the list. Use the “Secret toggle” button under “＋ New collection”, enter its 6-digit key, and it appears again for that session only.') }}</div>
+          <div v-if="collForm.secret" class="field" style="margin-top:8px">
+            <label>🔢 {{ t('6-digit secret key') }}</label>
+            <input v-model="collForm.secret_pin" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" maxlength="6"
+              @input="collForm.secret_pin = (collForm.secret_pin || '').replace(/\\D/g, '').slice(0, 6)"
+              :placeholder="current.secret ? t('Enter a new 6-digit key (leave blank to keep the current one)') : t('Set a 6-digit key (numbers only)')" />
+          </div>
+        </div>
+
         <div v-if="isOwner" class="field share-section" :class="{open: shareExpanded}">
           <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" v-model="shareExpanded" style="width:18px;height:18px" />
@@ -966,6 +1033,25 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         <button v-if="isOwner" class="btn danger foot-left" @click="deleteCollection">{{ t('Delete collection') }}</button>
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button v-if="canSettings" class="btn primary" @click="saveCollSettings">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Secret collections: 2FA-style 6-digit key prompt -->
+  <div v-if="modal && modal.type==='secretReveal'" class="modal-mask" @click.self="modal=null">
+    <div class="modal sm secret-modal">
+      <div class="modal-head"><h3>{{ t('🕶️ Secret collections') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <p class="secret-lead">{{ t('Enter the 6-digit secret key to show its collections.') }}</p>
+        <input class="secret-code" v-model="secretForm.pin" type="password" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"
+          maxlength="6" ref="secretCode" placeholder="••••••"
+          @input="secretForm.pin = (secretForm.pin || '').replace(/\\D/g, '').slice(0, 6); secretForm.err = ''"
+          @keyup.enter="submitSecretReveal" />
+        <div v-if="secretForm.err" class="share-err" style="text-align:center">{{ secretForm.err }}</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button class="btn primary" :disabled="secretForm.busy || secretForm.pin.length !== 6" @click="submitSecretReveal">{{ secretForm.busy ? t('Checking…') : t('Show') }}</button>
       </div>
     </div>
   </div>
@@ -1596,7 +1682,11 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         schemaMode: 'collection',
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
         dupForm: { name: '', withRecords: false, busy: false },
-        collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '', files_folder: '', map_provider: '' },
+        collForm: { name: '', icon: '', color: '', description: '', locked: false, key_head: false, key_sep: 'space', key_sep_char: '', files_folder: '', map_provider: '', secret: false, secret_pin: '' },
+        // secret collections: whether any are currently revealed this session,
+        // and the state of the 6-digit unlock prompt.
+        secretShown: false,
+        secretForm: { pin: '', err: '', busy: false },
         settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100 },
         undoTop: null, history: [],
         schemaSep: 'space', schemaSepChar: '',
@@ -1648,10 +1738,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         views: [
           { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
           { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
+          { key: 'note', label: 'Notes', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M9 4v16M15 4v16"/></svg>' },
           { key: 'card', label: 'Cards', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7.4" height="7.4"/><rect x="13.1" y="3.5" width="7.4" height="7.4"/><rect x="3.5" y="13.1" width="7.4" height="7.4"/><rect x="13.1" y="13.1" width="7.4" height="7.4"/></svg>' },
         ],
         xfer: { mode: 'copy', recordIds: [], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' },
         selectedIds: [], delConfirm: false,
+        // ノート形式表示の選択状態。永続化しない（セッション内のみ）。
+        // グループ列＝コレクション（＝既存サイドバー）、本体は「タイトル一覧｜内容」の
+        // 2列。id は右の内容ペインに表示中のレコード id。
+        note: { id: null },
         schemaPlan: null, schemaAck: false,
         reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
         collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
@@ -1698,7 +1793,7 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       curPerm() { return this.current ? (this.current.perm || 'owner') : 'owner'; },
       // Effective view. Only card / list / table remain; any older stored value
       // (detailed list, thumbnail cards) falls back to the plain list.
-      curView() { const v = this.current ? this.current.view : 'list'; return (v === 'card' || v === 'table') ? v : 'list'; },
+      curView() { const v = this.current ? this.current.view : 'list'; return (v === 'card' || v === 'table' || v === 'note') ? v : 'list'; },
       isOwner() { return this.current ? this.current.is_owner !== false : true; },
       // Edit lock: when a collection is locked it is view-only for everyone
       // (owner included). Only collection settings can still be changed — that's
@@ -1761,6 +1856,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       // Fields for the list summary (list_show) and card summary (card_show).
       listGroups() { return this.buildSummaryGroups('list_show'); },
       cardGroups() { return this.buildSummaryGroups('card_show'); },
+      // ---- ノート形式表示用 ----
+      // 右の内容ペインに表示するレコード（未選択なら null）。タイトル一覧＝visibleRecords。
+      noteCur() {
+        if (this.note.id == null) return null;
+        return this.visibleRecords.find((r) => r.id === this.note.id) || null;
+      },
       // Fields that can be used to sort the registration order (values must be
       // readable/comparable: no encrypted secrets, no attachment references).
       reorderFields() {
@@ -2095,6 +2196,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         // when that picker opens so the home screen appears as soon as collections load.
         const cols = await collectionsP;
         if (cols) { this.collections = cols; this.refreshUndo(); } else { await this.loadCollections(); }
+        // Return to the collection that was open before a reload. Only if it is
+        // still in the visible list — secret collections are hidden after a reload,
+        // so restoring one would bypass its key; deleted ones are simply gone.
+        try {
+          const saved = Number(localStorage.getItem('rb-open-coll') || 0);
+          if (saved && this.collections.some((c) => c.id === saved)) {
+            await this.selectCollection(saved, false);
+          }
+        } catch (e) { /* ignore */ }
       },
       // ---- theme (follow Nextcloud, or force dark/light) ----
       parseColor(s) {
@@ -2121,7 +2231,52 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         const el = document.getElementById('regibase-root');
         if (el) el.setAttribute('data-rbtheme', dark ? 'dark' : 'light');
       },
-      async loadCollections() { this.collections = await api('collections'); this.refreshUndo(); },
+      async loadCollections() {
+        const base = await api('collections');
+        // Re-merge any secret collections revealed this session (the base list
+        // excludes them). Keeps counts fresh and surfaces newly-added ones.
+        if (secretPins.size) {
+          const seen = new Set(base.map((c) => c.id));
+          for (const pin of secretPins) {
+            let extra = [];
+            try { extra = await api('collections-reveal', { method: 'POST', body: JSON.stringify({ pin }) }); } catch (e) { extra = []; }
+            for (const c of (extra || [])) { if (!seen.has(c.id)) { seen.add(c.id); base.push(c); } }
+          }
+          this.secretShown = base.some((c) => c.secret);
+        }
+        this.collections = base;
+        this.refreshUndo();
+      },
+      // "Secret toggle" button: if secret collections are shown, hide them again;
+      // otherwise open the 6-digit prompt to reveal them for this session.
+      openSecretToggle() {
+        if (this.secretShown) { this.hideSecretCollections(); return; }
+        this.secretForm = { pin: '', err: '', busy: false };
+        this.modal = { type: 'secretReveal' };
+        this.$nextTick(() => { if (this.$refs.secretCode) this.$refs.secretCode.focus(); });
+      },
+      async submitSecretReveal() {
+        const pin = String(this.secretForm.pin || '').trim();
+        if (!/^\d{6}$/.test(pin)) { this.secretForm.err = T('Enter the 6-digit secret key.'); return; }
+        this.secretForm.busy = true; this.secretForm.err = '';
+        let matches = [];
+        try { matches = await api('collections-reveal', { method: 'POST', body: JSON.stringify({ pin }) }); }
+        catch (e) { this.secretForm.busy = false; this.secretForm.err = T('Failed') + ': ' + (e.message || e); return; }
+        this.secretForm.busy = false;
+        if (!matches || !matches.length) { this.secretForm.err = T('No secret collection matches that key.'); return; }
+        secretPins.add(pin); this.secretShown = true;
+        await this.loadCollections();
+        this.modal = null;
+        this.showToast(T('{n} secret collection(s) shown', { n: matches.length }));
+      },
+      // Hide every revealed secret collection again (forget the entered keys).
+      async hideSecretCollections() {
+        secretPins.clear(); this.secretShown = false;
+        // if the collection currently open is now hidden, return to the home view
+        if (this.current && this.current.secret) { this.current = null; this.records = []; }
+        await this.loadCollections();
+        this.showToast(T('Secret collections hidden'));
+      },
       async selectCollection(id, push = true) {
         // a password-protected share must be unlocked (once per session) before opening
         const meta = this.collections.find((c) => c.id === id);
@@ -2130,7 +2285,10 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
           return;
         }
         this.sidebarOpen = false; this.search = ''; this.selectedIds = [];
+        this.note = { id: null };
         this.current = await api('collections/' + id);
+        // remember the open collection so a page reload returns to it (see boot())
+        try { localStorage.setItem('rb-open-coll', String(id)); } catch (e) { /* ignore */ }
         this.secretUnlocked = { ...this.secretUnlocked, [id]: !!sharedKeys[id] };
         await this.loadRecords();
         if (push) this.pushNav({ cid: id });
@@ -3026,11 +3184,12 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
       },
       goHome(push = true) {
         this.current = null; this.records = []; this.search = ''; this.sidebarOpen = false; this.selectedIds = [];
+        try { localStorage.removeItem('rb-open-coll'); } catch (e) { /* ignore */ }
         if (this.modal) this.modal = null;
         if (push) this.pushNav({ cid: null });
       },
       openCollSettings() {
-        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '', files_folder: this.current.files_folder || '', map_provider: this.current.map_provider || '' };
+        this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '', files_folder: this.current.files_folder || '', map_provider: this.current.map_provider || '', secret: !!this.current.secret, secret_pin: '' };
         this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
@@ -3167,8 +3326,22 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.showToast(T('Exported {fmt}', { fmt: format === 'json' ? 'JSON' : 'CSV' }));
       },
       async saveCollSettings() {
-        const c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify(this.collForm) });
-        this.current = { ...this.current, ...c }; await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
+        const wasSecret = !!this.current.secret;
+        const pin = String(this.collForm.secret_pin || '').trim();
+        if (this.collForm.secret) {
+          if (pin !== '' && !/^\d{6}$/.test(pin)) { alert(T('The secret key must be exactly 6 digits.')); return; }
+          if (!wasSecret && pin === '') { alert(T('Set a 6-digit secret key to make this collection secret.')); return; }
+        }
+        const body = { ...this.collForm, secret_pin: pin };
+        let c;
+        try {
+          c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify(body) });
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); return; }
+        this.current = { ...this.current, ...c };
+        // Keep a just-made-secret collection visible for this session (so it doesn't
+        // vanish from the list the moment you save it), using the key you just set.
+        if (this.collForm.secret && pin) { secretPins.add(pin); this.secretShown = true; }
+        await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
       },
       async deleteCollection() {
         if (!this.isOwner) return;
@@ -3639,6 +3812,15 @@ m-8228 -2390 c606 -480 1469 -828 2783 -1123 926 -208 1965 -340 3215 -411
         this.modal = { type: 'record' };
       },
       openRecord(rec) { this.reveal = {}; this.openDecrypted = {}; this.preloadFileMetas(this.current.fields, rec.data); this.modal = { type: 'detail', rec }; this.decryptSecretsOf(rec); },
+      // ---- ノート形式表示の操作 ----
+      // 右の内容ペインにレコードを表示。openRecord と同じく reveal/添付/秘密の復号を
+      // 用意する（モーダルは開かない）。
+      selNoteRec(rec) {
+        this.reveal = {}; this.openDecrypted = {};
+        this.note.id = rec.id;
+        this.preloadFileMetas(this.current.fields, rec.data);
+        this.decryptSecretsOf(rec);
+      },
       async editRecord(rec) {
         if (!this.canEdit) return;
         this.form = {}; this.reveal = {}; this.editingRecordId = rec.id; this.editingOrig = rec.data;

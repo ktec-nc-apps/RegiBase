@@ -2,6 +2,41 @@
 
 All notable changes to RegiBase.
 
+## 0.18.10 — 2026-08-11
+
+### Note view — a 3-pane, notes-app style layout
+
+- A new **Note view** joins the existing List / Table / Cards views. The view switcher now reads
+  **List · Table · Note · Cards**.
+- It turns the main area into a **title list** and a read-only **content** pane. Together with the
+  collection list in the left sidebar — which acts as the “group” column — it reads like a
+  three-pane notes app: pick a collection on the left, scan its records in the middle, click one
+  to read it on the right.
+- The content pane is laid out like a notes app: **each field is shown as a heading with its value
+  in a soft, rounded box** and a one-tap copy button. Multi-line values keep their line breaks.
+- Selecting a record shows it read-only; **Edit / Duplicate / Move / Delete** are available inline
+  without leaving the view. Long record lists scroll smoothly, and the open record stays selected.
+
+### Reopen where you left off
+
+- When a collection is open, **reloading the page now returns to that collection** instead of the
+  home screen. Going back to “All collections” clears it, so a reload then stays on the home screen.
+  (Secret collections are excluded — see below — so a reload never re-opens them without the key.)
+
+### Secret collections — hide a collection from the list
+
+- A collection can now be marked **secret** in its settings and protected with a **6-digit numeric
+  key**. Secret collections are **hidden from the collection list and the home screen**.
+- A permanent **“Secret toggle”** button under “＋ New collection” opens a passcode-style prompt.
+  Enter the 6-digit key and the matching collections appear **for the current session only** — a
+  reload, or pressing the button again, hides them once more. Nothing is unlocked on the server.
+- **This is a visibility lock, not encryption — and it is completely separate from the encryption
+  master key.** The 6-digit secret key only decides whether a collection is *shown in the list*.
+  It does **not** encrypt any records, and it is **not** the master key used by encrypted “secret
+  fields”. Making a collection secret does not encrypt its data; for confidentiality, use secret
+  fields together with the master key, which are unchanged by this release. The 6-digit key itself
+  is stored only as a bcrypt hash and is never sent to the browser.
+
 ## 0.17.6 — 2026-08-06
 
 ### Compatibility

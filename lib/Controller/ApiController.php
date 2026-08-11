@@ -360,7 +360,20 @@ class ApiController extends Controller {
 			return $this->forbidden();
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		}
+	}
+
+	/**
+	 * Reveal the caller's own secret collections whose 6-digit key matches.
+	 * Returns the matching collections (possibly empty); the client shows them
+	 * for the session only.
+	 */
+	#[NoAdminRequired]
+	public function revealSecretCollections(): JSONResponse {
+		$pin = (string)($this->request->getParam('pin') ?? '');
+		return new JSONResponse($this->service->revealSecretCollections($this->uid(), $pin));
 	}
 
 	#[NoAdminRequired]

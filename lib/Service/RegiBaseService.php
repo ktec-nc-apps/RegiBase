@@ -19,7 +19,7 @@ use OCP\ISession;
 use OCP\IUserManager;
 
 class RegiBaseService {
-	private const ALLOWED_VIEWS = ['card', 'list', 'table'];
+	private const ALLOWED_VIEWS = ['card', 'list', 'table', 'note'];
 	private const ALLOWED_SORTS = ['created_asc', 'created_desc', 'title_asc', 'title_desc'];
 	private const KEY_SEPS = ['none', 'space', 'fullspace', 'custom'];
 	/** Field concat separators: KEY_SEPS plus 'paren' (wrap the target in （ ）). */
@@ -201,6 +201,11 @@ class RegiBaseService {
 	public function listCollections(string $userId): array {
 		$out = [];
 		foreach ($this->collections->findAllForUser($userId) as $c) {
+			// secret collections are hidden until the session is unlocked with the
+			// matching 6-digit key (see revealSecretCollections()).
+			if ($c->getSecret()) {
+				continue;
+			}
 			$j = $c->jsonSerialize();
 			$j['record_count'] = $this->records->countForCollection((int)$c->getId());
 			$out[] = $this->decorateShare($j, true, null);
@@ -228,6 +233,38 @@ class RegiBaseService {
 			$j = $c->jsonSerialize();
 			$j['record_count'] = $this->records->countForCollection((int)$c->getId());
 			$out[] = $this->decorateShare($j, false, $share);
+		}
+		return $out;
+	}
+
+	/** A secret collection key is exactly six digits. */
+	private static function isValidSecretPin(string $pin): bool {
+		return (bool)preg_match('/^\d{6}$/', $pin);
+	}
+
+	/**
+	 * Return the caller's own secret collections whose 6-digit key matches $pin.
+	 * Used by the "secret toggle" to reveal hidden collections for the session
+	 * (nothing is persisted server-side — the client keeps them until it reloads
+	 * or hides them again). Returns [] for a malformed pin or no match, so a wrong
+	 * key is indistinguishable from "no secret collections".
+	 */
+	public function revealSecretCollections(string $userId, string $pin): array {
+		$pin = trim($pin);
+		if (!self::isValidSecretPin($pin)) {
+			return [];
+		}
+		$out = [];
+		foreach ($this->collections->findAllForUser($userId) as $c) {
+			if (!$c->getSecret()) {
+				continue;
+			}
+			$hash = (string)$c->getSecretHash();
+			if ($hash !== '' && password_verify($pin, $hash)) {
+				$j = $c->jsonSerialize();
+				$j['record_count'] = $this->records->countForCollection((int)$c->getId());
+				$out[] = $this->decorateShare($j, true, null);
+			}
 		}
 		return $out;
 	}
@@ -304,6 +341,12 @@ class RegiBaseService {
 		// Default attachment folder for this collection: "<base>/<name>".
 		$c->setFilesFolder($this->images->getBaseFolder($userId) . '/' . $c->getName());
 		$c->setMapProvider('');
+		// Optional: create the collection already secret (hidden behind a 6-digit key).
+		if (!empty($input['secret']) && isset($input['secret_pin'])
+			&& self::isValidSecretPin(trim((string)$input['secret_pin']))) {
+			$c->setSecret(true);
+			$c->setSecretHash(password_hash(trim((string)$input['secret_pin']), PASSWORD_DEFAULT));
+		}
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -428,6 +471,29 @@ class RegiBaseService {
 		}
 		if (isset($patch['map_provider']) && in_array((string)$patch['map_provider'], self::MAP_PROVIDERS, true)) {
 			$c->setMapProvider((string)$patch['map_provider']);
+		}
+		// Secret collection. A new 6-digit key (secret_pin) sets/replaces the hash;
+		// the `secret` flag turns hiding on/off. Turning it off clears the hash.
+		if (array_key_exists('secret_pin', $patch)) {
+			$pin = trim((string)$patch['secret_pin']);
+			if ($pin !== '') {
+				if (!self::isValidSecretPin($pin)) {
+					throw new \InvalidArgumentException($this->l->t('The secret key must be exactly 6 digits.'));
+				}
+				$c->setSecretHash(password_hash($pin, PASSWORD_DEFAULT));
+				$c->setSecret(true);
+			}
+		}
+		if (array_key_exists('secret', $patch)) {
+			if ($patch['secret']) {
+				if (!$c->getSecretHash()) {
+					throw new \InvalidArgumentException($this->l->t('Set a 6-digit secret key to make this collection secret.'));
+				}
+				$c->setSecret(true);
+			} else {
+				$c->setSecret(false);
+				$c->setSecretHash(null);
+			}
 		}
 		$c->setUpdatedAt($this->now());
 		$this->collections->update($c);

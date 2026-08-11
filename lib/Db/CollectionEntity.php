@@ -55,6 +55,11 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 	protected $keySepChar = '';
 	protected $filesFolder = '';
 	protected $mapProvider = '';
+	// Secret collection: hidden from the collection list until unlocked in the
+	// session with the matching 6-digit key. secretHash is the bcrypt hash of that
+	// key; it is never serialised to the client.
+	protected $secret = false;
+	protected $secretHash = null;
 	protected $createdAt = '';
 	protected $updatedAt = '';
 
@@ -62,6 +67,7 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 		$this->addType('sort', 'integer');
 		$this->addType('locked', 'boolean');
 		$this->addType('keyHead', 'boolean');
+		$this->addType('secret', 'boolean');
 	}
 
 	public function jsonSerialize(): array {
@@ -79,6 +85,8 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 			'key_sep_char' => $this->keySepChar,
 			'files_folder' => $this->filesFolder ?? '',
 			'map_provider' => $this->mapProvider ?? '',
+			// only the flag is exposed — never the hash of the secret key
+			'secret' => (bool)$this->secret,
 			'created_at' => $this->createdAt,
 			'updated_at' => $this->updatedAt,
 		];
