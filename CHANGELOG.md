@@ -2,6 +2,26 @@
 
 All notable changes to RegiBase.
 
+## 0.18.12 — 2026-08-17
+
+### New logo
+
+- RegiBase has a **new logo**. The refreshed two-color mark now appears throughout the app — the
+  sidebar header, the loading screen and the sign-in card — and the app icon in the Nextcloud
+  navigation bar has been updated to match.
+
+## 0.18.11 — 2026-08-12
+
+### Fixes
+
+- **Secret toggle window**: titled **“Secret toggle”** to match the button it opens, and the
+  small stray horizontal scrollbar in that window is gone.
+- **Note view**: the title list no longer shows a spurious horizontal scrollbar.
+- **Session handling**: reloading the page keeps you on the collection you had open, but when the
+  login session has ended — the browser was reopened, or the session was lost — RegiBase now
+  returns to the **collection list (home)** instead of reopening the last collection. A hidden
+  (secret) collection is never reopened automatically.
+
 ## 0.18.10 — 2026-08-11
 
 ### Note view — a 3-pane, notes-app style layout

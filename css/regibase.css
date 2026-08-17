@@ -191,8 +191,9 @@
   display: flex; flex-direction: column; min-height: 0;
 }
 #regibase-root .brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 12px; font-weight: 800; font-size: 20px; letter-spacing: .3px; cursor: default; -webkit-user-select: none; user-select: none; }
-#regibase-root .brand .logo { font-size: 24px; }
-#regibase-root .logo svg { width: 1em; height: 1em; display: inline-block; vertical-align: middle; }
+#regibase-root .brand .logo { display: flex; align-items: center; }
+#regibase-root .logo svg { width: auto; height: 1em; display: inline-block; vertical-align: middle; }
+#regibase-root .brand .logo svg { height: 28px; }
 #regibase-root .coll-home { display: flex; align-items: center; gap: 8px; width: calc(100% - 20px); margin: 2px 10px 4px; padding: 10px 12px; text-align: left; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 10px; font-size: 14px; font-weight: 600; }
 #regibase-root .coll-home:hover { background: var(--surface-2); border-color: var(--primary); }
 #regibase-root .coll-home.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
@@ -227,8 +228,8 @@
   display: flex; align-items: center; gap: 12px; padding: 14px 20px;
   border-bottom: 1px solid var(--border); background: var(--surface); min-height: 62px;
 }
-#regibase-root .topbar .title { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 10px; min-width: 0; }
-#regibase-root .topbar .title .ic { font-size: 22px; }
+#regibase-root .topbar .title { font-size: 25px; font-weight: 800; display: flex; align-items: center; gap: 10px; min-width: 0; }
+#regibase-root .topbar .title .ic { font-size: 27px; }
 #regibase-root .topbar .title .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #regibase-root .topbar .spacer { flex: 1; }
 #regibase-root .topbar-actions { display: flex; align-items: center; gap: 8px; }
@@ -649,27 +650,32 @@
 #regibase-root .note-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 #regibase-root .note-titles { flex: 0 0 320px; border-right: 1px solid var(--border); }
 #regibase-root .note-content { flex: 1 1 auto; min-width: 0; }
-#regibase-root .note-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+/* overflow-x:hidden is explicit: setting only overflow-y:auto would compute
+   overflow-x to auto, and a sub-pixel item overflow then shows a stray horizontal
+   scrollbar. Items are ellipsis-clipped, so horizontal scrolling is never wanted. */
+#regibase-root .note-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
 /* min-width:0 lets the item stay within the fixed 320px pane; font-weight:400
    resets Nextcloud core's bold-button default so the subtitle can be light. */
 /* flex-shrink:0 is essential: .note-list is a flex column, so once the records
    exceed its height the items would otherwise shrink (squishing each row to a few
    px and clipping the text) instead of scrolling. */
-#regibase-root .note-titem { display: flex; flex: 0 0 auto; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); border-radius: 8px; cursor: pointer; flex-direction: column; gap: 2px; padding: 9px 11px; font-weight: 400; }
+#regibase-root .note-titem { display: flex; flex: 0 0 auto; width: 100%; box-sizing: border-box; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); border-radius: 8px; cursor: pointer; flex-direction: column; gap: 2px; padding: 9px 11px; font-weight: 400; }
 #regibase-root .note-titem .nt-title { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 #regibase-root .note-titem .nt-sub { font-size: 12px; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 #regibase-root .note-titem:hover { background: var(--surface-2); border-color: var(--border); }
 #regibase-root .note-titem.on { background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
-#regibase-root .note-chead { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-#regibase-root .note-chead .nc-title { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .note-chead { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+#regibase-root .note-chead .nc-title { flex: 1; min-width: 0; margin: 0; font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -.01em; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
+#regibase-root .note-chead .nc-acts { margin-top: 1px; }
 #regibase-root .note-chead .nc-acts { flex: 0 0 auto; display: flex; gap: 6px; }
-#regibase-root .note-cbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 24px 28px; }
+#regibase-root .note-cbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 10px 24px 28px; }
 /* Content styled like the Nextcloud Notes app (owner's MT-03 reference): each
    field is a large heading with its value in a soft filled box + copy button.
    Scoped to .note-cbody so the record detail modal keeps its compact layout. */
-#regibase-root .note-cbody .detail-row { padding: 0; border-bottom: none; margin-bottom: 22px; }
+#regibase-root .note-cbody .detail-row { padding: 2px 0; border-bottom: none; margin-bottom: 22px; }
 #regibase-root .note-cbody .detail-row:last-child { margin-bottom: 0; }
-#regibase-root .note-cbody .detail-row .dk { font-size: 27px; font-weight: 600; color: var(--text); margin-bottom: 12px; line-height: 1.25; word-break: break-word; }
+/* the accent line sits on the field name only, not on the value box below */
+#regibase-root .note-cbody .detail-row .dk { font-size: 19px; font-weight: 600; color: var(--text); margin-bottom: 9px; line-height: 1.3; word-break: break-word; border-left: 5px solid var(--rb-coll-color, var(--primary)); padding-left: 12px; }
 #regibase-root .note-cbody .detail-row .dv { background: var(--surface-2); border-radius: 6px; padding: 13px 17px; font-size: 15px; align-items: flex-start; gap: 10px; }
 #regibase-root .note-cbody .detail-row .dv .val { line-height: 1.65; }
 #regibase-root .note-cbody .detail-row .dv .icon-btn { flex: 0 0 auto; }
@@ -685,9 +691,13 @@
 #regibase-root .secret-toggle.on { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); border-color: color-mix(in srgb, var(--primary) 42%, var(--border)); color: var(--primary); font-weight: 600; }
 /* シークレット解除モーダル（二段階認証風の6桁入力） */
 #regibase-root .secret-modal .secret-lead { margin: 2px 0 14px; color: var(--muted); text-align: center; font-size: 13.5px; }
-#regibase-root .secret-code { display: block; width: 100%; box-sizing: border-box; text-align: center; font-size: 30px; letter-spacing: 14px; padding: 14px 10px 14px 24px; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); }
-#regibase-root .secret-code:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent); }
-#regibase-root .secret-code::placeholder { letter-spacing: 10px; color: var(--muted); opacity: .5; }
+#regibase-root .secret-cells { display: flex; gap: 8px; justify-content: center; }
+#regibase-root .secret-cell { width: 46px; height: 56px; box-sizing: border-box; margin: 0; padding: 0; text-align: center; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); }
+#regibase-root .secret-cell:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent); }
+@media (max-width: 480px) {
+  #regibase-root .secret-cell { width: 42px; height: 52px; font-size: 23px; }
+  #regibase-root .secret-cells { gap: 6px; }
+}
 #regibase-root .rec-table-wrap { overflow: auto; overscroll-behavior: contain; max-width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 #regibase-root .rec-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; white-space: nowrap; }
 #regibase-root .rec-table th, #regibase-root .rec-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
