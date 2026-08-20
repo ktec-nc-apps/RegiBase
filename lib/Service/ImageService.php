@@ -96,6 +96,39 @@ class ImageService {
 	}
 
 	/**
+	 * Rename/move a collection's attachment folder from $oldPath to $newPath
+	 * (both Files-relative). No-op when the source doesn't exist (it may not have
+	 * been created yet), and skipped when the target already exists so an
+	 * unrelated folder is never overwritten. Returns true only if a folder moved.
+	 */
+	public function renameFolder(string $userId, string $oldPath, string $newPath): bool {
+		$old = $this->sanitizePath($oldPath);
+		$new = $this->sanitizePath($newPath);
+		if ($old === '' || $new === '' || $old === $new) {
+			return false;
+		}
+		$userFolder = $this->rootFolder->getUserFolder($userId);
+		if (!$userFolder->nodeExists($old)) {
+			return false;
+		}
+		$node = $userFolder->get($old);
+		if (!($node instanceof Folder)) {
+			return false;
+		}
+		if ($userFolder->nodeExists($new)) {
+			return false; // don't merge into / overwrite an existing folder
+		}
+		// Make sure the destination's parent exists before moving.
+		$slash = strrpos($new, '/');
+		$parentPath = $slash === false ? '' : substr($new, 0, $slash);
+		if ($parentPath !== '') {
+			$this->ensurePath($userId, $parentPath);
+		}
+		$node->move($userFolder->getPath() . '/' . $new);
+		return true;
+	}
+
+	/**
 	 * Save a data URL into the given Files-relative folder and return the fileId.
 	 * @throws \RuntimeException on invalid data / unsupported type
 	 */

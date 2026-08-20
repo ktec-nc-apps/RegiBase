@@ -1,6 +1,10 @@
 OC.L10N.register(
     "regibase",
     {
+    "📁 Rename save folder": "📁 Rename save folder",
+    "Keep the folder name": "Keep the folder name",
+    "Rename the folder": "Rename the folder",
+    "Rename the save folder too? Your data is kept.": "Rename the save folder too? Your data is kept.",
     "Secret collection": "Secret collection",
     "Show or hide secret collections": "Show or hide secret collections",
     "🕶️ Hide secret collections": "🕶️ Hide secret collections",

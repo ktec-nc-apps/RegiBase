@@ -1,6 +1,10 @@
 OC.L10N.register(
     "regibase",
     {
+    "📁 Rename save folder": "📁 保存先フォルダ名の変更",
+    "Keep the folder name": "変更しない",
+    "Rename the folder": "フォルダ名も変更する",
+    "Rename the save folder too? Your data is kept.": "保存先フォルダ名も変更しますか？（データはそのまま残ります）",
     "Secret collection": "シークレットコレクション",
     "Show or hide secret collections": "シークレットコレクションの表示/非表示",
     "🕶️ Hide secret collections": "🕶️ シークレットを隠す",

@@ -431,6 +431,7 @@ class RegiBaseService {
 		// owner-only. Share recipients — at any level, including 'delete' — cannot
 		// change them; their record-level rights are enforced elsewhere.
 		$c = $this->collections->findForUser($id, $userId); // owner only
+		$oldName = $c->getName();
 		// Don't clutter the undo history with pure display-preference switches
 		// (view / sort). Only real settings changes are worth an undo entry.
 		if (array_diff(array_keys($patch), ['view', 'record_sort'])) {
@@ -493,6 +494,30 @@ class RegiBaseService {
 			} else {
 				$c->setSecret(false);
 				$c->setSecretHash(null);
+			}
+		}
+		// When the title is renamed AND the user confirmed it in the settings
+		// dialog (rename_folder), keep the attachment folder's name in step — but
+		// only while it is still the auto-derived one (its last path segment equals
+		// the old title). If the user set a custom folder, leave it alone.
+		if (isset($patch['name']) && !empty($patch['rename_folder'])) {
+			$newName = $c->getName();
+			$folder = $c->getFilesFolder();
+			if ($newName !== '' && $newName !== $oldName && $folder !== '') {
+				$slash = mb_strrpos($folder, '/');
+				$parent = $slash === false ? '' : mb_substr($folder, 0, $slash);
+				$lastSeg = $slash === false ? $folder : mb_substr($folder, $slash + 1);
+				if ($lastSeg === $oldName) {
+					$newFolder = ($parent !== '' ? $parent . '/' : '') . $newName;
+					// Rename the physical Files folder if it exists (non-fatal:
+					// it may not have been created yet if no attachment was saved).
+					try {
+						$this->images->renameFolder($userId, $folder, $newFolder);
+					} catch (\Throwable $e) {
+						// ignore — the stored path is updated regardless
+					}
+					$c->setFilesFolder(mb_substr($newFolder, 0, 512));
+				}
 			}
 		}
 		$c->setUpdatedAt($this->now());

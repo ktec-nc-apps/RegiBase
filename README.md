@@ -40,7 +40,9 @@ fields you set up yourself.
   later (overwrite / merge / add).
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
-- **Attachments** — attach images and files from **Nextcloud Files** or **Notes**.
+- **Attachments** — attach images and files from **Nextcloud Files** or **Notes**. Each collection
+  has its own save folder; when you rename the collection, RegiBase offers to rename that folder to
+  match (your files stay put).
 - **Organise** — move, copy or merge records between collections.
 - **Duplicate a collection** — copy just the fields, or the whole thing **including
   its records**.
@@ -138,7 +140,8 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／追加）できます。
 - **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
   **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
-- **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。
+- **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。コレクションごとに
+  保存先フォルダを持ち、タイトルを変更するとフォルダ名も合わせて変更するか確認します（データはそのまま残ります）。
 - **整理** — レコードをコレクション間で移動・コピー・マージできます。
 - **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
 - **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。

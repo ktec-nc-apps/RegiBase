@@ -917,6 +917,26 @@
     </div>
   </div>
 
+  <!-- Dedicated dialog: on title change, ask whether to rename the save folder too.
+       Floats above the collection-settings modal (cropper-mask z-index). -->
+  <div v-if="folderAsk.open" class="modal-mask cropper-mask" @click.self="!folderAsk.busy && cancelFolderAsk()">
+    <div class="modal sm">
+      <div class="modal-head"><h3>{{ t('📁 Rename save folder') }}</h3><button class="icon-btn" :disabled="folderAsk.busy" @click="cancelFolderAsk">✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:15px;margin-top:0">{{ t('Rename the save folder too? Your data is kept.') }}</p>
+        <div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;font-size:13px;word-break:break-all">
+          <div style="color:var(--muted)">{{ folderAsk.from }}</div>
+          <div>↓</div>
+          <div style="font-weight:700">{{ folderAsk.to }}</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" :disabled="folderAsk.busy" @click="commitCollSettings(false)">{{ t('Keep the folder name') }}</button>
+        <button type="button" class="btn primary" :disabled="folderAsk.busy" @click="commitCollSettings(true)">{{ t('Rename the folder') }}</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Secret collections: 2FA-style 6-digit key prompt -->
   <div v-if="modal && modal.type==='secretReveal'" class="modal-mask" @click.self="modal=null">
     <div class="modal sm secret-modal">
@@ -1560,7 +1580,7 @@
       return {
         authenticated: null,
         collections: [], current: null, records: [], search: '', searchRegex: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
-        sidebarOpen: false, modal: null,
+        sidebarOpen: false, modal: null, folderAsk: { open: false },
         form: {}, editingRecordId: null, reveal: {},
         templates: [], templatesLoading: false, schemaFields: [],
         schemaMode: 'collection',
@@ -3262,15 +3282,40 @@
           if (pin !== '' && !/^\d{6}$/.test(pin)) { alert(T('The secret key must be exactly 6 digits.')); return; }
           if (!wasSecret && pin === '') { alert(T('Set a 6-digit secret key to make this collection secret.')); return; }
         }
+        // When the title changed and the attachment folder is still the auto-derived
+        // one (its last path segment matches the old title) and wasn't hand-edited,
+        // ask — with a dedicated in-app dialog — whether to rename that folder too.
+        // Any other case (custom folder, no title change): save straight away.
+        const oldName = String(this.current.name || '');
+        const newName = String(this.collForm.name || '').trim();
+        const curFolder = String(this.current.files_folder || '');
+        const lastSeg = curFolder.includes('/') ? curFolder.slice(curFolder.lastIndexOf('/') + 1) : curFolder;
+        const folderUnchanged = String(this.collForm.files_folder || '') === curFolder;
+        if (newName && newName !== oldName && folderUnchanged && lastSeg === oldName) {
+          const parent = curFolder.includes('/') ? curFolder.slice(0, curFolder.lastIndexOf('/') + 1) : '';
+          this.folderAsk = { open: true, busy: false, from: curFolder, to: parent + newName };
+          return;
+        }
+        await this.commitCollSettings(false);
+      },
+      // Cancel the folder-rename question and return to the settings dialog (nothing saved).
+      cancelFolderAsk() { this.folderAsk = { open: false }; },
+      // Persist the collection settings. renameFolder tells the backend whether to also
+      // rename the attachment folder (only set true from the dedicated dialog's confirm).
+      async commitCollSettings(renameFolder) {
+        const pin = String(this.collForm.secret_pin || '').trim();
         const body = { ...this.collForm, secret_pin: pin };
+        if (renameFolder) body.rename_folder = true;
+        if (this.folderAsk.open) this.folderAsk.busy = true;
         let c;
         try {
           c = await api('collections/' + this.current.id, { method: 'PATCH', body: JSON.stringify(body) });
-        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); return; }
+        } catch (e) { this.folderAsk = { open: false }; alert(T('Failed') + ': ' + (e.message || e)); return; }
         this.current = { ...this.current, ...c };
         // Keep a just-made-secret collection visible for this session (so it doesn't
         // vanish from the list the moment you save it), using the key you just set.
         if (this.collForm.secret && pin) { secretPins.add(pin); this.secretShown = true; }
+        this.folderAsk = { open: false };
         await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
       },
       async deleteCollection() {

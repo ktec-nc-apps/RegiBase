@@ -2,6 +2,16 @@
 
 All notable changes to RegiBase.
 
+## 0.18.13 — 2026-08-21
+
+### Rename the save folder together with the collection
+
+- When you **rename a collection's title**, RegiBase now asks — in a dedicated dialog — whether to
+  **rename that collection's save folder to match**. Your images and files stay exactly where they
+  are; only the folder name changes. Pick **“Rename the folder”** or **“Keep the folder name”**.
+- The prompt only appears while the save folder is still the auto-derived one (named after the
+  collection). If you have pointed the collection at a **custom folder**, it is left untouched.
+
 ## 0.18.12 — 2026-08-17
 
 ### New logo
