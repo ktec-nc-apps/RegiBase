@@ -644,6 +644,8 @@ class ApiController extends Controller {
 			'ja' => '日本語', 'en' => 'English', 'zh' => '简体中文', 'es' => 'Español',
 			'fr' => 'Français', 'de' => 'Deutsch', 'ru' => 'Русский', 'pt' => 'Português',
 			'ar' => 'العربية', 'hi' => 'हिन्दी', 'ko' => '한국어', 'it' => 'Italiano',
+			'cs' => 'Čeština', 'fa' => 'فارسی', 'id' => 'Bahasa Indonesia', 'pl' => 'Polski',
+			'th' => 'ไทย', 'tr' => 'Türkçe', 'uk' => 'Українська', 'vi' => 'Tiếng Việt',
 		];
 		$out = [];
 		foreach (glob(__DIR__ . '/../../l10n/*.json') ?: [] as $path) {
