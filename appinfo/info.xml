@@ -44,7 +44,7 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
 - 20言語対応]]></description>
-	<version>0.18.21</version>
+	<version>0.18.31</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
