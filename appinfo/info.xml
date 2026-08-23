@@ -23,7 +23,7 @@ Features:
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
 - Command-line access via occ — list / get / export / find (with regex), plus master-key management (set / change / remove) — with opt-in secret decryption
-- Available in 12 languages]]></description>
+- Available in 20 languages]]></description>
 	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
 
 項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・表計算風テーブル（先頭列固定）・カードの表示形式で閲覧でき、項目ごとにどの表示に出すかを選べます。
@@ -43,8 +43,8 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - レコードのコレクション間での移動・コピー・マージ
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
-- 12言語対応]]></description>
-	<version>0.18.13</version>
+- 20言語対応]]></description>
+	<version>0.18.21</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

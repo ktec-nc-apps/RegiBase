@@ -51,9 +51,10 @@ fields you set up yourself.
   secret-field sharing.
 - **Nextcloud Tables integration** — **import** a Tables table into a new collection,
   or **export** a collection to a new Tables table.
-- **12 languages** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
-  Русский · Português · العربية · हिन्दी · 한국어 · Italiano. Pick a language in the
-  app independently of your Nextcloud language.
+- **20 languages** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
+  Русский · Português · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
+  Bahasa Indonesia · Polski · ไทย · Türkçe · Українська · Tiếng Việt. Pick a language
+  in the app independently of your Nextcloud language.
 
 ### Works with your other Nextcloud apps
 
@@ -148,8 +149,9 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   任意のアクセスパスワードや、秘密項目の共有にも対応します。
 - **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、
   またはコレクションを Tables へ**書き出し**できます。
-- **12 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
-  Русский · Português · العربية · हिन्दी · 한국어 · Italiano。
+- **20 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
+  Русский · Português · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
+  Bahasa Indonesia · Polski · ไทย · Türkçe · Українська · Tiếng Việt。
   Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
 
 ### 他の Nextcloud アプリと連携
