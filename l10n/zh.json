@@ -831,7 +831,19 @@
         "No matches to replace": "没有可替换的匹配项",
         "Replace in {n} record(s)? This can be undone from snapshots.": "在 {n} 条记录中替换吗？此操作可从快照撤销。",
         "Replaced in {n} record(s)": "已在 {n} 条记录中替换",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "对此集合的每次变更都会创建快照。可打开以查看、撤销最新变更或恢复到更早的时间点。设为 0 可关闭快照。（保留上限适用于所有集合。）"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "对此集合的每次变更都会创建快照。可打开以查看、撤销最新变更或恢复到更早的时间点。设为 0 可关闭快照。（保留上限适用于所有集合。）",
+        "Base folder for attachments": "附件的基础文件夹",
+        "e.g. RegiBase": "例如：RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "新集合附件的默认父文件夹（位于 Files 下）；每个新集合都保存到“此文件夹／集合名称”下。默认：RegiBase。",
+        "Also delete this collection’s save folder": "同时删除此集合的保存文件夹",
+        "The saved data will be moved to the trash.": "保存的数据将被移至回收站。",
+        "Could not delete the collection": "无法删除集合",
+        "Browse…": "浏览…",
+        "Folder name already in use": "文件夹名称已被使用",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "另一个集合已经使用了同名的文件夹。要使用同一个文件夹吗？选择“否”将创建一个添加了编号的文件夹。",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "该保存文件夹被另一个集合使用，因此不会被删除。如有需要，请手动删除。",
+        "Yes": "是",
+        "No": "否"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

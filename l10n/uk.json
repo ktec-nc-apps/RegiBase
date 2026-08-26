@@ -831,7 +831,19 @@
         "No matches to replace": "Немає збігів для заміни",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Замінити в {n} записах? Це можна скасувати зі знімків.",
         "Replaced in {n} record(s)": "Замінено в {n} записах",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Кожна зміна цієї колекції фіксується у знімку. Відкрийте, щоб переглянути, скасувати останню або відновити до попередньої точки. Задайте 0, щоб вимкнути знімки. (Межа зберігання застосовується до всіх колекцій.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Кожна зміна цієї колекції фіксується у знімку. Відкрийте, щоб переглянути, скасувати останню або відновити до попередньої точки. Задайте 0, щоб вимкнути знімки. (Межа зберігання застосовується до всіх колекцій.)",
+        "Base folder for attachments": "Базова тека для вкладень",
+        "e.g. RegiBase": "напр. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Батьківська тека за замовчуванням (у Файлах) для вкладень нових колекцій; кожна нова колекція зберігає у “ця тека / назва колекції”. Типово: RegiBase.",
+        "Also delete this collection’s save folder": "Також видалити теку збереження цієї колекції",
+        "The saved data will be moved to the trash.": "Збережені дані буде переміщено до смітника.",
+        "Could not delete the collection": "Не вдалося видалити колекцію",
+        "Browse…": "Огляд…",
+        "Folder name already in use": "Назва теки вже використовується",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Інша колекція вже використовує теку з такою назвою. Використати ту саму теку? Якщо вибрати «Ні», її буде створено з доданим номером.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Тека збереження використовується іншою колекцією, тому її не видалено. За потреби видаліть її вручну.",
+        "Yes": "Так",
+        "No": "Ні"
     },
     "pluralForm": "nplurals=4; plural=(n % 1 == 0 && n % 10 == 1 && n % 100 != 11 ? 0 : n % 1 == 0 && n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 1 : n % 1 == 0 && (n % 10 ==0 || (n % 10 >=5 && n % 10 <=9) || (n % 100 >=11 && n % 100 <=14 )) ? 2: 3);"
 }

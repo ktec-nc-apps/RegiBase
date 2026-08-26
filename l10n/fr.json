@@ -831,7 +831,19 @@
         "No matches to replace": "Aucune correspondance à remplacer",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Remplacer dans {n} enregistrement(s) ? Cette opération peut être annulée depuis les instantanés.",
         "Replaced in {n} record(s)": "Remplacé dans {n} enregistrement(s)",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Chaque modification de cette collection fait l'objet d'un instantané. Ouvrez pour examiner, annuler la dernière ou restaurer à un point antérieur. Réglez sur 0 pour désactiver les instantanés. (La limite de conservation s'applique à toutes les collections.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Chaque modification de cette collection fait l'objet d'un instantané. Ouvrez pour examiner, annuler la dernière ou restaurer à un point antérieur. Réglez sur 0 pour désactiver les instantanés. (La limite de conservation s'applique à toutes les collections.)",
+        "Base folder for attachments": "Dossier de base pour les pièces jointes",
+        "e.g. RegiBase": "ex. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Le dossier parent par défaut (dans Fichiers) pour les pièces jointes des nouvelles collections ; chaque nouvelle collection enregistre dans « ce dossier / nom de la collection ». Par défaut : RegiBase.",
+        "Also delete this collection’s save folder": "Supprimer aussi le dossier de sauvegarde de cette collection",
+        "The saved data will be moved to the trash.": "Les données enregistrées seront déplacées vers la corbeille.",
+        "Could not delete the collection": "Impossible de supprimer la collection",
+        "Browse…": "Parcourir…",
+        "Folder name already in use": "Nom de dossier déjà utilisé",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Une autre collection utilise déjà un dossier portant ce nom. Utiliser le même dossier ? Si vous choisissez Non, il sera créé avec un numéro ajouté.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Le dossier de sauvegarde est utilisé par une autre collection, il n'est donc pas supprimé. Supprimez-le manuellement si nécessaire.",
+        "Yes": "Oui",
+        "No": "Non"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

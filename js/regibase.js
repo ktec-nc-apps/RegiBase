@@ -1183,6 +1183,14 @@
           </select>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The display language switches when you press “Save”.') }}</div>
         </div>
+        <div class="field" style="margin-top:16px">
+          <label>📁 {{ t('Base folder for attachments') }}</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input v-model="settingsForm.files_folder" :placeholder="t('e.g. RegiBase')" spellcheck="false" autocorrect="off" autocapitalize="off" style="flex:1;min-width:0" />
+            <button type="button" class="btn sm" @click="openFolderPicker('settings')">📁 {{ t('Browse…') }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.') }}</div>
+        </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>{{ t('🔒 Encryption (secret fields) — optional') }}</label>
           <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
@@ -1219,6 +1227,44 @@
       <div class="modal-foot">
         <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button class="btn primary" @click="saveSettings">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 作成時：保存フォルダ名が他コレクションと衝突（そのまま使う／連番を付ける） -->
+  <div v-if="modal && modal.type==='folderConflict'" class="modal-mask" @click.self="cancelFolderConflict()">
+    <div class="modal">
+      <div class="modal-head"><h3>📁 {{ t('Folder name already in use') }}</h3><button class="icon-btn" @click="cancelFolderConflict()">✕</button></div>
+      <div class="modal-body">
+        <p style="margin-top:0">{{ t('Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.') }}</p>
+        <p v-if="pendingCreate" style="font-size:12px;color:var(--muted)">📁 {{ pendingCreate.folder }}</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" :disabled="busy" @click="cancelFolderConflict()">{{ t('Cancel') }}</button>
+        <button class="btn" :disabled="busy" @click="resolveFolderConflict(false)">{{ t('No') }}</button>
+        <button class="btn primary" :disabled="busy" @click="resolveFolderConflict(true)">{{ t('Yes') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- コレクション削除の確認（保存フォルダも消すか尋ねる／既定は消さない） -->
+  <div v-if="modal && modal.type==='delColl' && current" class="modal-mask" @click.self="!modal.busy && (modal=null)">
+    <div class="modal">
+      <div class="modal-head"><h3>🗑 {{ t('Delete collection') }}</h3><button class="icon-btn" :disabled="modal.busy" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <p style="margin-top:0">{{ t('Delete the collection “{name}” and all its records. Are you sure?', { name: current.name }) }}</p>
+        <template v-if="current.files_folder">
+          <label v-if="!current.folder_shared" class="confirm-check" style="align-items:flex-start;margin-top:6px">
+            <input type="checkbox" v-model="modal.deleteFolder" />
+            <span>{{ t('Also delete this collection’s save folder') }}<br><span style="font-size:12px;color:var(--muted)">📁 {{ current.files_folder }}</span></span>
+          </label>
+          <p v-else style="font-size:13px;color:var(--muted);margin-top:6px">📁 {{ current.files_folder }}<br>{{ t('The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.') }}</p>
+        </template>
+        <p v-if="modal.deleteFolder && modal.folderHasData" style="color:var(--danger);font-size:13px;background:color-mix(in srgb,var(--danger) 12%,transparent);padding:8px 10px;border-radius:8px;margin-top:10px">{{ t('The saved data will be moved to the trash.') }}</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" :disabled="modal.busy" @click="modal=null">{{ t('Cancel') }}</button>
+        <button class="btn danger" :disabled="modal.busy" @click="doDeleteCollection">{{ t('Delete') }}</button>
       </div>
     </div>
   </div>
@@ -1580,7 +1626,7 @@
       return {
         authenticated: null,
         collections: [], current: null, records: [], search: '', searchRegex: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
-        sidebarOpen: false, modal: null, folderAsk: { open: false },
+        sidebarOpen: false, modal: null, folderAsk: { open: false }, pendingCreate: null,
         form: {}, editingRecordId: null, reveal: {},
         templates: [], templatesLoading: false, schemaFields: [],
         schemaMode: 'collection',
@@ -2620,13 +2666,15 @@
       fpClick(x) { if (x.is_dir) this.fpLoad(x.path); else this.filePicker.selected = x; },
       fpDbl(x) { if (!x.is_dir) { this.filePicker.selected = x; this.fpConfirm(); } },
       fpCancel() { this.filePicker.open = false; this.filePicker.selected = null; },
-      // Browse Files to pick this collection's attachment folder (fills collForm.files_folder).
-      openFolderPicker() {
-        this.filePicker = { open: true, field: null, mode: 'folder', path: '', parent: null, entries: [], selected: null, loading: true, error: '' };
+      // Browse Files to pick an attachment folder. target 'settings' fills the
+      // base folder in Settings; anything else fills this collection's folder.
+      openFolderPicker(target) {
+        this.filePicker = { open: true, field: null, mode: 'folder', target: (target === 'settings' ? 'settings' : 'coll'), path: '', parent: null, entries: [], selected: null, loading: true, error: '' };
         this.fpLoad('');
       },
       fpConfirmFolder() {
-        this.collForm.files_folder = this.filePicker.path || '';
+        if (this.filePicker.target === 'settings') this.settingsForm.files_folder = this.filePicker.path || '';
+        else this.collForm.files_folder = this.filePicker.path || '';
         this.filePicker.open = false;
       },
       async fpConfirm() {
@@ -3035,14 +3083,36 @@
         }
       },
       async createFromTemplate(tpl) {
+        const body = { name: tpl.name, icon: tpl.icon, color: tpl.color, description: tpl.description, fields: tpl.fields };
+        await this.createCollectionWithConflictCheck(body);
+      },
+      // POST a new collection. If its save folder would clash with another
+      // collection's, the server replies { folder_conflict } instead of creating;
+      // we then ask the user (reuse the folder / add a number). `choice` carries
+      // that answer on the retry.
+      async createCollectionWithConflictCheck(body, choice) {
         this.busy = true;
         try {
-          const body = { name: tpl.name, icon: tpl.icon, color: tpl.color, description: tpl.description, fields: tpl.fields };
-          const c = await api('collections', { method: 'POST', body: JSON.stringify(body) });
+          const payload = choice ? { ...body, folder_choice: choice } : body;
+          const c = await api('collections', { method: 'POST', body: JSON.stringify(payload) });
+          if (c && c.folder_conflict) {
+            this.pendingCreate = { body, folder: c.folder };
+            this.modal = { type: 'folderConflict' };
+            return;
+          }
           this.modal = null; await this.loadCollections(); await this.selectCollection(c.id);
           this.showToast(T('Collection created'));
         } finally { this.busy = false; }
       },
+      // Answer the folder-name conflict prompt: reuse=true keeps the same folder,
+      // reuse=false creates with a number appended.
+      async resolveFolderConflict(reuse) {
+        const pc = this.pendingCreate;
+        this.pendingCreate = null;
+        if (!pc) { this.modal = null; return; }
+        await this.createCollectionWithConflictCheck(pc.body, reuse ? 'reuse' : 'suffix');
+      },
+      cancelFolderConflict() { this.pendingCreate = null; this.modal = null; },
       async refreshTemplates() {
         this.templatesLoading = true;
         try { this.templates = await api('templates'); }
@@ -3318,10 +3388,35 @@
         this.folderAsk = { open: false };
         await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
       },
-      async deleteCollection() {
-        if (!this.isOwner) return;
-        if (!confirm(T('Delete the collection “{name}” and all its records. Are you sure?', { name: this.current.name }))) return;
-        await api('collections/' + this.current.id, { method: 'DELETE' });
+      deleteCollection() {
+        if (!this.isOwner || !this.current) return;
+        // Open a confirm dialog that also asks whether to trash the save folder
+        // (default off — the folder is kept unless the user opts in).
+        this.modal = { type: 'delColl', deleteFolder: false, busy: false, folderHasData: false };
+        this.checkDeleteFolderData();
+      },
+      // Does this collection's save folder actually hold any files? Used to show
+      // the "data will be moved to the trash" note only when there is data.
+      async checkDeleteFolderData() {
+        const folder = String((this.current && this.current.files_folder) || '').trim();
+        if (!folder) return;
+        try {
+          const r = await api('files/browse?path=' + encodeURIComponent(folder));
+          const n = Array.isArray(r.entries) ? r.entries.length : 0;
+          if (this.modal && this.modal.type === 'delColl') this.modal.folderHasData = n > 0;
+        } catch (e) { /* folder missing / unreadable → treat as empty */ }
+      },
+      async doDeleteCollection() {
+        if (!this.isOwner || !this.current || !this.modal) return;
+        const del = !!this.modal.deleteFolder;
+        this.modal.busy = true;
+        try {
+          await api('collections/' + this.current.id + (del ? '?delete_folder=1' : ''), { method: 'DELETE' });
+        } catch (e) {
+          this.modal.busy = false;
+          this.showToast(T('Could not delete the collection'));
+          return;
+        }
         this.modal = null; this.current = null; this.records = []; await this.loadCollections(); this.showToast(T('Deleted'));
       },
       // "records with data / total" for a field, shown at the bottom-right of its

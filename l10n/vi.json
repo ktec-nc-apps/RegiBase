@@ -831,7 +831,19 @@
         "No matches to replace": "Không có kết quả khớp nào để thay thế",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Thay thế trong {n} bản ghi? Việc này có thể được hoàn tác từ ảnh chụp nhanh.",
         "Replaced in {n} record(s)": "Đã thay thế trong {n} bản ghi",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Mọi thay đổi đối với bộ sưu tập này đều được chụp nhanh. Mở để xem lại, hoàn tác thay đổi mới nhất, hoặc khôi phục về một thời điểm trước đó. Đặt 0 để tắt ảnh chụp nhanh. (Giới hạn giữ áp dụng cho tất cả các bộ sưu tập.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Mọi thay đổi đối với bộ sưu tập này đều được chụp nhanh. Mở để xem lại, hoàn tác thay đổi mới nhất, hoặc khôi phục về một thời điểm trước đó. Đặt 0 để tắt ảnh chụp nhanh. (Giới hạn giữ áp dụng cho tất cả các bộ sưu tập.)",
+        "Base folder for attachments": "Thư mục gốc cho tệp đính kèm",
+        "e.g. RegiBase": "ví dụ RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Thư mục cha mặc định (dưới Files) cho tệp đính kèm của các bộ sưu tập mới; mỗi bộ sưu tập mới lưu vào “thư mục này / tên bộ sưu tập”. Mặc định: RegiBase.",
+        "Also delete this collection’s save folder": "Xóa cả thư mục lưu của bộ sưu tập này",
+        "The saved data will be moved to the trash.": "Dữ liệu đã lưu sẽ được chuyển vào thùng rác.",
+        "Could not delete the collection": "Không thể xóa bộ sưu tập",
+        "Browse…": "Duyệt…",
+        "Folder name already in use": "Tên thư mục đã được sử dụng",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Một bộ sưu tập khác đã dùng thư mục có tên này. Dùng chung thư mục đó? Chọn Không sẽ tạo thư mục mới có thêm số ở cuối.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Thư mục lưu đang được một bộ sưu tập khác sử dụng nên không bị xóa. Hãy xóa thủ công nếu bạn cần.",
+        "Yes": "Có",
+        "No": "Không"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

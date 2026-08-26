@@ -831,7 +831,19 @@
         "No matches to replace": "Tidak ada kecocokan untuk diganti",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Ganti di {n} rekaman? Ini dapat diurungkan dari snapshot.",
         "Replaced in {n} record(s)": "Diganti di {n} rekaman",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Setiap perubahan pada koleksi ini dibuatkan snapshot. Buka untuk meninjau, mengurungkan yang terbaru, atau memulihkan ke titik sebelumnya. Setel 0 untuk mematikan snapshot. (Batas penyimpanan berlaku untuk semua koleksi.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Setiap perubahan pada koleksi ini dibuatkan snapshot. Buka untuk meninjau, mengurungkan yang terbaru, atau memulihkan ke titik sebelumnya. Setel 0 untuk mematikan snapshot. (Batas penyimpanan berlaku untuk semua koleksi.)",
+        "Base folder for attachments": "Folder dasar untuk lampiran",
+        "e.g. RegiBase": "mis. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Folder induk bawaan (di bawah Files) untuk lampiran koleksi baru; setiap koleksi baru disimpan ke dalam “folder ini / nama koleksi”. Bawaan: RegiBase.",
+        "Also delete this collection’s save folder": "Hapus juga folder simpan koleksi ini",
+        "The saved data will be moved to the trash.": "Data yang tersimpan akan dipindahkan ke tempat sampah.",
+        "Could not delete the collection": "Tidak dapat menghapus koleksi",
+        "Browse…": "Telusuri…",
+        "Folder name already in use": "Nama folder sudah digunakan",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Koleksi lain sudah menggunakan folder dengan nama ini. Gunakan folder yang sama? Memilih Tidak akan membuatnya dengan nomor tambahan.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Folder simpan digunakan oleh koleksi lain, sehingga tidak dihapus. Hapus secara manual jika Anda perlu.",
+        "Yes": "Ya",
+        "No": "Tidak"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

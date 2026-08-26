@@ -317,7 +317,71 @@ class RegiBaseService {
 		[$c, , $isOwner, $share] = $this->resolve($userId, $id);
 		$j = $c->jsonSerialize();
 		$j['fields'] = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
-		return $this->decorateShare($j, $isOwner, $share);
+		$out = $this->decorateShare($j, $isOwner, $share);
+		if ($isOwner) {
+			// Flag when another collection shares this save folder, so the delete
+			// dialog can refuse to remove the folder (it would take the other
+			// collection's attachments with it).
+			$out['folder_shared'] = $this->folderSharedByOthers($userId, (int)$id, (string)$c->getFilesFolder());
+		}
+		return $out;
+	}
+
+	/**
+	 * Save folders (Files-relative) currently used by this user's collections,
+	 * excluding collection $exceptId (0 = none). Keyed by folder path.
+	 * @return array<string,string> folder => collection name
+	 */
+	private function foldersInUse(string $userId, int $exceptId): array {
+		$used = [];
+		foreach ($this->collections->findAllForUser($userId) as $c) {
+			if ((int)$c->getId() === $exceptId) {
+				continue;
+			}
+			$f = trim((string)$c->getFilesFolder());
+			if ($f !== '') {
+				$used[$f] = $c->getName();
+			}
+		}
+		return $used;
+	}
+
+	/** The folder a new collection would use for this input: "<base>/<name>". */
+	private function intendedFolderFor(string $userId, array $input, IL10N $l): string {
+		$tpl = isset($input['template_key']) ? Templates::byKey($l, (string)$input['template_key']) : null;
+		$name = (string)($input['name'] ?? ($tpl['name'] ?? $l->t('New collection')));
+		return $this->images->getBaseFolder($userId) . '/' . $name;
+	}
+
+	/**
+	 * If a new collection created from $input would reuse the save folder of an
+	 * existing collection, return that folder path; otherwise null.
+	 */
+	public function collectionFolderConflict(string $userId, array $input, ?IL10N $l = null): ?string {
+		$l = $l ?? $this->l;
+		$folder = $this->intendedFolderFor($userId, $input, $l);
+		return isset($this->foldersInUse($userId, 0)[$folder]) ? $folder : null;
+	}
+
+	/** Is $folder the save folder of some other collection (not $exceptId)? */
+	public function folderSharedByOthers(string $userId, int $exceptId, string $folder): bool {
+		$folder = trim($folder);
+		return $folder !== '' && isset($this->foldersInUse($userId, $exceptId)[$folder]);
+	}
+
+	/**
+	 * First save folder not used by any collection and not present on disk:
+	 * "<base>/<name>", then "<base>/<name> (2)", "(3)", …
+	 */
+	private function uniqueFolder(string $userId, string $base, string $name): string {
+		$used = $this->foldersInUse($userId, 0);
+		$candidate = $base . '/' . $name;
+		$i = 1;
+		while (isset($used[$candidate]) || $this->images->folderExists($userId, $candidate)) {
+			$i++;
+			$candidate = $base . '/' . $name . ' (' . $i . ')';
+		}
+		return $candidate;
 	}
 
 	public function createCollection(string $userId, array $input, ?IL10N $tplL10n = null): array {
@@ -338,8 +402,13 @@ class RegiBaseService {
 		$c->setKeyHead(!empty($input['key_head']));
 		$c->setKeySep(in_array($input['key_sep'] ?? 'space', self::KEY_SEPS, true) ? (string)$input['key_sep'] : 'space');
 		$c->setKeySepChar(mb_substr((string)($input['key_sep_char'] ?? ''), 0, 4));
-		// Default attachment folder for this collection: "<base>/<name>".
-		$c->setFilesFolder($this->images->getBaseFolder($userId) . '/' . $c->getName());
+		// Default attachment folder for this collection: "<base>/<name>". When the
+		// caller chose "add a number" for a name that clashes with another
+		// collection's folder, pick the first free "<name> (n)" instead.
+		$base = $this->images->getBaseFolder($userId);
+		$c->setFilesFolder(((string)($input['folder_choice'] ?? '') === 'suffix')
+			? $this->uniqueFolder($userId, $base, $c->getName())
+			: $base . '/' . $c->getName());
 		$c->setMapProvider('');
 		// Optional: create the collection already secret (hidden behind a 6-digit key).
 		if (!empty($input['secret']) && isset($input['secret_pin'])
@@ -351,6 +420,9 @@ class RegiBaseService {
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
 		$c = $this->collections->insert($c);
+		// Create the attachment folder on disk now, so it exists in Files even
+		// before the first attachment is added (best-effort).
+		$this->images->ensureFolderExists($userId, (string)$c->getFilesFolder());
 
 		$fields = $input['fields'] ?? ($tpl['fields'] ?? []);
 		$this->insertFields((int)$c->getId(), $fields);
@@ -468,7 +540,20 @@ class RegiBaseService {
 			$c->setKeySepChar(mb_substr((string)$patch['key_sep_char'], 0, 4));
 		}
 		if (array_key_exists('files_folder', $patch)) {
-			$c->setFilesFolder(mb_substr(trim((string)$patch['files_folder']), 0, 512));
+			$oldFolder = (string)$c->getFilesFolder();
+			$newFolder = mb_substr(trim((string)$patch['files_folder']), 0, 512);
+			$c->setFilesFolder($newFolder);
+			// A direct edit of the folder path must also update Files itself, not
+			// just the database pointer: move (rename) the existing folder to the
+			// new location. If there is nothing to move — no old folder, or the
+			// destination already exists — just make sure the new folder exists so
+			// it shows up in Files. The title-triggered rename below is left to
+			// handle the rename-on-rename_folder case.
+			if ($newFolder !== '' && $newFolder !== $oldFolder && empty($patch['rename_folder'])) {
+				if ($oldFolder === '' || !$this->images->renameFolder($userId, $oldFolder, $newFolder)) {
+					$this->images->ensureFolderExists($userId, $newFolder);
+				}
+			}
 		}
 		if (isset($patch['map_provider']) && in_array((string)$patch['map_provider'], self::MAP_PROVIDERS, true)) {
 			$c->setMapProvider((string)$patch['map_provider']);
@@ -525,8 +610,9 @@ class RegiBaseService {
 		return $this->getCollection($userId, $id);
 	}
 
-	public function deleteCollection(string $userId, int $id): void {
+	public function deleteCollection(string $userId, int $id, bool $deleteFolder = false): void {
 		$c = $this->collections->findForUser($id, $userId);
+		$folder = (string)$c->getFilesFolder();
 		// Snapshot the whole collection (settings + fields + record data) so the
 		// deletion can be reversed. Attachment files are trashed below; on undo the
 		// data references are restored (files may need restoring from the trash bin).
@@ -547,6 +633,13 @@ class RegiBaseService {
 		$this->records->deleteForCollection($id);
 		$this->shares->deleteForCollection($id);
 		$this->collections->delete($c);
+		// Optionally move this collection's save folder to the trash. Off by
+		// default; the caller opts in. Best-effort — never blocks the delete.
+		// Safety net: never remove a folder that another collection also uses
+		// (that would trash the other collection's attachments).
+		if ($deleteFolder && $folder !== '' && !$this->folderSharedByOthers($userId, $id, $folder)) {
+			$this->images->trashFolder($userId, $folder);
+		}
 	}
 
 	// ---- undo / change history ----

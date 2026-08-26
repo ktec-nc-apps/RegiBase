@@ -831,7 +831,19 @@
         "No matches to replace": "Keine Übereinstimmungen zum Ersetzen",
         "Replace in {n} record(s)? This can be undone from snapshots.": "In {n} Datensatz/Datensätzen ersetzen? Dies kann über Schnappschüsse rückgängig gemacht werden.",
         "Replaced in {n} record(s)": "In {n} Datensatz/Datensätzen ersetzt",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Jede Änderung an dieser Sammlung wird als Schnappschuss gespeichert. Öffnen Sie sie, um sie zu prüfen, die letzte rückgängig zu machen oder auf einen früheren Punkt zurückzusetzen. Setzen Sie 0, um Schnappschüsse zu deaktivieren. (Das Aufbewahrungslimit gilt für alle Sammlungen.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Jede Änderung an dieser Sammlung wird als Schnappschuss gespeichert. Öffnen Sie sie, um sie zu prüfen, die letzte rückgängig zu machen oder auf einen früheren Punkt zurückzusetzen. Setzen Sie 0, um Schnappschüsse zu deaktivieren. (Das Aufbewahrungslimit gilt für alle Sammlungen.)",
+        "Base folder for attachments": "Basisordner für Anhänge",
+        "e.g. RegiBase": "z. B. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Der übergeordnete Standardordner (unter Dateien) für die Anhänge neuer Sammlungen; jede neue Sammlung speichert in „dieser Ordner / Sammlungsname“. Standard: RegiBase.",
+        "Also delete this collection’s save folder": "Auch den Speicherordner dieser Sammlung löschen",
+        "The saved data will be moved to the trash.": "Die gespeicherten Daten werden in den Papierkorb verschoben.",
+        "Could not delete the collection": "Die Sammlung konnte nicht gelöscht werden",
+        "Browse…": "Durchsuchen…",
+        "Folder name already in use": "Ordnername bereits vergeben",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Eine andere Sammlung verwendet bereits einen Ordner mit diesem Namen. Denselben Ordner verwenden? Bei Auswahl von „Nein“ wird er mit einer angehängten Nummer erstellt.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Der Speicherordner wird von einer anderen Sammlung verwendet und wird daher nicht gelöscht. Löschen Sie ihn bei Bedarf manuell.",
+        "Yes": "Ja",
+        "No": "Nein"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

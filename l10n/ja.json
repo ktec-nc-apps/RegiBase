@@ -870,7 +870,18 @@
         "No matches to replace": "置換対象の一致はありません",
         "Replace in {n} record(s)? This can be undone from snapshots.": "{n}件のレコードで置換しますか？スナップショットから元に戻せます。",
         "Replaced in {n} record(s)": "{n}件のレコードで置換しました",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "このコレクションの変更はすべてスナップショット化されます。開いて確認・直近の取り消し・任意の時点への復元ができます。0で無効化。（保持件数は全コレクション共通です。）"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "このコレクションの変更はすべてスナップショット化されます。開いて確認・直近の取り消し・任意の時点への復元ができます。0で無効化。（保持件数は全コレクション共通です。）",
+        "Base folder for attachments": "添付ファイルの基準フォルダ",
+        "e.g. RegiBase": "例: RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "新しいコレクションの添付ファイルを保存する既定の親フォルダ（Files 直下）です。各コレクションは「このフォルダ／コレクション名」に保存されます。初期値: RegiBase。",
+        "Also delete this collection’s save folder": "このコレクションの保存先フォルダも削除する",
+        "The saved data will be moved to the trash.": "保存されていたデータはゴミ箱に移動します。",
+        "Could not delete the collection": "コレクションを削除できませんでした",
+        "Folder name already in use": "同名のフォルダが使用中です",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "他のコレクションで同名のフォルダが使用されています。そのまま使用しますか？ いいえですと連番を付加して作成します。",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "他のコレクションで保存フォルダが使用されているため削除しません。必要な場合は手動で削除して下さい。",
+        "Yes": "はい",
+        "No": "いいえ"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

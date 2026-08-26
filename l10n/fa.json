@@ -831,7 +831,19 @@
         "No matches to replace": "هیچ مطابقتی برای جایگزینی نیست",
         "Replace in {n} record(s)? This can be undone from snapshots.": "در {n} رکورد جایگزینی شود؟ این کار را می‌توان از عکس‌های فوری واگرد کرد.",
         "Replaced in {n} record(s)": "در {n} رکورد جایگزین شد",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "از هر تغییر در این مجموعه عکس فوری گرفته می‌شود. برای بازبینی، واگرد آخرین تغییر یا بازگردانی به نقطه‌ای پیشین باز کنید. برای خاموش‌کردن عکس‌های فوری ۰ بگذارید. (حد نگهداری برای همهٔ مجموعه‌ها اعمال می‌شود.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "از هر تغییر در این مجموعه عکس فوری گرفته می‌شود. برای بازبینی، واگرد آخرین تغییر یا بازگردانی به نقطه‌ای پیشین باز کنید. برای خاموش‌کردن عکس‌های فوری ۰ بگذارید. (حد نگهداری برای همهٔ مجموعه‌ها اعمال می‌شود.)",
+        "Base folder for attachments": "پوشهٔ پایه برای پیوست‌ها",
+        "e.g. RegiBase": "مثلاً RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "پوشهٔ اصلی پیش‌فرض (زیر فایل‌ها) برای پیوست‌های مجموعه‌های جدید؛ هر مجموعهٔ جدید در «این پوشه / نام مجموعه» ذخیره می‌شود. پیش‌فرض: RegiBase.",
+        "Also delete this collection’s save folder": "پوشهٔ ذخیرهٔ این مجموعه هم حذف شود",
+        "The saved data will be moved to the trash.": "داده‌های ذخیره‌شده به زباله‌دان منتقل می‌شوند.",
+        "Could not delete the collection": "حذف مجموعه ممکن نشد",
+        "Browse…": "مرور…",
+        "Folder name already in use": "نام پوشه از پیش در حال استفاده است",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "مجموعهٔ دیگری هم‌اکنون از پوشه‌ای با این نام استفاده می‌کند. از همان پوشه استفاده شود؟ انتخاب «خیر» آن را با افزودن یک عدد می‌سازد.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "پوشهٔ ذخیره توسط مجموعهٔ دیگری استفاده می‌شود، بنابراین حذف نشد. در صورت نیاز آن را به‌صورت دستی حذف کنید.",
+        "Yes": "بله",
+        "No": "خیر"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

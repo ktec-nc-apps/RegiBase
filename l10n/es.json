@@ -831,7 +831,19 @@
         "No matches to replace": "No hay coincidencias que reemplazar",
         "Replace in {n} record(s)? This can be undone from snapshots.": "¿Reemplazar en {n} registro(s)? Esto se puede deshacer desde las instantáneas.",
         "Replaced in {n} record(s)": "Reemplazado en {n} registro(s)",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Cada cambio en esta colección se guarda como instantánea. Ábrelas para revisarlas, deshacer el último cambio o restaurar a un punto anterior. Pon 0 para desactivar las instantáneas. (El límite de conservación se aplica a todas las colecciones.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Cada cambio en esta colección se guarda como instantánea. Ábrelas para revisarlas, deshacer el último cambio o restaurar a un punto anterior. Pon 0 para desactivar las instantáneas. (El límite de conservación se aplica a todas las colecciones.)",
+        "Base folder for attachments": "Carpeta base para los adjuntos",
+        "e.g. RegiBase": "p. ej. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "La carpeta principal predeterminada (en Archivos) para los adjuntos de las nuevas colecciones; cada nueva colección guarda en «esta carpeta / nombre de la colección». Predeterminado: RegiBase.",
+        "Also delete this collection’s save folder": "Eliminar también la carpeta de guardado de esta colección",
+        "The saved data will be moved to the trash.": "Los datos guardados se moverán a la papelera.",
+        "Could not delete the collection": "No se pudo eliminar la colección",
+        "Browse…": "Explorar…",
+        "Folder name already in use": "Nombre de carpeta ya en uso",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Otra colección ya usa una carpeta con este nombre. ¿Usar la misma carpeta? Si eliges No, se creará con un número añadido.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "La carpeta de guardado la usa otra colección, por lo que no se elimina. Elimínala manualmente si lo necesitas.",
+        "Yes": "Sí",
+        "No": "No"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

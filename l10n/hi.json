@@ -831,7 +831,19 @@
         "No matches to replace": "बदलने के लिए कोई मेल नहीं",
         "Replace in {n} record(s)? This can be undone from snapshots.": "{n} रिकॉर्ड में बदलें? इसे स्नैपशॉट से पूर्ववत किया जा सकता है।",
         "Replaced in {n} record(s)": "{n} रिकॉर्ड में बदला गया",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "इस संग्रह के हर परिवर्तन का स्नैपशॉट लिया जाता है। समीक्षा करने, नवीनतम को पूर्ववत करने, या पहले के बिंदु पर पुनर्स्थापित करने के लिए खोलें। स्नैपशॉट बंद करने के लिए 0 सेट करें। (रखने की सीमा सभी संग्रहों पर लागू होती है।)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "इस संग्रह के हर परिवर्तन का स्नैपशॉट लिया जाता है। समीक्षा करने, नवीनतम को पूर्ववत करने, या पहले के बिंदु पर पुनर्स्थापित करने के लिए खोलें। स्नैपशॉट बंद करने के लिए 0 सेट करें। (रखने की सीमा सभी संग्रहों पर लागू होती है।)",
+        "Base folder for attachments": "संलग्नकों के लिए आधार फ़ोल्डर",
+        "e.g. RegiBase": "उदा. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "नए संग्रहों के संलग्नकों के लिए डिफ़ॉल्ट मूल फ़ोल्डर (Files के अंतर्गत); हर नया संग्रह “इस फ़ोल्डर / संग्रह नाम” में सहेजता है। डिफ़ॉल्ट: RegiBase।",
+        "Also delete this collection’s save folder": "इस संग्रह का सहेजने का फ़ोल्डर भी हटाएं",
+        "The saved data will be moved to the trash.": "सहेजा गया डेटा ट्रैश में स्थानांतरित कर दिया जाएगा।",
+        "Could not delete the collection": "संग्रह हटाया नहीं जा सका",
+        "Browse…": "ब्राउज़ करें…",
+        "Folder name already in use": "फ़ोल्डर का नाम पहले से उपयोग में है",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "एक अन्य संग्रह पहले से इस नाम के फ़ोल्डर का उपयोग करता है। वही फ़ोल्डर उपयोग करें? “नहीं” चुनने पर वह एक संख्या जोड़कर बनाया जाता है।",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "सहेजने का फ़ोल्डर किसी अन्य संग्रह द्वारा उपयोग किया जा रहा है, इसलिए इसे हटाया नहीं गया। ज़रूरत हो तो इसे मैन्युअल रूप से हटाएं।",
+        "Yes": "हाँ",
+        "No": "नहीं"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

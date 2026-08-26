@@ -831,7 +831,19 @@
         "No matches to replace": "لا توجد مطابقات لاستبدالها",
         "Replace in {n} record(s)? This can be undone from snapshots.": "هل تريد الاستبدال في {n} سجل؟ يمكن التراجع عن هذا من اللقطات.",
         "Replaced in {n} record(s)": "تم الاستبدال في {n} سجل",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "تُلتقط لقطة لكل تغيير يطرأ على هذه المجموعة. افتحها للمراجعة، أو التراجع عن الأحدث، أو الاستعادة إلى نقطة سابقة. اضبط على 0 لإيقاف اللقطات. (ينطبق حد الاحتفاظ على جميع المجموعات.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "تُلتقط لقطة لكل تغيير يطرأ على هذه المجموعة. افتحها للمراجعة، أو التراجع عن الأحدث، أو الاستعادة إلى نقطة سابقة. اضبط على 0 لإيقاف اللقطات. (ينطبق حد الاحتفاظ على جميع المجموعات.)",
+        "Base folder for attachments": "المجلد الأساسي للمرفقات",
+        "e.g. RegiBase": "مثال: RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "المجلد الأصل الافتراضي (ضمن Files) لمرفقات المجموعات الجديدة؛ تُحفظ كل مجموعة جديدة في «هذا المجلد / اسم المجموعة». الافتراضي: RegiBase.",
+        "Also delete this collection’s save folder": "حذف مجلد حفظ هذه المجموعة أيضاً",
+        "The saved data will be moved to the trash.": "ستُنقل البيانات المحفوظة إلى سلة المهملات.",
+        "Could not delete the collection": "تعذّر حذف المجموعة",
+        "Browse…": "استعراض…",
+        "Folder name already in use": "اسم المجلد مُستخدَم بالفعل",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "تستخدم مجموعة أخرى بالفعل مجلداً بهذا الاسم. هل تريد استخدام المجلد نفسه؟ اختيار «لا» يُنشئه مع إضافة رقم.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "مجلد الحفظ مُستخدَم من قِبل مجموعة أخرى، لذلك لم يُحذَف. احذفه يدوياً إذا احتجت إلى ذلك.",
+        "Yes": "نعم",
+        "No": "لا"
     },
     "pluralForm": "nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);"
 }

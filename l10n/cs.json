@@ -831,7 +831,19 @@
         "No matches to replace": "Žádné shody k nahrazení",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Nahradit v záznamech ({n})? Toto lze vrátit zpět ze snímků.",
         "Replaced in {n} record(s)": "Nahrazeno v záznamech: {n}",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Každá změna této kolekce se zaznamenává jako snímek. Otevřete pro kontrolu, vrácení poslední změny nebo obnovení do dřívějšího bodu. Nastavením 0 snímky vypnete. (Limit uchování platí pro všechny kolekce.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Každá změna této kolekce se zaznamenává jako snímek. Otevřete pro kontrolu, vrácení poslední změny nebo obnovení do dřívějšího bodu. Nastavením 0 snímky vypnete. (Limit uchování platí pro všechny kolekce.)",
+        "Base folder for attachments": "Základní složka pro přílohy",
+        "e.g. RegiBase": "např. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Výchozí nadřazená složka (v Souborech) pro přílohy nových kolekcí; každá nová kolekce ukládá do „tato složka / název kolekce“. Výchozí: RegiBase.",
+        "Also delete this collection’s save folder": "Smazat i složku pro ukládání této kolekce",
+        "The saved data will be moved to the trash.": "Uložená data budou přesunuta do koše.",
+        "Could not delete the collection": "Nepodařilo se smazat kolekci",
+        "Browse…": "Procházet…",
+        "Folder name already in use": "Název složky se již používá",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Jiná kolekce již používá složku s tímto názvem. Použít stejnou složku? Při volbě „Ne“ se vytvoří s přidaným číslem.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Složku pro ukládání používá jiná kolekce, proto se nemaže. V případě potřeby ji smažte ručně.",
+        "Yes": "Ano",
+        "No": "Ne"
     },
     "pluralForm": "nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;"
 }

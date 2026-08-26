@@ -831,7 +831,19 @@
         "No matches to replace": "ไม่มีรายการที่ตรงกันให้แทนที่",
         "Replace in {n} record(s)? This can be undone from snapshots.": "แทนที่ในระเบียน {n} รายการหรือไม่ การนี้เลิกทำได้จากสแนปช็อต",
         "Replaced in {n} record(s)": "แทนที่ในระเบียน {n} รายการแล้ว",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "ทุกการเปลี่ยนแปลงในคอลเลกชันนี้จะถูกบันทึกเป็นสแนปช็อต เปิดเพื่อตรวจดู เลิกทำรายการล่าสุด หรือกู้คืนไปยังจุดก่อนหน้า ตั้งเป็น 0 เพื่อปิดสแนปช็อต (ขีดจำกัดการเก็บมีผลกับทุกคอลเลกชัน)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "ทุกการเปลี่ยนแปลงในคอลเลกชันนี้จะถูกบันทึกเป็นสแนปช็อต เปิดเพื่อตรวจดู เลิกทำรายการล่าสุด หรือกู้คืนไปยังจุดก่อนหน้า ตั้งเป็น 0 เพื่อปิดสแนปช็อต (ขีดจำกัดการเก็บมีผลกับทุกคอลเลกชัน)",
+        "Base folder for attachments": "โฟลเดอร์ฐานสำหรับไฟล์แนบ",
+        "e.g. RegiBase": "เช่น RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "โฟลเดอร์แม่เริ่มต้น (ใต้ Files) สำหรับไฟล์แนบของคอลเลกชันใหม่ คอลเลกชันใหม่แต่ละรายการจะบันทึกลงใน “โฟลเดอร์นี้ / ชื่อคอลเลกชัน” ค่าปริยาย: RegiBase",
+        "Also delete this collection’s save folder": "ลบโฟลเดอร์บันทึกของคอลเลกชันนี้ด้วย",
+        "The saved data will be moved to the trash.": "ข้อมูลที่บันทึกไว้จะถูกย้ายไปยังถังขยะ",
+        "Could not delete the collection": "ไม่สามารถลบคอลเลกชันได้",
+        "Browse…": "เรียกดู…",
+        "Folder name already in use": "ชื่อโฟลเดอร์ถูกใช้แล้ว",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "มีคอลเลกชันอื่นใช้โฟลเดอร์ชื่อนี้อยู่แล้ว ใช้โฟลเดอร์เดียวกันหรือไม่ หากเลือก “ไม่” จะสร้างโฟลเดอร์ใหม่โดยเติมหมายเลขต่อท้าย",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "โฟลเดอร์บันทึกถูกใช้โดยคอลเลกชันอื่น จึงไม่ถูกลบ หากจำเป็น โปรดลบด้วยตนเอง",
+        "Yes": "ใช่",
+        "No": "ไม่"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

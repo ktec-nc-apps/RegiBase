@@ -45,7 +45,62 @@ class ImageService {
 			$folder = self::DEFAULT_FOLDER;
 		}
 		$this->config->setUserValue($userId, 'regibase', 'files_folder', $folder);
+		// Create the base folder now so it shows up in Files immediately.
+		$this->ensureFolderExists($userId, $folder);
 		return $folder;
+	}
+
+	/**
+	 * Best-effort: make sure an attachment folder exists on disk, creating the
+	 * base folder and any sub-folders. Called when a collection is created,
+	 * opened, or the base folder is set, so the folder is present even before
+	 * the first attachment. Never throws — a Files problem must not block the
+	 * caller.
+	 */
+	public function ensureFolderExists(string $userId, string $folderPath): void {
+		try {
+			$this->ensurePath($userId, $folderPath);
+		} catch (\Throwable $e) {
+			// best-effort; a Files error must not block collection create/open
+		}
+	}
+
+	/** Does the given Files-relative folder already exist for the user? */
+	public function folderExists(string $userId, string $folderPath): bool {
+		$path = $this->sanitizePath(trim($folderPath));
+		if ($path === '') {
+			return false;
+		}
+		try {
+			return $this->rootFolder->getUserFolder($userId)->nodeExists($path);
+		} catch (\Throwable $e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Move a collection's save folder to the trash (best-effort, owner's Files).
+	 * Returns true only when a folder was actually trashed. Never throws.
+	 */
+	public function trashFolder(string $userId, string $folderPath): bool {
+		$path = $this->sanitizePath(trim($folderPath));
+		if ($path === '') {
+			return false;
+		}
+		try {
+			$user = $this->rootFolder->getUserFolder($userId);
+			if (!$user->nodeExists($path)) {
+				return false;
+			}
+			$node = $user->get($path);
+			if ($node instanceof Folder) {
+				$node->delete();
+				return true;
+			}
+		} catch (\Throwable $e) {
+			// best-effort; a Files error must not block the delete
+		}
+		return false;
 	}
 
 	/** Keep a single-segment-safe name (no slashes / traversal / reserved). */

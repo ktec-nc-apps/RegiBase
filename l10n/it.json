@@ -831,7 +831,19 @@
         "No matches to replace": "Nessuna corrispondenza da sostituire",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Sostituire in {n} record? L’operazione può essere annullata dalle istantanee.",
         "Replaced in {n} record(s)": "Sostituito in {n} record",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Ogni modifica a questa raccolta viene registrata come istantanea. Apri per rivedere, annullare l’ultima o ripristinare a un punto precedente. Imposta 0 per disattivare le istantanee. (Il limite di conservazione si applica a tutte le raccolte.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Ogni modifica a questa raccolta viene registrata come istantanea. Apri per rivedere, annullare l’ultima o ripristinare a un punto precedente. Imposta 0 per disattivare le istantanee. (Il limite di conservazione si applica a tutte le raccolte.)",
+        "Base folder for attachments": "Cartella di base per gli allegati",
+        "e.g. RegiBase": "es. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "La cartella principale predefinita (in File) per gli allegati delle nuove raccolte; ogni nuova raccolta salva in «questa cartella / nome della raccolta». Predefinito: RegiBase.",
+        "Also delete this collection’s save folder": "Elimina anche la cartella di salvataggio di questa raccolta",
+        "The saved data will be moved to the trash.": "I dati salvati verranno spostati nel cestino.",
+        "Could not delete the collection": "Impossibile eliminare la raccolta",
+        "Browse…": "Sfoglia…",
+        "Folder name already in use": "Nome della cartella già in uso",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Un'altra raccolta usa già una cartella con questo nome. Usare la stessa cartella? Scegliendo No, verrà creata con un numero aggiunto.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "La cartella di salvataggio è usata da un'altra raccolta, quindi non viene eliminata. Eliminala manualmente se necessario.",
+        "Yes": "Sì",
+        "No": "No"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

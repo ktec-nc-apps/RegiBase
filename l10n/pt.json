@@ -831,7 +831,19 @@
         "No matches to replace": "Nenhuma correspondência para substituir",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Substituir em {n} registro(s)? Isto pode ser desfeito a partir dos instantâneos.",
         "Replaced in {n} record(s)": "Substituído em {n} registro(s)",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Cada alteração nesta coleção é registrada como um instantâneo. Abra para revisar, desfazer a mais recente ou restaurar a um ponto anterior. Defina 0 para desativar os instantâneos. (O limite de retenção se aplica a todas as coleções.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Cada alteração nesta coleção é registrada como um instantâneo. Abra para revisar, desfazer a mais recente ou restaurar a um ponto anterior. Defina 0 para desativar os instantâneos. (O limite de retenção se aplica a todas as coleções.)",
+        "Base folder for attachments": "Pasta base para os anexos",
+        "e.g. RegiBase": "ex.: RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "A pasta principal padrão (em Files) para os anexos das novas coleções; cada nova coleção salva em “esta pasta / nome da coleção”. Padrão: RegiBase.",
+        "Also delete this collection’s save folder": "Excluir também a pasta de salvamento desta coleção",
+        "The saved data will be moved to the trash.": "Os dados salvos serão movidos para a lixeira.",
+        "Could not delete the collection": "Não foi possível excluir a coleção",
+        "Browse…": "Procurar…",
+        "Folder name already in use": "Nome de pasta já em uso",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Outra coleção já usa uma pasta com este nome. Usar a mesma pasta? Se você escolher Não, ela será criada com um número adicionado.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "A pasta de salvamento é usada por outra coleção, por isso não é excluída. Exclua-a manualmente se precisar.",
+        "Yes": "Sim",
+        "No": "Não"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

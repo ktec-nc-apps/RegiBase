@@ -322,13 +322,36 @@ class ApiController extends Controller {
 
 	#[NoAdminRequired]
 	public function collections(): JSONResponse {
-		return new JSONResponse($this->service->listCollections($this->uid()));
+		$list = $this->service->listCollections($this->uid());
+		// Make sure every owned collection's save folder exists in Files. This
+		// backfills folders for collections created before folders were made
+		// eagerly, so opening RegiBase creates any that are still missing (owner
+		// only — never touches a sharer's Files). Best-effort per folder.
+		foreach ($list as $coll) {
+			if (!empty($coll['is_owner'])) {
+				$folder = trim((string)($coll['files_folder'] ?? ''));
+				if ($folder !== '') {
+					$this->images->ensureFolderExists($this->uid(), $folder);
+				}
+			}
+		}
+		return new JSONResponse($list);
 	}
 
 	#[NoAdminRequired]
 	public function getCollection(int $id): JSONResponse {
 		try {
-			return new JSONResponse($this->service->getCollection($this->uid(), $id));
+			$coll = $this->service->getCollection($this->uid(), $id);
+			// Backfill: make sure this collection's attachment folder exists in
+			// Files, even for collections created before folders were made eagerly.
+			// Owner only — never create folders in a sharee's Files.
+			if (!empty($coll['is_owner'])) {
+				$folder = trim((string)($coll['files_folder'] ?? ''));
+				if ($folder !== '') {
+					$this->images->ensureFolderExists($this->uid(), $folder);
+				}
+			}
+			return new JSONResponse($coll);
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (DoesNotExistException $e) {
@@ -346,6 +369,15 @@ class ApiController extends Controller {
 	#[NoAdminRequired]
 	public function createCollection(): JSONResponse {
 		$body = $this->request->getParams();
+		// If the new collection's save folder would collide with another
+		// collection's, ask the client first (unless it already chose). Returns a
+		// non-creating signal the frontend turns into a Yes/No prompt.
+		if ((string)($body['folder_choice'] ?? '') === '') {
+			$conflict = $this->service->collectionFolderConflict($this->uid(), $body, $this->appL10n());
+			if ($conflict !== null) {
+				return new JSONResponse(['folder_conflict' => true, 'folder' => $conflict]);
+			}
+		}
 		$c = $this->service->createCollection($this->uid(), $body, $this->appL10n());
 		return new JSONResponse($c, Http::STATUS_CREATED);
 	}
@@ -379,7 +411,8 @@ class ApiController extends Controller {
 	#[NoAdminRequired]
 	public function deleteCollection(int $id): JSONResponse {
 		try {
-			$this->service->deleteCollection($this->uid(), $id);
+			$deleteFolder = filter_var($this->request->getParam('delete_folder', false), FILTER_VALIDATE_BOOLEAN);
+			$this->service->deleteCollection($this->uid(), $id, $deleteFolder);
 			return new JSONResponse(['ok' => true]);
 		} catch (DoesNotExistException $e) {
 			return $this->notFound();

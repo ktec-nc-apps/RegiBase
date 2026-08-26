@@ -831,7 +831,19 @@
         "No matches to replace": "No matches to replace",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Replace in {n} record(s)? This can be undone from snapshots.",
         "Replaced in {n} record(s)": "Replaced in {n} record(s)",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)",
+        "Base folder for attachments": "Base folder for attachments",
+        "e.g. RegiBase": "e.g. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.",
+        "Also delete this collection’s save folder": "Also delete this collection’s save folder",
+        "The saved data will be moved to the trash.": "The saved data will be moved to the trash.",
+        "Could not delete the collection": "Could not delete the collection",
+        "Browse…": "Browse…",
+        "Folder name already in use": "Folder name already in use",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.",
+        "Yes": "Yes",
+        "No": "No"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

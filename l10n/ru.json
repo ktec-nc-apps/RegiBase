@@ -831,7 +831,19 @@
         "No matches to replace": "Нет совпадений для замены",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Заменить в записях ({n})? Это можно отменить из снимков.",
         "Replaced in {n} record(s)": "Заменено в записях: {n}",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Каждое изменение этой коллекции сохраняется как снимок. Откройте, чтобы просмотреть, отменить последнее или восстановить до более раннего момента. Установите 0, чтобы отключить снимки. (Лимит хранения применяется ко всем коллекциям.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Каждое изменение этой коллекции сохраняется как снимок. Откройте, чтобы просмотреть, отменить последнее или восстановить до более раннего момента. Установите 0, чтобы отключить снимки. (Лимит хранения применяется ко всем коллекциям.)",
+        "Base folder for attachments": "Базовая папка для вложений",
+        "e.g. RegiBase": "например: RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Родительская папка по умолчанию (в Файлах) для вложений новых коллекций; каждая новая коллекция сохраняет в «эта папка / название коллекции». По умолчанию: RegiBase.",
+        "Also delete this collection’s save folder": "Также удалить папку сохранения этой коллекции",
+        "The saved data will be moved to the trash.": "Сохранённые данные будут перемещены в корзину.",
+        "Could not delete the collection": "Не удалось удалить коллекцию",
+        "Browse…": "Обзор…",
+        "Folder name already in use": "Имя папки уже используется",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Другая коллекция уже использует папку с таким именем. Использовать ту же папку? При выборе «Нет» она создаётся с добавлением номера.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Папка сохранения используется другой коллекцией, поэтому она не удаляется. При необходимости удалите её вручную.",
+        "Yes": "Да",
+        "No": "Нет"
     },
     "pluralForm": "nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

@@ -831,7 +831,19 @@
         "No matches to replace": "Değiştirilecek eşleşme yok",
         "Replace in {n} record(s)? This can be undone from snapshots.": "{n} kayıtta değiştirilsin mi? Bu, anlık görüntülerden geri alınabilir.",
         "Replaced in {n} record(s)": "{n} kayıtta değiştirildi",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Bu koleksiyondaki her değişikliğin anlık görüntüsü alınır. İncelemek, en sonuncuyu geri almak ya da daha önceki bir noktaya geri yüklemek için açın. Anlık görüntüleri kapatmak için 0 girin. (Tutma sınırı tüm koleksiyonlar için geçerlidir.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Bu koleksiyondaki her değişikliğin anlık görüntüsü alınır. İncelemek, en sonuncuyu geri almak ya da daha önceki bir noktaya geri yüklemek için açın. Anlık görüntüleri kapatmak için 0 girin. (Tutma sınırı tüm koleksiyonlar için geçerlidir.)",
+        "Base folder for attachments": "Ekler için temel klasör",
+        "e.g. RegiBase": "örn. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Yeni koleksiyonların ekleri için varsayılan üst klasör (Dosyalar altında); her yeni koleksiyon “bu klasör / koleksiyon adı” içine kaydeder. Varsayılan: RegiBase.",
+        "Also delete this collection’s save folder": "Bu koleksiyonun kayıt klasörünü de sil",
+        "The saved data will be moved to the trash.": "Kaydedilen veriler çöp kutusuna taşınacak.",
+        "Could not delete the collection": "Koleksiyon silinemedi",
+        "Browse…": "Gözat…",
+        "Folder name already in use": "Klasör adı zaten kullanımda",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Başka bir koleksiyon bu adda bir klasörü zaten kullanıyor. Aynı klasör kullanılsın mı? “Hayır”ı seçerseniz bir sayı eklenerek oluşturulur.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Kayıt klasörü başka bir koleksiyon tarafından kullanıldığından silinmedi. Gerekirse elle silin.",
+        "Yes": "Evet",
+        "No": "Hayır"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

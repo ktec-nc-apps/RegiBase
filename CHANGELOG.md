@@ -2,6 +2,33 @@
 
 All notable changes to RegiBase.
 
+## 0.18.35 — 2026-08-27
+
+### Fix — the attachment save folder is now created
+
+- **Fixed a bug where the data save folder was not being created.** Added a **Base folder**
+  setting in **Settings**, and fixed collection creation so that it now creates — under the base
+  folder, named after the collection — the folder that should have been created all along.
+- The **Base folder** (default `RegiBase`) can now be set in **Settings**. It is the parent
+  folder, under Files, where each new collection stores its images and files
+  (as *base folder / collection name*).
+- Existing collections that never got a folder are repaired automatically: opening RegiBase now
+  creates the save folder for every one of your collections that is still missing it.
+- **Folder-name clashes are handled on creation.** If a new collection would reuse another
+  collection's save folder, RegiBase asks whether to share that folder or to create a new one
+  with a number added (e.g. *Credit card (2)*).
+- **Deleting a collection never removes a shared folder.** If the save folder is also used by
+  another collection, the delete dialog says so and keeps the folder (delete it manually if you
+  really mean to) — so one collection's deletion can no longer take another's attachments.
+- When you **delete a collection** you can now also **move its save folder to the trash**
+  (off by default). If the folder still holds files, RegiBase tells you that the saved data
+  will be moved to the trash (from where it can still be restored).
+- **Fixed a bug where editing a collection's save-folder path directly had no visible effect.**
+  Saving a hand-edited folder path now also **moves (renames) the folder in Files**, carrying
+  any files inside it along — previously only the database pointer changed, so the folder in
+  Files was left untouched and the change did not appear to take effect.
+- Added translations for the new text in all 20 languages.
+
 ## 0.18.13 — 2026-08-21
 
 ### Rename the save folder together with the collection

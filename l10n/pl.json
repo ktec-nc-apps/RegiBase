@@ -831,7 +831,19 @@
         "No matches to replace": "Brak dopasowań do zamiany",
         "Replace in {n} record(s)? This can be undone from snapshots.": "Zamienić w {n} wpisach? Można to cofnąć z migawek.",
         "Replaced in {n} record(s)": "Zamieniono w {n} wpisach",
-        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Każda zmiana w tej kolekcji jest zapisywana jako migawka. Otwórz, aby przejrzeć, cofnąć ostatnią lub przywrócić wcześniejszy stan. Ustaw 0, aby wyłączyć migawki. (Limit przechowywania dotyczy wszystkich kolekcji.)"
+        "Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)": "Każda zmiana w tej kolekcji jest zapisywana jako migawka. Otwórz, aby przejrzeć, cofnąć ostatnią lub przywrócić wcześniejszy stan. Ustaw 0, aby wyłączyć migawki. (Limit przechowywania dotyczy wszystkich kolekcji.)",
+        "Base folder for attachments": "Folder bazowy na załączniki",
+        "e.g. RegiBase": "np. RegiBase",
+        "The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.": "Domyślny folder nadrzędny (w Plikach) na załączniki nowych kolekcji; każda nowa kolekcja zapisuje do „ten folder / nazwa kolekcji”. Domyślnie: RegiBase.",
+        "Also delete this collection’s save folder": "Usuń także folder zapisu tej kolekcji",
+        "The saved data will be moved to the trash.": "Zapisane dane zostaną przeniesione do kosza.",
+        "Could not delete the collection": "Nie udało się usunąć kolekcji",
+        "Browse…": "Przeglądaj…",
+        "Folder name already in use": "Nazwa folderu jest już używana",
+        "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Inna kolekcja już używa folderu o tej nazwie. Użyć tego samego folderu? Wybranie „Nie” tworzy go z dodanym numerem.",
+        "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Folder zapisu jest używany przez inną kolekcję, więc nie zostaje usunięty. W razie potrzeby usuń go ręcznie.",
+        "Yes": "Tak",
+        "No": "Nie"
     },
     "pluralForm": "nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);"
 }
