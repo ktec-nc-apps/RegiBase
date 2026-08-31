@@ -843,7 +843,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "مجموعهٔ دیگری هم‌اکنون از پوشه‌ای با این نام استفاده می‌کند. از همان پوشه استفاده شود؟ انتخاب «خیر» آن را با افزودن یک عدد می‌سازد.",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "پوشهٔ ذخیره توسط مجموعهٔ دیگری استفاده می‌شود، بنابراین حذف نشد. در صورت نیاز آن را به‌صورت دستی حذف کنید.",
         "Yes": "بله",
-        "No": "خیر"
+        "No": "خیر",
+        "Versions": "نسخه‌ها",
+        "Versions of “{name}”": "نسخه‌های «{name}»",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "هنوز هیچ نسخه‌ای نیست. اگر نسخه‌ها در تنظیمات روشن باشد، هر بار که رکورد ویرایش شود یک نسخه نگه داشته می‌شود.",
+        "Put this one back": "بازگرداندن این نسخه",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "هنگام بازگرداندن یک نسخه، محتوای کنونی نیز به‌عنوان نسخه‌ای مستقل نگه داشته می‌شود تا بتوان به همان روش آن را واگرد کرد.",
+        "Done": "انجام شد",
+        "Record versions": "نسخه‌های رکورد",
+        "versions per record": "نسخه برای هر رکورد",
+        "A version is kept": "نسخه چه زمانی نگه داشته شود",
+        "only when you ask for one": "فقط وقتی درخواست کنید",
+        "every time a record is edited": "هر بار که رکورد ویرایش شود",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "وضعیت پیش از هر ویرایش کنار رکورد نگه داشته می‌شود و از #01 (تازه‌ترین) به بالا شماره‌گذاری می‌شود؛ قدیمی‌ترین با گذر از حد بالا حذف می‌شود. مستقل از تاریخچهٔ عکس‌های فوری (واگرد) است — یک نسخه حتی پس از منقضی‌شدن مدخل واگردش باقی می‌ماند. صفر هیچ‌کدام را نگه نمی‌دارد.",
+        "Could not read the versions": "خواندن نسخه‌ها ممکن نشد",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "نسخهٔ #{n} بازگردانده شود؟ محتوای کنونی رکورد به‌عنوان نسخه‌ای مستقل نگه داشته می‌شود.",
+        "Version #{n} restored": "نسخهٔ #{n} بازگردانده شد",
+        "Failed to restore": "بازگردانی ناموفق بود"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

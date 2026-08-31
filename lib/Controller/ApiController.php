@@ -492,7 +492,8 @@ class ApiController extends Controller {
 			$data = $this->request->getParam('data', []);
 			$grp = $this->request->getParam('_undoGroup');
 			$noHistory = in_array($this->request->getParam('_noHistory'), ['1', 'true', true], true);
-			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : [], is_string($grp) ? $grp : null, $noHistory));
+			$manualVersion = in_array($this->request->getParam('_manualVersion'), ['1', 'true', true], true);
+			return new JSONResponse($this->service->updateRecord($this->uid(), $id, is_array($data) ? $data : [], is_string($grp) ? $grp : null, $noHistory, $manualVersion));
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (ForbiddenException $e) {
@@ -527,6 +528,44 @@ class ApiController extends Controller {
 		try {
 			$this->service->deleteRecord($this->uid(), $id);
 			return new JSONResponse(['ok' => true]);
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	// ---- per-record version history ----
+
+	#[NoAdminRequired]
+	public function recordVersions(int $id): JSONResponse {
+		try {
+			return new JSONResponse(['versions' => $this->service->recordVersions($this->uid(), $id)]);
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
+	public function readRecordVersion(int $id, int $number): JSONResponse {
+		try {
+			return new JSONResponse(['data' => $this->service->readRecordVersion($this->uid(), $id, $number)]);
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
+	public function restoreRecordVersion(int $id): JSONResponse {
+		$number = (int)($this->request->getParam('number') ?? 0);
+		try {
+			return new JSONResponse($this->service->restoreRecordVersion($this->uid(), $id, $number));
 		} catch (LockedException $e) {
 			return $this->locked();
 		} catch (ForbiddenException $e) {
@@ -658,6 +697,10 @@ class ApiController extends Controller {
 			'map_provider' => $c->getUserValue($uid, Application::APP_ID, 'map_provider', 'google'),
 			// Undo / change-history depth (max entries kept; 0 disables).
 			'undo_limit' => $this->service->undoLimit($uid),
+			// How many versions of a record are kept beside it, and when one is
+			// taken: every edit, or only the ones the writer asks for.
+			'version_keep' => $this->service->versionKeep($uid),
+			'version_when' => $this->service->versionWhen($uid),
 			// client-side encryption metadata (server never sees the key or plaintext)
 			'enc_enabled' => $c->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1',
 			'enc_salt' => $c->getUserValue($uid, Application::APP_ID, 'enc_salt', ''),
@@ -760,6 +803,15 @@ class ApiController extends Controller {
 		}
 		if (array_key_exists('undo_limit', $params)) {
 			$this->service->setUndoLimit($uid, (int)$params['undo_limit']);
+		}
+		if (array_key_exists('version_keep', $params)) {
+			$this->service->setVersionKeep($uid, (int)$params['version_keep']);
+		}
+		if (array_key_exists('version_when', $params)) {
+			$when = (string)$params['version_when'];
+			if (in_array($when, ['manual', 'auto'], true)) {
+				$this->service->setVersionWhen($uid, $when);
+			}
 		}
 		// Encryption metadata: salt + verifier (ciphertext) + on/off flag. No key material.
 		if (array_key_exists('enc_salt', $params)) {

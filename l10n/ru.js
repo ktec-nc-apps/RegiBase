@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Другая коллекция уже использует папку с таким именем. Использовать ту же папку? При выборе «Нет» она создаётся с добавлением номера.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Папка сохранения используется другой коллекцией, поэтому она не удаляется. При необходимости удалите её вручную.",
     "Yes": "Да",
-    "No": "Нет"
+    "No": "Нет",
+    "Versions": "Версии",
+    "Versions of “{name}”": "Версии «{name}»",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Пока нет ни одной. Одна сохраняется при каждом изменении записи, если версии включены в настройках.",
+    "Put this one back": "Вернуть эту",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "При возврате версии текущее содержимое тоже сохраняется как отдельная версия, поэтому это можно отменить тем же способом.",
+    "Done": "Готово",
+    "Record versions": "Версии записи",
+    "versions per record": "версий на запись",
+    "A version is kept": "Версия сохраняется",
+    "only when you ask for one": "только по запросу",
+    "every time a record is edited": "при каждом изменении записи",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Состояние перед каждым изменением сохраняется рядом с записью и нумеруется от #01 (самая новая) вверх; самая старая удаляется при превышении указанного предела. Не связано с историей снимков (отмены): версия сохраняется даже после того, как её запись отмены устареет и исчезнет. Ноль не сохраняет ни одной.",
+    "Could not read the versions": "Не удалось прочитать версии",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Вернуть версию #{n}? Текущее содержимое записи будет сохранено как отдельная версия.",
+    "Version #{n} restored": "Версия #{n} восстановлена",
+    "Failed to restore": "Не удалось восстановить"
 },
 "nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);");

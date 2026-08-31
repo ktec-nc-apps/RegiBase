@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Eine andere Sammlung verwendet bereits einen Ordner mit diesem Namen. Denselben Ordner verwenden? Bei Auswahl von „Nein“ wird er mit einer angehängten Nummer erstellt.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Der Speicherordner wird von einer anderen Sammlung verwendet und wird daher nicht gelöscht. Löschen Sie ihn bei Bedarf manuell.",
     "Yes": "Ja",
-    "No": "Nein"
+    "No": "Nein",
+    "Versions": "Versionen",
+    "Versions of “{name}”": "Versionen von „{name}“",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Noch keine. Bei jeder Bearbeitung des Datensatzes wird eine gespeichert, sofern Versionen in den Einstellungen aktiviert sind.",
+    "Put this one back": "Diese wiederherstellen",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Beim Wiederherstellen einer Version wird der aktuelle Stand als eigene Version gesichert, sodass es sich auf dieselbe Weise rückgängig machen lässt.",
+    "Done": "Fertig",
+    "Record versions": "Datensatzversionen",
+    "versions per record": "Versionen pro Datensatz",
+    "A version is kept": "Eine Version wird gespeichert",
+    "only when you ask for one": "nur auf Anforderung",
+    "every time a record is edited": "bei jeder Bearbeitung eines Datensatzes",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Der Stand vor jeder Bearbeitung wird neben dem Datensatz gespeichert, nummeriert ab #01 (neueste) aufwärts; die älteste fällt beim Überschreiten des obigen Limits weg. Unabhängig vom Schnappschuss-/Rückgängig-Verlauf – eine Version bleibt erhalten, auch wenn ihr Rückgängig-Eintrag verfallen ist. Null speichert keine.",
+    "Could not read the versions": "Die Versionen konnten nicht gelesen werden",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Version #{n} wiederherstellen? Der aktuelle Inhalt des Datensatzes wird als eigene Version gesichert.",
+    "Version #{n} restored": "Version #{n} wiederhergestellt",
+    "Failed to restore": "Wiederherstellung fehlgeschlagen"
 },
 "nplurals=2; plural=(n != 1);");

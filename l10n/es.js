@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Otra colección ya usa una carpeta con este nombre. ¿Usar la misma carpeta? Si eliges No, se creará con un número añadido.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "La carpeta de guardado la usa otra colección, por lo que no se elimina. Elimínala manualmente si lo necesitas.",
     "Yes": "Sí",
-    "No": "No"
+    "No": "No",
+    "Versions": "Versiones",
+    "Versions of “{name}”": "Versiones de «{name}»",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Todavía no hay ninguna. Se guarda una cada vez que se edita el registro, si las versiones están activadas en los ajustes.",
+    "Put this one back": "Restaurar esta",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Al restaurar una versión, lo que hay ahora se guarda como una versión propia, de modo que puede deshacerse de la misma manera.",
+    "Done": "Hecho",
+    "Record versions": "Versiones de registro",
+    "versions per record": "versiones por registro",
+    "A version is kept": "Se guarda una versión",
+    "only when you ask for one": "solo cuando lo pidas",
+    "every time a record is edited": "cada vez que se edita un registro",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "El estado anterior a cada edición se guarda junto al registro, numerado desde #01 (la más reciente) hacia arriba; la más antigua se descarta al superar el límite anterior. Es independiente del historial de instantáneas (deshacer): una versión permanece aunque su entrada de deshacer haya caducado. Cero no guarda ninguna.",
+    "Could not read the versions": "No se pudieron leer las versiones",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "¿Restaurar la versión #{n}? Lo que hay ahora en el registro se guarda como una versión propia.",
+    "Version #{n} restored": "Versión #{n} restaurada",
+    "Failed to restore": "No se pudo restaurar"
 },
 "nplurals=2; plural=(n != 1);");

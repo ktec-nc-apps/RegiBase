@@ -881,7 +881,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "他のコレクションで同名のフォルダが使用されています。そのまま使用しますか？ いいえですと連番を付加して作成します。",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "他のコレクションで保存フォルダが使用されているため削除しません。必要な場合は手動で削除して下さい。",
         "Yes": "はい",
-        "No": "いいえ"
+        "No": "いいえ",
+        "Versions": "バージョン",
+        "Versions of “{name}”": "「{name}」のバージョン",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "まだありません。設定でバージョンを有効にすると、レコードを編集するたびに1つ保存されます。",
+        "Put this one back": "この版に戻す",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "版を戻すと、現在の内容もそれ自体の版として保存されるので、同じ手順でやり直せます。",
+        "Done": "閉じる",
+        "Record versions": "レコードのバージョン",
+        "versions per record": "版／レコード",
+        "A version is kept": "版を保存するタイミング",
+        "only when you ask for one": "指定したときだけ",
+        "every time a record is edited": "レコードを編集するたびに",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "編集の直前の状態がレコードの隣に保存され、#01（最新）から順に番号が付きます。上限を超えた最古の版は消えます。スナップショット（取り消し履歴）とは別で、取り消し履歴が古くなって消えた後も版は残ります。0で保存しません。",
+        "Could not read the versions": "バージョンを読み込めませんでした",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "バージョン #{n} に戻しますか？ 現在のレコードの内容はそれ自体の版として保存されます。",
+        "Version #{n} restored": "バージョン #{n} に戻しました",
+        "Failed to restore": "復元に失敗しました"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

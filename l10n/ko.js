@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "다른 컬렉션이 이미 이 이름의 폴더를 사용하고 있습니다. 같은 폴더를 사용하시겠습니까? “아니요”를 선택하면 번호를 붙여 새로 만듭니다.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "저장 폴더를 다른 컬렉션이 사용 중이므로 삭제되지 않았습니다. 필요하면 직접 삭제하세요.",
     "Yes": "예",
-    "No": "아니요"
+    "No": "아니요",
+    "Versions": "버전",
+    "Versions of “{name}”": "“{name}”의 버전",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "아직 없습니다. 설정에서 버전을 켜면 레코드를 편집할 때마다 하나씩 보관됩니다.",
+    "Put this one back": "이 버전으로 되돌리기",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "버전을 되돌리면 현재 내용도 하나의 버전으로 보관되므로 같은 방식으로 되돌릴 수 있습니다.",
+    "Done": "완료",
+    "Record versions": "레코드 버전",
+    "versions per record": "개 버전 / 레코드당",
+    "A version is kept": "버전을 보관하는 시점",
+    "only when you ask for one": "요청할 때만",
+    "every time a record is edited": "레코드를 편집할 때마다",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "각 편집 직전 상태가 레코드 옆에 #01(최신)부터 번호가 매겨져 보관되며, 위 한도를 넘은 가장 오래된 버전은 사라집니다. 스냅샷(실행 취소 기록)과는 별개로, 실행 취소 항목이 오래되어 사라진 뒤에도 버전은 남습니다. 0이면 보관하지 않습니다.",
+    "Could not read the versions": "버전을 읽을 수 없습니다",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "버전 #{n}(으)로 되돌릴까요? 현재 레코드 내용은 하나의 버전으로 보관됩니다.",
+    "Version #{n} restored": "버전 #{n}을(를) 되돌렸습니다",
+    "Failed to restore": "복원하지 못했습니다"
 },
 "nplurals=1; plural=0;");

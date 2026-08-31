@@ -42,6 +42,7 @@ class RegiBaseService {
 		private IL10N $l,
 		private ISession $session,
 		private HistoryService $history,
+		private RecordVersionService $versions,
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
 	) {
@@ -1119,7 +1120,7 @@ class RegiBaseService {
 		return $this->getRecord($userId, (int)$e->getId());
 	}
 
-	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null, bool $noHistory = false): array {
+	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null, bool $noHistory = false, bool $manualVersion = false): array {
 		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
 		$this->assertEditable($c);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
@@ -1129,6 +1130,18 @@ class RegiBaseService {
 		// the encryption and expose the plaintext.
 		if (!$noHistory) {
 			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			// A numbered version of the record as it stood just before this write,
+			// kept beside it the way EditBase keeps versions beside a document —
+			// independent of the account-wide undo log above, and surviving past
+			// its retention limit.
+			$keep = $this->versions->keep($userId);
+			if ($keep > 0 && $oldData !== [] && ($manualVersion || $this->versions->when($userId) === 'auto')) {
+				try {
+					$this->versions->take($id, ['data' => $oldData, 'reading' => (string)$r->getReading()], $keep);
+				} catch (\Throwable $e) {
+					// A version that cannot be taken must not cost the writer their save.
+				}
+			}
 		}
 		$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 		$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
@@ -1145,6 +1158,52 @@ class RegiBaseService {
 			}
 		}
 		return $this->getRecord($userId, $id);
+	}
+
+	// ---- per-record version history ----
+
+	public function versionKeep(string $userId): int {
+		return $this->versions->keep($userId);
+	}
+
+	public function setVersionKeep(string $userId, int $n): int {
+		return $this->versions->setKeep($userId, $n);
+	}
+
+	public function versionWhen(string $userId): string {
+		return $this->versions->when($userId);
+	}
+
+	public function setVersionWhen(string $userId, string $when): string {
+		return $this->versions->setWhen($userId, $when);
+	}
+
+	/** The versions kept beside a record, newest first. */
+	public function recordVersions(string $userId, int $id): array {
+		[, $c] = $this->recordWithPerm($userId, $id, self::PERM_VIEW);
+		unset($c);
+		return $this->versions->list($id);
+	}
+
+	/** What one version of a record held: the same shape as getRecord()'s `data`. */
+	public function readRecordVersion(string $userId, int $id, int $number): array {
+		[, $c] = $this->recordWithPerm($userId, $id, self::PERM_VIEW);
+		unset($c);
+		$snap = $this->versions->read($id, $number);
+		return is_array($snap['data'] ?? null) ? $snap['data'] : [];
+	}
+
+	/**
+	 * Put a version back. What is there now becomes #1 first (this is routed
+	 * through updateRecord(), which both records the usual undo entry and takes
+	 * that version), so restoring can itself be undone either way.
+	 */
+	public function restoreRecordVersion(string $userId, int $id, int $number): array {
+		[, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
+		$this->assertEditable($c);
+		$snap = $this->versions->read($id, $number);
+		$restoredData = is_array($snap['data'] ?? null) ? $snap['data'] : [];
+		return $this->updateRecord($userId, $id, $restoredData, null, false, true);
 	}
 
 	/**
@@ -1199,6 +1258,9 @@ class RegiBaseService {
 		$data = json_decode($r->getData() ?: '{}', true) ?: [];
 		$this->trashDataAttachments($userId, $this->attachmentFields((int)$c->getId()), $data);
 		$snap = ['collectionId' => (int)$c->getId(), 'data' => $data, 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()];
+		// Undoing this delete re-creates the record under a new id, so the version
+		// history under the old id would otherwise be orphaned for good.
+		$this->versions->drop($id);
 		$this->records->delete($r);
 		return $snap;
 	}

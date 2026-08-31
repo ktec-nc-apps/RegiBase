@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "एक अन्य संग्रह पहले से इस नाम के फ़ोल्डर का उपयोग करता है। वही फ़ोल्डर उपयोग करें? “नहीं” चुनने पर वह एक संख्या जोड़कर बनाया जाता है।",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "सहेजने का फ़ोल्डर किसी अन्य संग्रह द्वारा उपयोग किया जा रहा है, इसलिए इसे हटाया नहीं गया। ज़रूरत हो तो इसे मैन्युअल रूप से हटाएं।",
     "Yes": "हाँ",
-    "No": "नहीं"
+    "No": "नहीं",
+    "Versions": "संस्करण",
+    "Versions of “{name}”": "“{name}” के संस्करण",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "अभी कोई नहीं। यदि सेटिंग में संस्करण चालू हैं, तो रिकॉर्ड संपादित करने पर हर बार एक रखा जाता है।",
+    "Put this one back": "इसे वापस लाएँ",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "किसी संस्करण को वापस लाने पर अभी जो मौजूद है वह भी अपने आप में एक संस्करण के रूप में रखा जाता है, ताकि उसे उसी तरह पूर्ववत किया जा सके।",
+    "Done": "पूर्ण",
+    "Record versions": "रिकॉर्ड संस्करण",
+    "versions per record": "संस्करण प्रति रिकॉर्ड",
+    "A version is kept": "संस्करण कब रखा जाए",
+    "only when you ask for one": "केवल जब आप कहें",
+    "every time a record is edited": "हर बार रिकॉर्ड संपादित होने पर",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "हर संपादन से पहले की स्थिति रिकॉर्ड के पास रखी जाती है, #01 (नवीनतम) से ऊपर की ओर क्रमांकित; ऊपर दी गई सीमा पार होने पर सबसे पुराना हट जाता है। यह स्नैपशॉट (पूर्ववत इतिहास) से अलग है — पूर्ववत प्रविष्टि के पुराने होकर हटने के बाद भी संस्करण बना रहता है। शून्य कोई नहीं रखता।",
+    "Could not read the versions": "संस्करण पढ़े नहीं जा सके",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "संस्करण #{n} वापस लाएँ? रिकॉर्ड में अभी जो है वह अपने आप में एक संस्करण के रूप में रखा जाएगा।",
+    "Version #{n} restored": "संस्करण #{n} वापस लाया गया",
+    "Failed to restore": "पुनर्स्थापित करने में विफल"
 },
 "nplurals=2; plural=(n != 1);");

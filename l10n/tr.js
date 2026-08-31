@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Başka bir koleksiyon bu adda bir klasörü zaten kullanıyor. Aynı klasör kullanılsın mı? “Hayır”ı seçerseniz bir sayı eklenerek oluşturulur.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Kayıt klasörü başka bir koleksiyon tarafından kullanıldığından silinmedi. Gerekirse elle silin.",
     "Yes": "Evet",
-    "No": "Hayır"
+    "No": "Hayır",
+    "Versions": "Sürümler",
+    "Versions of “{name}”": "“{name}” sürümleri",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Henüz yok. Ayarlarda sürümler açıksa, kayıt her düzenlendiğinde bir tane saklanır.",
+    "Put this one back": "Bunu geri getir",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Bir sürümü geri getirdiğinizde şu anki içerik de kendi başına bir sürüm olarak saklanır, böylece aynı şekilde geri alınabilir.",
+    "Done": "Bitti",
+    "Record versions": "Kayıt sürümleri",
+    "versions per record": "kayıt başına sürüm",
+    "A version is kept": "Bir sürüm saklanır",
+    "only when you ask for one": "yalnızca istediğinizde",
+    "every time a record is edited": "kayıt her düzenlendiğinde",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Her düzenlemeden önceki durum kaydın yanında saklanır ve #01 (en yeni) numarasından yukarıya doğru numaralanır; yukarıdaki sınırı aşan en eski sürüm silinir. Anlık görüntü (geri alma) geçmişinden bağımsızdır — geri alma girdisi eskiyip silinse bile sürüm kalır. Sıfır hiçbirini saklamaz.",
+    "Could not read the versions": "Sürümler okunamadı",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "#{n} sürümü geri getirilsin mi? Kaydın şu anki içeriği kendi başına bir sürüm olarak saklanır.",
+    "Version #{n} restored": "#{n} sürümü geri getirildi",
+    "Failed to restore": "Geri getirilemedi"
 },
 "nplurals=2; plural=(n > 1);");

@@ -843,7 +843,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Une autre collection utilise déjà un dossier portant ce nom. Utiliser le même dossier ? Si vous choisissez Non, il sera créé avec un numéro ajouté.",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Le dossier de sauvegarde est utilisé par une autre collection, il n'est donc pas supprimé. Supprimez-le manuellement si nécessaire.",
         "Yes": "Oui",
-        "No": "Non"
+        "No": "Non",
+        "Versions": "Versions",
+        "Versions of “{name}”": "Versions de « {name} »",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Aucune pour l'instant. Une version est conservée à chaque modification de la fiche, si les versions sont activées dans les paramètres.",
+        "Put this one back": "Restaurer celle-ci",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Lorsqu'une version est restaurée, l'état actuel est conservé comme version à part entière, ce qui permet de l'annuler de la même façon.",
+        "Done": "Terminé",
+        "Record versions": "Versions de fiche",
+        "versions per record": "versions par fiche",
+        "A version is kept": "Une version est conservée",
+        "only when you ask for one": "uniquement à la demande",
+        "every time a record is edited": "à chaque modification d'une fiche",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "L'état précédant chaque modification est conservé à côté de la fiche, numéroté à partir de #01 (la plus récente) ; la plus ancienne disparaît au-delà de la limite ci-dessus. Indépendant de l'historique des instantanés (annulation) : une version subsiste même après l'expiration de son entrée d'annulation. Zéro n'en conserve aucune.",
+        "Could not read the versions": "Impossible de lire les versions",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "Restaurer la version #{n} ? Le contenu actuel de la fiche est conservé comme version à part entière.",
+        "Version #{n} restored": "Version #{n} restaurée",
+        "Failed to restore": "Échec de la restauration"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

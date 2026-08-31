@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "تستخدم مجموعة أخرى بالفعل مجلداً بهذا الاسم. هل تريد استخدام المجلد نفسه؟ اختيار «لا» يُنشئه مع إضافة رقم.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "مجلد الحفظ مُستخدَم من قِبل مجموعة أخرى، لذلك لم يُحذَف. احذفه يدوياً إذا احتجت إلى ذلك.",
     "Yes": "نعم",
-    "No": "لا"
+    "No": "لا",
+    "Versions": "الإصدارات",
+    "Versions of “{name}”": "إصدارات «{name}»",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "لا يوجد بعد. يُحفَظ إصدار في كل مرة يُحرَّر فيها السجل، إذا كانت الإصدارات مُفعَّلة في الإعدادات.",
+    "Put this one back": "استعادة هذا",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "عند استعادة إصدار، يُحفَظ المحتوى الحالي أيضًا كإصدار مستقل، بحيث يمكن التراجع عنه بالطريقة نفسها.",
+    "Done": "تم",
+    "Record versions": "إصدارات السجل",
+    "versions per record": "إصدارات لكل سجل",
+    "A version is kept": "يُحفَظ إصدار",
+    "only when you ask for one": "فقط عند طلبك",
+    "every time a record is edited": "في كل مرة يُحرَّر فيها السجل",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "تُحفَظ الحالة السابقة لكل تعديل بجانب السجل، مرقَّمة من #01 (الأحدث) فصاعدًا؛ ويُحذَف الأقدم عند تجاوز الحد أعلاه. وهي مستقلة عن سجل اللقطات (التراجع) — إذ يبقى الإصدار حتى بعد انتهاء صلاحية إدخال التراجع الخاص به. الصفر لا يحفظ أيًّا منها.",
+    "Could not read the versions": "تعذَّر قراءة الإصدارات",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "استعادة الإصدار #{n}؟ سيُحفَظ محتوى السجل الحالي كإصدار مستقل.",
+    "Version #{n} restored": "تمت استعادة الإصدار #{n}",
+    "Failed to restore": "فشلت الاستعادة"
 },
 "nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);");

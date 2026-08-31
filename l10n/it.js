@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Un'altra raccolta usa già una cartella con questo nome. Usare la stessa cartella? Scegliendo No, verrà creata con un numero aggiunto.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "La cartella di salvataggio è usata da un'altra raccolta, quindi non viene eliminata. Eliminala manualmente se necessario.",
     "Yes": "Sì",
-    "No": "No"
+    "No": "No",
+    "Versions": "Versioni",
+    "Versions of “{name}”": "Versioni di «{name}»",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Ancora nessuna. Ne viene conservata una a ogni modifica del record, se le versioni sono attivate nelle impostazioni.",
+    "Put this one back": "Ripristina questa",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Ripristinando una versione, ciò che c'è ora viene salvato come versione a sé, così da poter essere annullato allo stesso modo.",
+    "Done": "Fatto",
+    "Record versions": "Versioni del record",
+    "versions per record": "versioni per record",
+    "A version is kept": "Una versione viene conservata",
+    "only when you ask for one": "solo quando la richiedi",
+    "every time a record is edited": "a ogni modifica di un record",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Lo stato precedente a ogni modifica viene conservato accanto al record, numerato da #01 (la più recente) in su; la più vecchia viene scartata oltre il limite indicato. È indipendente dalla cronologia delle istantanee (annulla): una versione resta anche dopo la scadenza della sua voce di annullamento. Zero non ne conserva alcuna.",
+    "Could not read the versions": "Impossibile leggere le versioni",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Ripristinare la versione #{n}? Il contenuto attuale del record viene salvato come versione a sé.",
+    "Version #{n} restored": "Versione #{n} ripristinata",
+    "Failed to restore": "Ripristino non riuscito"
 },
 "nplurals=2; plural=(n != 1);");

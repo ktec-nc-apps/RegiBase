@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Koleksi lain sudah menggunakan folder dengan nama ini. Gunakan folder yang sama? Memilih Tidak akan membuatnya dengan nomor tambahan.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Folder simpan digunakan oleh koleksi lain, sehingga tidak dihapus. Hapus secara manual jika Anda perlu.",
     "Yes": "Ya",
-    "No": "Tidak"
+    "No": "Tidak",
+    "Versions": "Versi",
+    "Versions of “{name}”": "Versi “{name}”",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Belum ada. Satu versi disimpan setiap kali catatan diedit, jika versi diaktifkan di pengaturan.",
+    "Put this one back": "Kembalikan yang ini",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Saat mengembalikan sebuah versi, isi saat ini juga disimpan sebagai versi tersendiri, sehingga dapat dibatalkan dengan cara yang sama.",
+    "Done": "Selesai",
+    "Record versions": "Versi catatan",
+    "versions per record": "versi per catatan",
+    "A version is kept": "Versi disimpan",
+    "only when you ask for one": "hanya saat Anda minta",
+    "every time a record is edited": "setiap kali catatan diedit",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Keadaan sebelum setiap penyuntingan disimpan di samping catatan, dinomori dari #01 (terbaru) ke atas; yang tertua terbuang setelah melewati batas di atas. Terpisah dari riwayat snapshot (urungkan) — sebuah versi tetap ada bahkan setelah entri urungkannya kedaluwarsa. Nol tidak menyimpan satu pun.",
+    "Could not read the versions": "Tidak dapat membaca versi",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Kembalikan versi #{n}? Isi catatan saat ini disimpan sebagai versi tersendiri.",
+    "Version #{n} restored": "Versi #{n} dikembalikan",
+    "Failed to restore": "Gagal mengembalikan"
 },
 "nplurals=1; plural=0;");

@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.",
     "Yes": "Yes",
-    "No": "No"
+    "No": "No",
+    "Versions": "Versions",
+    "Versions of “{name}”": "Versions of “{name}”",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "None yet. One is kept each time the record is edited, if versions are switched on in the settings.",
+    "Put this one back": "Put this one back",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.",
+    "Done": "Done",
+    "Record versions": "Record versions",
+    "versions per record": "versions per record",
+    "A version is kept": "A version is kept",
+    "only when you ask for one": "only when you ask for one",
+    "every time a record is edited": "every time a record is edited",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.",
+    "Could not read the versions": "Could not read the versions",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Put version #{n} back? What is in the record now is kept as a version of its own.",
+    "Version #{n} restored": "Version #{n} restored",
+    "Failed to restore": "Failed to restore"
 },
 "nplurals=2; plural=(n != 1);");

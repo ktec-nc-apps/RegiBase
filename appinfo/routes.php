@@ -46,6 +46,11 @@ return [
 		['name' => 'api#deleteRecords', 'url' => '/api/records/delete', 'verb' => 'POST'],
 		['name' => 'api#bulkUpdateRecords', 'url' => '/api/collections/{id}/records/bulk', 'verb' => 'POST'],
 
+		// per-record version history
+		['name' => 'api#recordVersions', 'url' => '/api/records/{id}/versions', 'verb' => 'GET'],
+		['name' => 'api#readRecordVersion', 'url' => '/api/records/{id}/versions/{number}', 'verb' => 'GET'],
+		['name' => 'api#restoreRecordVersion', 'url' => '/api/records/{id}/versions/restore', 'verb' => 'POST'],
+
 		// transfer (move/copy between collections)
 		['name' => 'api#transfer', 'url' => '/api/transfer', 'verb' => 'POST'],
 

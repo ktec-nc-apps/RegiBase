@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Outra coleção já usa uma pasta com este nome. Usar a mesma pasta? Se você escolher Não, ela será criada com um número adicionado.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "A pasta de salvamento é usada por outra coleção, por isso não é excluída. Exclua-a manualmente se precisar.",
     "Yes": "Sim",
-    "No": "Não"
+    "No": "Não",
+    "Versions": "Versões",
+    "Versions of “{name}”": "Versões de “{name}”",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Ainda nenhuma. Uma é guardada sempre que o registo é editado, se as versões estiverem ativadas nas definições.",
+    "Put this one back": "Repor esta",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Ao repor uma versão, o que existe agora é guardado como uma versão própria, para que possa ser desfeito da mesma forma.",
+    "Done": "Concluído",
+    "Record versions": "Versões de registo",
+    "versions per record": "versões por registo",
+    "A version is kept": "Uma versão é guardada",
+    "only when you ask for one": "apenas quando pedir",
+    "every time a record is edited": "sempre que um registo é editado",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "O estado anterior a cada edição é guardado junto ao registo, numerado a partir de #01 (a mais recente) para cima; a mais antiga é descartada ao ultrapassar o limite acima. É independente do histórico de instantâneos (desfazer): uma versão permanece mesmo depois de a sua entrada de desfazer expirar. Zero não guarda nenhuma.",
+    "Could not read the versions": "Não foi possível ler as versões",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Repor a versão #{n}? O conteúdo atual do registo é guardado como uma versão própria.",
+    "Version #{n} restored": "Versão #{n} reposta",
+    "Failed to restore": "Falha ao repor"
 },
 "nplurals=2; plural=(n > 1);");

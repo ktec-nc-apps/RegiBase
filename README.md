@@ -48,6 +48,9 @@ fields you set up yourself.
 - **Organise** — move, copy or merge records between collections.
 - **Duplicate a collection** — copy just the fields, or the whole thing **including
   its records**.
+- **Version history** — keep the last few versions of each record and **put any one back**
+  (like EditBase's document versions). Separate from Snapshots; how many to keep and when they
+  are taken are set in **Settings**.
 - **Collection sharing** — share with other Nextcloud users at three levels
   (**view / edit / delete**), with an optional access password and optional
   secret-field sharing.
@@ -149,6 +152,9 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   確認します（データはそのまま残ります）。コレクションを削除する際は、保存先フォルダをゴミ箱へ移動することもできます。
 - **整理** — レコードをコレクション間で移動・コピー・マージできます。
 - **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
+- **バージョン履歴** — レコードごとに直近数件のバージョンを保存し、いつでも**任意の版に戻せます**
+  （EditBase の文書バージョンと同じ考え方）。スナップショットとは別で、保存件数と保存タイミングは
+  **設定**で指定します。
 - **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
   任意のアクセスパスワードや、秘密項目の共有にも対応します。
 - **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、

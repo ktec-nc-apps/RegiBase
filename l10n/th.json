@@ -843,7 +843,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "มีคอลเลกชันอื่นใช้โฟลเดอร์ชื่อนี้อยู่แล้ว ใช้โฟลเดอร์เดียวกันหรือไม่ หากเลือก “ไม่” จะสร้างโฟลเดอร์ใหม่โดยเติมหมายเลขต่อท้าย",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "โฟลเดอร์บันทึกถูกใช้โดยคอลเลกชันอื่น จึงไม่ถูกลบ หากจำเป็น โปรดลบด้วยตนเอง",
         "Yes": "ใช่",
-        "No": "ไม่"
+        "No": "ไม่",
+        "Versions": "เวอร์ชัน",
+        "Versions of “{name}”": "เวอร์ชันของ “{name}”",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "ยังไม่มี ระบบจะเก็บไว้หนึ่งเวอร์ชันทุกครั้งที่แก้ไขระเบียน หากเปิดใช้เวอร์ชันในการตั้งค่า",
+        "Put this one back": "คืนค่าเวอร์ชันนี้",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "เมื่อคืนค่าเวอร์ชันหนึ่ง เนื้อหาปัจจุบันจะถูกเก็บเป็นเวอร์ชันของตัวเองด้วย จึงสามารถย้อนกลับได้ด้วยวิธีเดียวกัน",
+        "Done": "เสร็จสิ้น",
+        "Record versions": "เวอร์ชันของระเบียน",
+        "versions per record": "เวอร์ชันต่อระเบียน",
+        "A version is kept": "เก็บเวอร์ชันเมื่อ",
+        "only when you ask for one": "เฉพาะเมื่อคุณสั่ง",
+        "every time a record is edited": "ทุกครั้งที่แก้ไขระเบียน",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "สถานะก่อนการแก้ไขแต่ละครั้งจะถูกเก็บไว้ข้างระเบียน โดยกำหนดหมายเลขจาก #01 (ใหม่สุด) ขึ้นไป เวอร์ชันเก่าสุดจะหลุดออกเมื่อเกินขีดจำกัดด้านบน แยกจากประวัติสแนปช็อต (เลิกทำ) — เวอร์ชันยังคงอยู่แม้รายการเลิกทำจะเก่าจนหายไปแล้ว ค่า 0 คือไม่เก็บเลย",
+        "Could not read the versions": "ไม่สามารถอ่านเวอร์ชันได้",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "คืนค่าเวอร์ชัน #{n} หรือไม่? เนื้อหาปัจจุบันของระเบียนจะถูกเก็บเป็นเวอร์ชันของตัวเอง",
+        "Version #{n} restored": "คืนค่าเวอร์ชัน #{n} แล้ว",
+        "Failed to restore": "คืนค่าไม่สำเร็จ"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

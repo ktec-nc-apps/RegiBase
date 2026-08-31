@@ -843,7 +843,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Một bộ sưu tập khác đã dùng thư mục có tên này. Dùng chung thư mục đó? Chọn Không sẽ tạo thư mục mới có thêm số ở cuối.",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Thư mục lưu đang được một bộ sưu tập khác sử dụng nên không bị xóa. Hãy xóa thủ công nếu bạn cần.",
         "Yes": "Có",
-        "No": "Không"
+        "No": "Không",
+        "Versions": "Phiên bản",
+        "Versions of “{name}”": "Các phiên bản của “{name}”",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Chưa có. Mỗi lần bản ghi được chỉnh sửa sẽ giữ lại một phiên bản, nếu tính năng phiên bản được bật trong cài đặt.",
+        "Put this one back": "Khôi phục bản này",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Khi khôi phục một phiên bản, nội dung hiện tại cũng được lưu thành một phiên bản riêng, nên có thể hoàn tác theo cùng cách.",
+        "Done": "Xong",
+        "Record versions": "Phiên bản bản ghi",
+        "versions per record": "phiên bản mỗi bản ghi",
+        "A version is kept": "Giữ một phiên bản",
+        "only when you ask for one": "chỉ khi bạn yêu cầu",
+        "every time a record is edited": "mỗi lần một bản ghi được chỉnh sửa",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Trạng thái trước mỗi lần chỉnh sửa được giữ bên cạnh bản ghi, đánh số từ #01 (mới nhất) trở lên; bản cũ nhất bị loại bỏ khi vượt quá giới hạn ở trên. Độc lập với lịch sử ảnh chụp (hoàn tác) — một phiên bản vẫn còn ngay cả sau khi mục hoàn tác của nó hết hạn. Số 0 không giữ phiên bản nào.",
+        "Could not read the versions": "Không thể đọc các phiên bản",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "Khôi phục phiên bản #{n}? Nội dung hiện tại của bản ghi được lưu thành một phiên bản riêng.",
+        "Version #{n} restored": "Đã khôi phục phiên bản #{n}",
+        "Failed to restore": "Khôi phục thất bại"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

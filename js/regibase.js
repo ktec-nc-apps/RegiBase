@@ -519,6 +519,7 @@
       </div>
       <div class="modal-foot">
         <button v-if="editingRecordId" type="button" class="btn danger" @click="deleteRecord({id:editingRecordId})">{{ t('Delete') }}</button>
+        <button v-if="editingRecordId" type="button" class="btn" @click="openVersions(editingRecordId)">🕐 {{ t('Versions') }}</button>
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button type="submit" class="btn primary">{{ t('Save') }}</button>
       </div>
@@ -553,7 +554,30 @@
         <button v-if="canDelete" class="btn danger" @click="deleteRecord(modal.rec)">{{ t('Delete') }}</button>
         <button class="btn" @click="copyRecord(modal.rec)">{{ t('⧉ Copy all') }}</button>
         <button v-if="isOwner && !isLocked" class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
+        <button class="btn" @click="openVersions(modal.rec.id)">🕐 {{ t('Versions') }}</button>
         <button v-if="canEdit" class="btn primary" @click="editRecord(modal.rec)">{{ t('Edit') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Versions kept beside a record. Floats above the record/detail modal. -->
+  <div v-if="vers.open" class="modal-mask cropper-mask" @click.self="vers.open=false">
+    <div class="modal sm">
+      <div class="modal-head"><h3>{{ t('Versions of “{name}”', {name: vers.title}) }}</h3><button class="icon-btn" @click="vers.open=false">✕</button></div>
+      <div class="modal-body">
+        <p v-if="!vers.list.length" style="font-size:13px;color:var(--muted)">{{ t('None yet. One is kept each time the record is edited, if versions are switched on in the settings.') }}</p>
+        <ol v-else class="ver-list">
+          <li v-for="v in vers.list" :key="v.number" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="font-family:monospace;color:var(--muted)">#{{ String(v.number).padStart(2,'0') }}</span>
+            <span style="flex:1;font-size:13px">{{ fmtHistTime(v.created_at) }}</span>
+            <span style="font-size:12px;color:var(--muted)">{{ v.size }} B</span>
+            <button type="button" class="btn sm" @click="restoreVersion(v.number)">{{ t('Put this one back') }}</button>
+          </li>
+        </ol>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">{{ t('Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.') }}</p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn primary" @click="vers.open=false">{{ t('Done') }}</button>
       </div>
     </div>
   </div>
@@ -1192,6 +1216,22 @@
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.') }}</div>
         </div>
         <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <label>🕐 {{ t('Record versions') }}</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
+            <input type="number" min="0" max="99" step="1" v-model.number="settingsForm.version_keep" style="width:88px" />
+            <span style="font-size:13px;color:var(--muted)">{{ t('versions per record') }}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:13px;color:var(--muted)">{{ t('A version is kept') }}</span>
+            <select v-model="settingsForm.version_when">
+              <option value="manual">{{ t('only when you ask for one') }}</option>
+              <option value="auto">{{ t('every time a record is edited') }}</option>
+            </select>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.') }}</div>
+        </div>
+        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>{{ t('🔒 Encryption (secret fields) — optional') }}</label>
           <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
             <b style="color:var(--accent)">{{ t('Enabled') }}</b>{{ t(': Secret fields such as passwords are encrypted with the master key you entered on this device.') }}<span v-if="hasRemembered()">{{ t('(remembered on this device)') }}</span>
@@ -1637,8 +1677,10 @@
         // and the state of the 6-digit unlock prompt.
         secretShown: false,
         secretForm: { cells: ['', '', '', '', '', ''], pin: '', err: '', busy: false },
-        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100 },
+        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100, version_keep: 10, version_when: 'manual' },
         undoTop: null, history: [],
+        // versions kept beside a record (floats above the record modal, like folderAsk)
+        vers: { open: false, id: null, title: '', list: [] },
         schemaSep: 'space', schemaSepChar: '',
         languages: [],
         locale: 0,
@@ -2926,7 +2968,7 @@
       },
       async saveSettings() {
         try {
-          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider, undo_limit: this.settingsForm.undo_limit }) });
+          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider, undo_limit: this.settingsForm.undo_limit, version_keep: this.settingsForm.version_keep, version_when: this.settingsForm.version_when }) });
           this.settingsForm = s; this.theme = s.theme || 'auto'; this.applyTheme();
           this.languages = s.languages || this.languages;
           await this.applyLanguage(s.language || 'auto');
@@ -2992,6 +3034,31 @@
         await this.refreshUndo();
       },
       async openHistory() { await this.refreshUndo(); this.modal = { type: 'history' }; },
+      // ---- per-record version history (independent of the snapshot/undo log above) ----
+      async openVersions(id) {
+        if (!id) return;
+        const rec = this.records.find((r) => r.id === id);
+        this.vers = { open: true, id, title: (rec && rec.title) || '', list: [] };
+        await this.reloadVersions();
+      },
+      async reloadVersions() {
+        try {
+          const r = await api('records/' + this.vers.id + '/versions');
+          this.vers.list = r.versions || [];
+        } catch (e) { this.showToast(T('Could not read the versions') + ': ' + (e.message || e)); }
+      },
+      async restoreVersion(number) {
+        if (!window.confirm(T('Put version #{n} back? What is in the record now is kept as a version of its own.', { n: String(number).padStart(2, '0') }))) return;
+        try {
+          await api('records/' + this.vers.id + '/versions/restore', { method: 'POST', body: JSON.stringify({ number }) });
+          await this.reloadVersions();
+          await this.loadRecords();
+          const fresh = this.records.find((r) => r.id === this.vers.id);
+          if (fresh && this.editingRecordId === this.vers.id) await this.editRecord(fresh);
+          else if (fresh && this.modal && this.modal.type === 'detail' && this.modal.rec && this.modal.rec.id === this.vers.id) this.openRecord(fresh);
+          this.showToast(T('Version #{n} restored', { n: String(number).padStart(2, '0') }));
+        } catch (e) { alert(T('Failed to restore') + ': ' + (e.message || e)); }
+      },
       snapIcon(op) {
         return { 'record.create': '➕', 'record.update': '✏️', 'record.delete': '🗑', 'record.delete_many': '🗑', 'record.reorder': '⇅', 'records.bulk_add': '📥', 'record.transfer': '↔', 'fields.replace': '🧩', 'fields.append': '🧩', 'collection.create': '🗂️', 'collection.update': '⚙️', 'collection.delete': '🗑', 'collection.duplicate': '📄' }[op] || '•';
       },

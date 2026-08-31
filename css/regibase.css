@@ -234,7 +234,9 @@
 #regibase-root .topbar .spacer { flex: 1; }
 #regibase-root .topbar-actions { display: flex; align-items: center; gap: 8px; }
 #regibase-root .ta-break { display: none; }
-#regibase-root .hamburger { display: none; }
+/* The button also carries .btn, whose display:inline-flex has equal specificity
+   and comes later; qualify with .btn so this hide rule wins on desktop. */
+#regibase-root .btn.hamburger { display: none; }
 
 #regibase-root .content { flex: 1; overflow-y: auto; padding: 18px 20px 40px; }
 /* unified sticky toolbar: search / sort + bulk actions in one frame */
@@ -602,7 +604,7 @@
   }
   #regibase-root .sidebar.open { transform: translateX(0); }
   #regibase-root .backdrop.show { display: block; position: fixed; top: var(--header-height, 50px); left: 0; right: 0; bottom: 0; background: rgba(8,12,22,.45); z-index: 35; }
-  #regibase-root .hamburger { display: inline-flex; }
+  #regibase-root .btn.hamburger { display: inline-flex; }
   #regibase-root .rec-grid { grid-template-columns: 1fr; }
   #regibase-root .tpl-grid { grid-template-columns: 1fr; }
   /* Full-screen modals: no mask padding + stretch so the header ✕ and footer

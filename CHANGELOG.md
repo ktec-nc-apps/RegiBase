@@ -2,6 +2,29 @@
 
 All notable changes to RegiBase.
 
+## 0.19.0 — 2026-09-01
+
+### New — record version history
+
+- **Each record can keep its last few versions**, the way EditBase keeps numbered versions
+  beside a document. Before an edit overwrites a record, its previous state is saved as a
+  numbered version (**#01** is the newest; older ones shift down and the oldest falls off once
+  past the limit). Open them from a record's **🕐 Versions** button and **put any one back** —
+  restoring is itself reversible, because the current state is kept as a version first.
+- In **Settings**, set **how many versions to keep** per record (0–99; nought turns it off) and
+  **when one is taken** — only when you ask, or every time a record is edited.
+- This is **separate from the snapshot / undo history**: a version stays even after its undo
+  entry has aged out of the account-wide log, so it is a longer-lived safety net for one
+  record's contents.
+- Added translations for the new text in all 20 languages.
+
+### Fix
+
+- **Fixed the ☰ button appearing on the desktop layout next to the collection title, where
+  pressing it did nothing.** It is a small-screen control that opens the collections sidebar
+  (already always visible on wider screens); a style rule was letting it show on the desktop
+  layout too.
+
 ## 0.18.35 — 2026-08-27
 
 ### Fix — the attachment save folder is now created

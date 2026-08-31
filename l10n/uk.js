@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Інша колекція вже використовує теку з такою назвою. Використати ту саму теку? Якщо вибрати «Ні», її буде створено з доданим номером.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Тека збереження використовується іншою колекцією, тому її не видалено. За потреби видаліть її вручну.",
     "Yes": "Так",
-    "No": "Ні"
+    "No": "Ні",
+    "Versions": "Версії",
+    "Versions of “{name}”": "Версії «{name}»",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Поки що немає. Одна зберігається щоразу під час редагування запису, якщо версії увімкнено в налаштуваннях.",
+    "Put this one back": "Повернути цю",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Під час повернення версії поточний вміст також зберігається як окрема версія, тож це можна скасувати так само.",
+    "Done": "Готово",
+    "Record versions": "Версії запису",
+    "versions per record": "версій на запис",
+    "A version is kept": "Версія зберігається",
+    "only when you ask for one": "лише на запит",
+    "every time a record is edited": "щоразу під час редагування запису",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Стан перед кожним редагуванням зберігається поряд із записом і нумерується від #01 (найновіша) вгору; найстаріша відкидається після перевищення наведеного ліміту. Незалежно від історії знімків (скасування) — версія залишається навіть після того, як її запис скасування застаріє та зникне. Нуль не зберігає жодної.",
+    "Could not read the versions": "Не вдалося прочитати версії",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Повернути версію #{n}? Поточний вміст запису буде збережено як окрему версію.",
+    "Version #{n} restored": "Версію #{n} відновлено",
+    "Failed to restore": "Не вдалося відновити"
 },
 "nplurals=4; plural=(n % 1 == 0 && n % 10 == 1 && n % 100 != 11 ? 0 : n % 1 == 0 && n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 1 : n % 1 == 0 && (n % 10 ==0 || (n % 10 >=5 && n % 10 <=9) || (n % 100 >=11 && n % 100 <=14 )) ? 2: 3);");

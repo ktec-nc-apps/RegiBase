@@ -843,7 +843,23 @@
         "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Jiná kolekce již používá složku s tímto názvem. Použít stejnou složku? Při volbě „Ne“ se vytvoří s přidaným číslem.",
         "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Složku pro ukládání používá jiná kolekce, proto se nemaže. V případě potřeby ji smažte ručně.",
         "Yes": "Ano",
-        "No": "Ne"
+        "No": "Ne",
+        "Versions": "Verze",
+        "Versions of “{name}”": "Verze „{name}”",
+        "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Zatím žádná. Při každé úpravě záznamu se jedna uchová, pokud jsou verze zapnuté v nastavení.",
+        "Put this one back": "Obnovit tuto",
+        "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Při obnovení verze se stávající obsah také uloží jako vlastní verze, takže to lze stejným způsobem vrátit zpět.",
+        "Done": "Hotovo",
+        "Record versions": "Verze záznamu",
+        "versions per record": "verzí na záznam",
+        "A version is kept": "Verze se uchová",
+        "only when you ask for one": "jen když si o ni řeknete",
+        "every time a record is edited": "při každé úpravě záznamu",
+        "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Stav před každou úpravou se uchová vedle záznamu, číslovaný od #01 (nejnovější) nahoru; nejstarší při překročení výše uvedeného limitu vypadne. Nezávislé na historii snímků (zpět) — verze zůstává i poté, co její položka zpět zestárne a zmizí. Nula neuchová žádnou.",
+        "Could not read the versions": "Verze se nepodařilo načíst",
+        "Put version #{n} back? What is in the record now is kept as a version of its own.": "Obnovit verzi #{n}? Stávající obsah záznamu se uloží jako vlastní verze.",
+        "Version #{n} restored": "Verze #{n} obnovena",
+        "Failed to restore": "Obnovení se nezdařilo"
     },
     "pluralForm": "nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;"
 }

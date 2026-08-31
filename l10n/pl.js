@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "Inna kolekcja już używa folderu o tej nazwie. Użyć tego samego folderu? Wybranie „Nie” tworzy go z dodanym numerem.",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "Folder zapisu jest używany przez inną kolekcję, więc nie zostaje usunięty. W razie potrzeby usuń go ręcznie.",
     "Yes": "Tak",
-    "No": "Nie"
+    "No": "Nie",
+    "Versions": "Wersje",
+    "Versions of “{name}”": "Wersje „{name}”",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "Jeszcze żadnej. Jedna jest zachowywana przy każdej edycji rekordu, jeśli wersje są włączone w ustawieniach.",
+    "Put this one back": "Przywróć tę",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "Przy przywracaniu wersji obecna zawartość również zostaje zapisana jako osobna wersja, dzięki czemu można to cofnąć w ten sam sposób.",
+    "Done": "Gotowe",
+    "Record versions": "Wersje rekordu",
+    "versions per record": "wersji na rekord",
+    "A version is kept": "Wersja jest zachowywana",
+    "only when you ask for one": "tylko na żądanie",
+    "every time a record is edited": "przy każdej edycji rekordu",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "Stan sprzed każdej edycji jest zachowywany obok rekordu, numerowany od #01 (najnowsza) w górę; najstarsza odpada po przekroczeniu powyższego limitu. Niezależnie od historii migawek (cofania) — wersja pozostaje nawet po wygaśnięciu jej wpisu cofania. Zero nie zachowuje żadnej.",
+    "Could not read the versions": "Nie udało się odczytać wersji",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "Przywrócić wersję #{n}? Obecna zawartość rekordu zostanie zapisana jako osobna wersja.",
+    "Version #{n} restored": "Przywrócono wersję #{n}",
+    "Failed to restore": "Nie udało się przywrócić"
 },
 "nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);");

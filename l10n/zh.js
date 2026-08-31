@@ -844,6 +844,22 @@ OC.L10N.register(
     "Another collection already uses a folder with this name. Use the same folder? Choosing No creates it with a number added.": "另一个集合已经使用了同名的文件夹。要使用同一个文件夹吗？选择“否”将创建一个添加了编号的文件夹。",
     "The save folder is used by another collection, so it is not deleted. Delete it manually if you need to.": "该保存文件夹被另一个集合使用，因此不会被删除。如有需要，请手动删除。",
     "Yes": "是",
-    "No": "否"
+    "No": "否",
+    "Versions": "版本",
+    "Versions of “{name}”": "“{name}”的版本",
+    "None yet. One is kept each time the record is edited, if versions are switched on in the settings.": "暂无版本。若在设置中开启版本功能，则每次编辑记录时都会保留一个。",
+    "Put this one back": "恢复此版本",
+    "Putting a version back keeps what is there now as a version of its own, so it can be undone the same way.": "恢复某个版本时，会将当前内容也保存为一个版本，因此可以用同样的方式撤销。",
+    "Done": "完成",
+    "Record versions": "记录版本",
+    "versions per record": "个版本／每条记录",
+    "A version is kept": "何时保留版本",
+    "only when you ask for one": "仅在您需要时",
+    "every time a record is edited": "每次编辑记录时",
+    "The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.": "每次编辑前的状态会保留在记录旁边，从 #01（最新）开始编号；超过上述上限的最旧版本会被删除。它与快照（撤销历史）相互独立——即使撤销记录因过期而消失，版本仍会保留。设为 0 则不保留。",
+    "Could not read the versions": "无法读取版本",
+    "Put version #{n} back? What is in the record now is kept as a version of its own.": "恢复到版本 #{n}？当前记录的内容会保存为一个版本。",
+    "Version #{n} restored": "已恢复版本 #{n}",
+    "Failed to restore": "恢复失败"
 },
 "nplurals=1; plural=0;");
