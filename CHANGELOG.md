@@ -2,6 +2,22 @@
 
 All notable changes to RegiBase.
 
+## 0.19.1 — 2026-09-08
+
+### Fixed
+
+- **Fixed a bug where clicking outside a dialog while editing made the edit screen
+  disappear.** In every editing dialog — the record editor, collection edit, collection
+  settings, Settings and the rest — clicking outside no longer closes it and discards what you
+  were entering; close it with ✕, Cancel or Save.
+  （各ダイアログで編集中に編集画面外をクリックした際、編集画面が消えてしまうバグを修正した。）
+- **The package now passes Nextcloud's integrity check.** The signature shipped with 0.19.0
+  listed two files the package does not contain (`appinfo/CHANGELOG.md` and
+  `appinfo/README.md` — duplicates of the ones at the root), so every server running
+  RegiBase reported "Some files have not passed the integrity check" in its admin
+  overview. The signature is now generated from the packaged files alone. No app code
+  has changed.
+
 ## 0.19.0 — 2026-09-01
 
 ### New — record version history

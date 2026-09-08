@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "संस्करण पढ़े नहीं जा सके",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "संस्करण #{n} वापस लाएँ? रिकॉर्ड में अभी जो है वह अपने आप में एक संस्करण के रूप में रखा जाएगा।",
     "Version #{n} restored": "संस्करण #{n} वापस लाया गया",
-    "Failed to restore": "पुनर्स्थापित करने में विफल"
+    "Failed to restore": "पुनर्स्थापित करने में विफल",
+    "Discard your unsaved changes?": "बिना सहेजे किए गए बदलाव रद्द करें?"
 },
 "nplurals=2; plural=(n != 1);");

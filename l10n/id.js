@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Tidak dapat membaca versi",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Kembalikan versi #{n}? Isi catatan saat ini disimpan sebagai versi tersendiri.",
     "Version #{n} restored": "Versi #{n} dikembalikan",
-    "Failed to restore": "Gagal mengembalikan"
+    "Failed to restore": "Gagal mengembalikan",
+    "Discard your unsaved changes?": "Buang perubahan yang belum disimpan?"
 },
 "nplurals=1; plural=0;");

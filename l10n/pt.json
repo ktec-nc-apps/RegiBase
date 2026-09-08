@@ -859,7 +859,8 @@
         "Could not read the versions": "Não foi possível ler as versões",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "Repor a versão #{n}? O conteúdo atual do registo é guardado como uma versão própria.",
         "Version #{n} restored": "Versão #{n} reposta",
-        "Failed to restore": "Falha ao repor"
+        "Failed to restore": "Falha ao repor",
+        "Discard your unsaved changes?": "Descartar as alterações não guardadas?"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

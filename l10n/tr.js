@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Sürümler okunamadı",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "#{n} sürümü geri getirilsin mi? Kaydın şu anki içeriği kendi başına bir sürüm olarak saklanır.",
     "Version #{n} restored": "#{n} sürümü geri getirildi",
-    "Failed to restore": "Geri getirilemedi"
+    "Failed to restore": "Geri getirilemedi",
+    "Discard your unsaved changes?": "Kaydedilmemiş değişiklikler atılsın mı?"
 },
 "nplurals=2; plural=(n > 1);");

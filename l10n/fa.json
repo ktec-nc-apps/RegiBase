@@ -859,7 +859,8 @@
         "Could not read the versions": "خواندن نسخه‌ها ممکن نشد",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "نسخهٔ #{n} بازگردانده شود؟ محتوای کنونی رکورد به‌عنوان نسخه‌ای مستقل نگه داشته می‌شود.",
         "Version #{n} restored": "نسخهٔ #{n} بازگردانده شد",
-        "Failed to restore": "بازگردانی ناموفق بود"
+        "Failed to restore": "بازگردانی ناموفق بود",
+        "Discard your unsaved changes?": "تغییرات ذخیره‌نشده نادیده گرفته شود؟"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

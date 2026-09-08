@@ -429,7 +429,7 @@
   </main>
 
   <!-- Template picker -->
-  <div v-if="modal && modal.type==='template'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='template'" class="modal-mask">
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('New collection') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -457,7 +457,7 @@
   </div>
 
   <!-- Record form -->
-  <div v-if="modal && modal.type==='record'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='record'" class="modal-mask">
     <form class="modal" @submit.prevent="saveRecord">
       <div class="modal-head"><h3>{{ editingRecordId ? t('Edit record') : t('New record') }}</h3><button type="button" class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -583,7 +583,7 @@
   </div>
 
   <!-- Schema editor -->
-  <div v-if="modal && modal.type==='schema'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='schema'" class="modal-mask">
     <div class="modal wide">
       <div class="modal-head"><h3>{{ schemaMode==='template' ? (tplEdit.row_id || tplEdit.builtin_key ? t('✏️ Edit template') : t('⭐ New template')) : t('🧩 Edit collection') }}</h3><button class="icon-btn" @click="closeSchemaEditor">✕</button></div>
       <div class="modal-body" ref="schemaBody" @dragover="onSchemaAutoScroll($event)">
@@ -705,7 +705,7 @@
   </div>
 
   <!-- Duplicate collection -->
-  <div v-if="modal && modal.type==='duplicate'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='duplicate'" class="modal-mask">
     <div class="modal sm">
       <div class="modal-head"><h3>{{ t('📄 Duplicate collection') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -721,7 +721,7 @@
   </div>
 
   <!-- Reorder records (registration order) -->
-  <div v-if="modal && modal.type==='reorder'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='reorder'" class="modal-mask">
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('⇅ Edit the saved record order') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -765,7 +765,7 @@
   </div>
 
   <!-- Collection settings -->
-  <div v-if="modal && modal.type==='collSettings'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='collSettings'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('⚙️ Collection settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body settings-body">
@@ -1003,7 +1003,7 @@
   </div>
 
   <!-- Data Import (CSV / JSON) -->
-  <div v-if="modal && modal.type==='import'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='import'" class="modal-mask">
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('📥 Import (CSV / JSON)') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1059,7 +1059,7 @@
   </div>
 
   <!-- 連絡先（Contacts）からインポート -->
-  <div v-if="modal && modal.type==='contactsImport'" class="modal-mask" @click.self="!contactsImport.busy && (modal=null)">
+  <div v-if="modal && modal.type==='contactsImport'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('📇 Import from Contacts') }}</h3><button class="icon-btn" :disabled="contactsImport.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1092,7 +1092,7 @@
   </div>
 
   <!-- Tables からインポート -->
-  <div v-if="modal && modal.type==='tablesImport'" class="modal-mask" @click.self="!tablesImport.busy && (modal=null)">
+  <div v-if="modal && modal.type==='tablesImport'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('📊 Import from Tables') }}</h3><button class="icon-btn" :disabled="tablesImport.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1125,7 +1125,7 @@
   </div>
 
   <!-- 移動 / 複製 -->
-  <div v-if="modal && modal.type==='transfer'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='transfer'" class="modal-mask">
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('↔ Move / Copy') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1187,7 +1187,7 @@
   </div>
 
   <!-- 保存先設定 -->
-  <div v-if="modal && modal.type==='settings'" class="modal-mask" @click.self="modal=null">
+  <div v-if="modal && modal.type==='settings'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('⚙️ Settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body settings-body">
@@ -1335,7 +1335,7 @@
   </div>
 
   <!-- 全データのバックアップ -->
-  <div v-if="modal && modal.type==='backup'" class="modal-mask" @click.self="!backupForm.busy && (modal=null)">
+  <div v-if="modal && modal.type==='backup'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('🔒 Download all data') }}</h3><button class="icon-btn" :disabled="backupForm.busy" @click="modal=null">✕</button></div>
       <form class="modal-body" @submit.prevent="doBackup">
@@ -1352,7 +1352,7 @@
   </div>
 
   <!-- バックアップから復元 -->
-  <div v-if="modal && modal.type==='restore'" class="modal-mask" @click.self="!restoreForm.busy && (modal=null)">
+  <div v-if="modal && modal.type==='restore'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('♻ Restore from backup') }}</h3><button class="icon-btn" :disabled="restoreForm.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1385,7 +1385,7 @@
   </div>
 
   <!-- 暗号化を有効にする -->
-  <div v-if="modal && modal.type==='encSetup'" class="modal-mask" @click.self="!encForm.busy && (modal=null)">
+  <div v-if="modal && modal.type==='encSetup'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('🔒 Enable encryption') }}</h3><button class="icon-btn" :disabled="encForm.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1405,7 +1405,7 @@
   </div>
 
   <!-- マスターキー変更 -->
-  <div v-if="modal && modal.type==='encChange'" class="modal-mask" @click.self="!encForm.busy && (modal=null)">
+  <div v-if="modal && modal.type==='encChange'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('🔑 Change master key') }}</h3><button class="icon-btn" :disabled="encForm.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1424,7 +1424,7 @@
   </div>
 
   <!-- マスターパスワード削除（平文化して暗号化を解除） -->
-  <div v-if="modal && modal.type==='encRemove'" class="modal-mask" @click.self="!encForm.busy && (modal=null)">
+  <div v-if="modal && modal.type==='encRemove'" class="modal-mask">
     <div class="modal">
       <div class="modal-head"><h3>{{ t('🗝️ Remove master key') }}</h3><button class="icon-btn" :disabled="encForm.busy" @click="modal=null">✕</button></div>
       <div class="modal-body">
@@ -1667,7 +1667,7 @@
         authenticated: null,
         collections: [], current: null, records: [], search: '', searchRegex: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
         sidebarOpen: false, modal: null, folderAsk: { open: false }, pendingCreate: null,
-        form: {}, editingRecordId: null, reveal: {},
+        form: {}, editingRecordId: null, reveal: {}, formBaseline: '',
         templates: [], templatesLoading: false, schemaFields: [],
         schemaMode: 'collection',
         tplEdit: { row_id: null, key: null, builtin_key: null, name: '', icon: '', color: '', description: '', busy: false },
@@ -3946,6 +3946,7 @@
         if (!this.canEdit) return;
         this.form = {}; this.reveal = {}; this.editingRecordId = null; this.editingOrig = null;
         this.current.fields.forEach((f) => (this.form[f.key] = f.type === 'checkbox' ? [] : ''));
+        this.formBaseline = JSON.stringify(this.form);
         this.modal = { type: 'record' };
       },
       openRecord(rec) { this.reveal = {}; this.openDecrypted = {}; this.preloadFileMetas(this.current.fields, rec.data); this.modal = { type: 'detail', rec }; this.decryptSecretsOf(rec); },
@@ -3969,6 +3970,7 @@
           this.form[f.key] = f.secret ? await this.secretPlain(rec.data[f.key]) : (rec.data[f.key] ?? '');
         }
         this.preloadFileMetas(this.current.fields, rec.data);
+        this.formBaseline = JSON.stringify(this.form);
         this.modal = { type: 'record' };
       },
       async saveRecord() {

@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Không thể đọc các phiên bản",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Khôi phục phiên bản #{n}? Nội dung hiện tại của bản ghi được lưu thành một phiên bản riêng.",
     "Version #{n} restored": "Đã khôi phục phiên bản #{n}",
-    "Failed to restore": "Khôi phục thất bại"
+    "Failed to restore": "Khôi phục thất bại",
+    "Discard your unsaved changes?": "Bỏ các thay đổi chưa lưu?"
 },
 "nplurals=1; plural=0;");

@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "无法读取版本",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "恢复到版本 #{n}？当前记录的内容会保存为一个版本。",
     "Version #{n} restored": "已恢复版本 #{n}",
-    "Failed to restore": "恢复失败"
+    "Failed to restore": "恢复失败",
+    "Discard your unsaved changes?": "放弃未保存的更改吗？"
 },
 "nplurals=1; plural=0;");

@@ -859,7 +859,8 @@
         "Could not read the versions": "Verze se nepodařilo načíst",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "Obnovit verzi #{n}? Stávající obsah záznamu se uloží jako vlastní verze.",
         "Version #{n} restored": "Verze #{n} obnovena",
-        "Failed to restore": "Obnovení se nezdařilo"
+        "Failed to restore": "Obnovení se nezdařilo",
+        "Discard your unsaved changes?": "Zahodit neuložené změny?"
     },
     "pluralForm": "nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;"
 }

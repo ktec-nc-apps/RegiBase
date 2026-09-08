@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Impossible de lire les versions",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Restaurer la version #{n} ? Le contenu actuel de la fiche est conservé comme version à part entière.",
     "Version #{n} restored": "Version #{n} restaurée",
-    "Failed to restore": "Échec de la restauration"
+    "Failed to restore": "Échec de la restauration",
+    "Discard your unsaved changes?": "Abandonner les modifications non enregistrées ?"
 },
 "nplurals=2; plural=(n > 1);");

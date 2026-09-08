@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Не удалось прочитать версии",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Вернуть версию #{n}? Текущее содержимое записи будет сохранено как отдельная версия.",
     "Version #{n} restored": "Версия #{n} восстановлена",
-    "Failed to restore": "Не удалось восстановить"
+    "Failed to restore": "Не удалось восстановить",
+    "Discard your unsaved changes?": "Отменить несохранённые изменения?"
 },
 "nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);");

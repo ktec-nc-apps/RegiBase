@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Die Versionen konnten nicht gelesen werden",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Version #{n} wiederherstellen? Der aktuelle Inhalt des Datensatzes wird als eigene Version gesichert.",
     "Version #{n} restored": "Version #{n} wiederhergestellt",
-    "Failed to restore": "Wiederherstellung fehlgeschlagen"
+    "Failed to restore": "Wiederherstellung fehlgeschlagen",
+    "Discard your unsaved changes?": "Nicht gespeicherte Änderungen verwerfen?"
 },
 "nplurals=2; plural=(n != 1);");

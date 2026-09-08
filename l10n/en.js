@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "Could not read the versions",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "Put version #{n} back? What is in the record now is kept as a version of its own.",
     "Version #{n} restored": "Version #{n} restored",
-    "Failed to restore": "Failed to restore"
+    "Failed to restore": "Failed to restore",
+    "Discard your unsaved changes?": "Discard your unsaved changes?"
 },
 "nplurals=2; plural=(n != 1);");

@@ -897,7 +897,8 @@
         "Could not read the versions": "バージョンを読み込めませんでした",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "バージョン #{n} に戻しますか？ 現在のレコードの内容はそれ自体の版として保存されます。",
         "Version #{n} restored": "バージョン #{n} に戻しました",
-        "Failed to restore": "復元に失敗しました"
+        "Failed to restore": "復元に失敗しました",
+        "Discard your unsaved changes?": "未保存の変更を破棄しますか？"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

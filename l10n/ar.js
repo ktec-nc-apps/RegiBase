@@ -860,6 +860,7 @@ OC.L10N.register(
     "Could not read the versions": "تعذَّر قراءة الإصدارات",
     "Put version #{n} back? What is in the record now is kept as a version of its own.": "استعادة الإصدار #{n}؟ سيُحفَظ محتوى السجل الحالي كإصدار مستقل.",
     "Version #{n} restored": "تمت استعادة الإصدار #{n}",
-    "Failed to restore": "فشلت الاستعادة"
+    "Failed to restore": "فشلت الاستعادة",
+    "Discard your unsaved changes?": "هل تريد تجاهل التغييرات غير المحفوظة؟"
 },
 "nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);");

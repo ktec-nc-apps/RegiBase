@@ -859,7 +859,8 @@
         "Could not read the versions": "Не вдалося прочитати версії",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "Повернути версію #{n}? Поточний вміст запису буде збережено як окрему версію.",
         "Version #{n} restored": "Версію #{n} відновлено",
-        "Failed to restore": "Не вдалося відновити"
+        "Failed to restore": "Не вдалося відновити",
+        "Discard your unsaved changes?": "Скасувати незбережені зміни?"
     },
     "pluralForm": "nplurals=4; plural=(n % 1 == 0 && n % 10 == 1 && n % 100 != 11 ? 0 : n % 1 == 0 && n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 1 : n % 1 == 0 && (n % 10 ==0 || (n % 10 >=5 && n % 10 <=9) || (n % 100 >=11 && n % 100 <=14 )) ? 2: 3);"
 }

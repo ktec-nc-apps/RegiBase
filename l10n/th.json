@@ -859,7 +859,8 @@
         "Could not read the versions": "ไม่สามารถอ่านเวอร์ชันได้",
         "Put version #{n} back? What is in the record now is kept as a version of its own.": "คืนค่าเวอร์ชัน #{n} หรือไม่? เนื้อหาปัจจุบันของระเบียนจะถูกเก็บเป็นเวอร์ชันของตัวเอง",
         "Version #{n} restored": "คืนค่าเวอร์ชัน #{n} แล้ว",
-        "Failed to restore": "คืนค่าไม่สำเร็จ"
+        "Failed to restore": "คืนค่าไม่สำเร็จ",
+        "Discard your unsaved changes?": "ละทิ้งการเปลี่ยนแปลงที่ยังไม่บันทึกหรือไม่?"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }
