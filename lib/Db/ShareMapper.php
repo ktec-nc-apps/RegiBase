@@ -65,6 +65,15 @@ class ShareMapper extends QBMapper {
 	}
 
 	/** All shares of a collection (its recipients). @return ShareEntity[] */
+	/** Shares that still hold a wrapped key and have an end date. @return ShareEntity[] */
+	public function findWithKeyAndEnd(): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->where($qb->expr()->isNotNull('expires_at'))
+			->andWhere($qb->expr()->isNotNull('enc_key'));
+		return $this->findEntities($qb);
+	}
+
 	public function findForCollection(int $collectionId): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())

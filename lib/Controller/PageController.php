@@ -40,6 +40,9 @@ class PageController extends Controller {
 		// ('auto' = follow Nextcloud) so it matches the in-app language.
 		$user = $this->userSession->getUser();
 		$lang = $user ? $this->config->getUserValue($user->getUID(), Application::APP_ID, 'language', 'auto') : 'auto';
+		if ($lang === 'pt') {
+			$lang = 'pt_BR'; // shipped as "pt" until 2026-09
+		}
 		$l = $this->l10nFactory->get(Application::APP_ID, $lang === 'auto' ? null : $lang);
 
 		return new TemplateResponse(Application::APP_ID, 'main', [

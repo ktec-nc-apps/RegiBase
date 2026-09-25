@@ -20,7 +20,7 @@ class Records extends Base {
 
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$c = $this->resolveCollection($input);
-		$key = $this->secretKey($c->getUserId(), $input, $output);
+		$key = $this->collectionKey($this->secretKey($c->getUserId(), $input, $output), $c);
 
 		$fieldsByKey = [];
 		foreach ($this->fields->findForCollection((int)$c->getId()) as $f) {

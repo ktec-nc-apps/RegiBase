@@ -31,6 +31,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setUpdatedAt(string $v)
  */
 class TemplateEntity extends Entity implements \JsonSerializable {
+	use CheckedLook;
+
 	protected $userId = '';
 	protected $tplKey = '';
 	protected $builtinKey = null;

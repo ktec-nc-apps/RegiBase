@@ -21,7 +21,7 @@ class ExportCollection extends Base {
 
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$c = $this->resolveCollection($input);
-		$key = $this->secretKey($c->getUserId(), $input, $output);
+		$key = $this->collectionKey($this->secretKey($c->getUserId(), $input, $output), $c);
 		$fields = $this->fields->findForCollection((int)$c->getId());
 		$recs = $this->records->findForCollection((int)$c->getId());
 		$format = strtolower((string)$input->getOption('format'));
@@ -33,7 +33,7 @@ class ExportCollection extends Base {
 				$data = json_decode($r->getData() ?: '{}', true) ?: [];
 				$row = [];
 				foreach ($fields as $f) {
-					$row[] = $this->reveal($key, $data[$f->getFieldKey()] ?? '') ?? '';
+					$row[] = $this->reveal($key, $data[$f->getFieldKey()] ?? '', (bool)$f->getSecret()) ?? '';
 				}
 				fputcsv($fh, $row);
 			}
@@ -67,7 +67,7 @@ class ExportCollection extends Base {
 			$data = json_decode($r->getData() ?: '{}', true) ?: [];
 			$rowValues = [];
 			foreach ($fields as $f) {
-				$rowValues[$f->getFieldKey()] = $this->reveal($key, $data[$f->getFieldKey()] ?? '');
+				$rowValues[$f->getFieldKey()] = $this->reveal($key, $data[$f->getFieldKey()] ?? '', (bool)$f->getSecret());
 			}
 			$out['records'][] = [
 				'id' => (int)$r->getId(),

@@ -77,6 +77,10 @@ return [
 		// settings
 		['name' => 'api#getSettings', 'url' => '/api/settings', 'verb' => 'GET'],
 		['name' => 'api#updateSettings', 'url' => '/api/settings', 'verb' => 'PUT'],
+		// every secret value the user owns (hidden collections included), and the
+		// one-transaction rewrite used by master key change / removal (review K1/K2)
+		['name' => 'api#ownedSecrets', 'url' => '/api/secrets/owned', 'verb' => 'GET'],
+		['name' => 'api#rekeySecrets', 'url' => '/api/secrets/rekey', 'verb' => 'POST'],
 		['name' => 'api#backup', 'url' => '/api/backup', 'verb' => 'POST'],
 		['name' => 'api#restore', 'url' => '/api/restore', 'verb' => 'POST'],
 		['name' => 'api#contactsAddressbooks', 'url' => '/api/contacts/addressbooks', 'verb' => 'GET'],

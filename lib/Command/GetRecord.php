@@ -39,7 +39,7 @@ class GetRecord extends Base {
 			throw new \RuntimeException("Record #$rid is not in collection #{$c->getId()}");
 		}
 
-		$key = $this->secretKey($c->getUserId(), $input, $output);
+		$key = $this->collectionKey($this->secretKey($c->getUserId(), $input, $output), $c);
 		$data = json_decode($rec->getData() ?: '{}', true) ?: [];
 		$fields = $this->fields->findForCollection((int)$c->getId());
 
@@ -48,7 +48,7 @@ class GetRecord extends Base {
 		if (is_string($only) && $only !== '') {
 			foreach ($fields as $f) {
 				if ($f->getFieldKey() === $only || $f->getLabel() === $only) {
-					$output->write($this->reveal($key, $data[$f->getFieldKey()] ?? '') ?? '');
+					$output->write($this->reveal($key, $data[$f->getFieldKey()] ?? '', (bool)$f->getSecret()) ?? '');
 					return 0;
 				}
 			}
@@ -61,7 +61,7 @@ class GetRecord extends Base {
 				'key' => $f->getFieldKey(),
 				'label' => $f->getLabel(),
 				'secret' => (bool)$f->getSecret(),
-				'value' => $this->reveal($key, $data[$f->getFieldKey()] ?? ''),
+				'value' => $this->reveal($key, $data[$f->getFieldKey()] ?? '', (bool)$f->getSecret()),
 			];
 		}
 

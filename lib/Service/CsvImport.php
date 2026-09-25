@@ -17,8 +17,33 @@ class CsvImport {
 	private const TEL_RE = '/\btel\b|phone|mobile|電話/iu';
 	private const DATE_RE = '/date|期限|日付|発行日/iu';
 
+	/**
+	 * The separator of a CSV: comma, semicolon (Excel where the decimal mark is a comma) or
+	 * tab, whichever the first line has most of, outside quotes. A ; or tab separated file
+	 * came in as a single column (review K15). Comma when there is none.
+	 */
+	public static function detectDelimiter(string $text): string {
+		$counts = [',' => 0, ';' => 0, "\t" => 0];
+		$inQuotes = false;
+		$n = strlen($text);
+		for ($i = 0; $i < $n; $i++) {
+			$c = $text[$i];
+			if ($c === '"') {
+				$inQuotes = !$inQuotes;
+			} elseif (!$inQuotes && ($c === "\n" || $c === "\r")) {
+				break;
+			} elseif (!$inQuotes && isset($counts[$c])) {
+				$counts[$c]++;
+			}
+		}
+		arsort($counts);
+		$best = (string)array_key_first($counts);
+		return $counts[$best] > 0 ? $best : ',';
+	}
+
 	/** RFC4180-ish CSV parser (quotes, escaped "", CRLF, newlines in quotes). */
-	public static function parseCsv(string $text): array {
+	public static function parseCsv(string $text, ?string $delim = null): array {
+		$delim ??= self::detectDelimiter($text);
 		$rows = [];
 		$field = '';
 		$row = [];
@@ -39,7 +64,7 @@ class CsvImport {
 				$field .= $c; $i++; continue;
 			}
 			if ($c === '"') { $inQuotes = true; $i++; continue; }
-			if ($c === ',') { $row[] = $field; $field = ''; $i++; continue; }
+			if ($c === $delim) { $row[] = $field; $field = ''; $i++; continue; }
 			if ($c === "\r") { $i++; continue; }
 			if ($c === "\n") { $row[] = $field; $rows[] = $row; $row = []; $field = ''; $i++; continue; }
 			$field .= $c; $i++;
@@ -62,6 +87,28 @@ class CsvImport {
 		$base = preg_replace('/[^a-z0-9぀-ヿ一-鿿]+/u', '_', $base);
 		$base = trim((string)$base, '_');
 		return $base !== '' ? $base : ('col_' . ($fallbackIndex + 1));
+	}
+
+	/**
+	 * Give every column a key of its own. Headings such as "E-mail" and "E mail", or two
+	 * "Memo" columns, came out as the same key: the fields were told apart, but every row
+	 * wrote both values into one key, so one column was lost without a word (review K13).
+	 */
+	public static function uniqueKeys(array $columns): array {
+		$used = [];
+		foreach ($columns as $i => $c) {
+			$key = (string)($c['key'] ?? '');
+			if ($key === '') {
+				$key = 'col_' . ($i + 1);
+			}
+			$try = $key;
+			for ($n = 2; isset($used[$try]); $n++) {
+				$try = $key . '_' . $n;
+			}
+			$used[$try] = true;
+			$columns[$i]['key'] = $try;
+		}
+		return $columns;
 	}
 
 	public static function isSecret(string $header): bool {
@@ -132,6 +179,7 @@ class CsvImport {
 				'is_title' => $override['title'] ?? false,
 			];
 		}
+		$columns = self::uniqueKeys($columns);
 		// ensure exactly one title
 		$hasTitle = false;
 		foreach ($columns as $c) {
@@ -160,6 +208,7 @@ class CsvImport {
 	public static function buildRecords(string $csv, array $columns): array {
 		$rows = self::nonEmptyRows(self::parseCsv($csv));
 		$dataRows = array_slice($rows, 1);
+		$columns = self::uniqueKeys(array_values($columns));
 		$fields = [];
 		foreach ($columns as $c) {
 			$fields[] = [

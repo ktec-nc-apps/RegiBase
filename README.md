@@ -33,11 +33,13 @@ fields you set up yourself.
   frozen first column and grab-to-scroll), cards, and thumbnail cards.
 - **Client-side encryption (optional)** — secret fields (passwords, PINs, card
   numbers…) are encrypted in the browser with **AES-GCM**. The server never sees
-  your master key or the plaintext. *Forgetting the master key means the data
+  your master key or the plaintext. The master key is at least 8 characters and is
+  strengthened with 600,000 PBKDF2 rounds. *Forgetting the master key means the data
   cannot be recovered.*
 - **Password-protected backup & restore** — download all data (collections,
-  records, settings, attachments) as an **AES-256 encrypted ZIP**, and restore it
-  later (overwrite / merge / add).
+  records, settings, shares, templates, attachments) as an **AES-256 encrypted ZIP**,
+  protected by your login password or by a password of its own, and restore it later
+  (overwrite / merge / add). Large attachments are streamed, not held in memory.
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
 - **Attachments** — attach images and files from **Nextcloud Files** or **Notes**. Each collection
@@ -53,11 +55,12 @@ fields you set up yourself.
   are taken are set in **Settings**.
 - **Collection sharing** — share with other Nextcloud users at three levels
   (**view / edit / delete**), with an optional access password and optional
-  secret-field sharing.
+  secret-field sharing. Sharing follows your Nextcloud sharing settings; a share they no
+  longer allow is paused until they allow it again.
 - **Nextcloud Tables integration** — **import** a Tables table into a new collection,
   or **export** a collection to a new Tables table.
-- **20 languages** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
-  Русский · Português · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
+- **21 languages** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
+  Русский · Português (Brasil) · Português (Portugal) · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
   Bahasa Indonesia · Polski · ไทย · Türkçe · Українська · Tiếng Việt. Pick a language
   in the app independently of your Nextcloud language.
 
@@ -79,7 +82,7 @@ button stays disabled.
 
 ### Requirements
 
-- Nextcloud **30 – 33**
+- Nextcloud **30 – 35**
 - PHP 8.1+
 - A Nextcloud-supported database (MySQL/MariaDB, PostgreSQL or SQLite)
 
@@ -141,9 +144,12 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   掴んで横スクロール）/ カード / サムネイル付きカード。
 - **クライアント側暗号化（任意）** — パスワードや暗証番号、カード番号などの秘密項目は、
   ブラウザ内で **AES-GCM** により暗号化されます。サーバーはマスターキーも平文も一切見ません。
+  マスターキーは 8 文字以上で、PBKDF2 60 万回で強化します。
   *マスターキーを忘れるとデータは復元できません。*
-- **パスワード付きバックアップ／復元** — 全データ（コレクション・レコード・設定・添付）を
-  **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／追加）できます。
+- **パスワード付きバックアップ／復元** — 全データ（コレクション・レコード・設定・共有・
+  テンプレート・添付）を **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／
+  追加）できます。ZIP のパスワードは、ログインパスワードか、専用のパスワードを選べます。
+  大きな添付も、メモリに載せずに処理します。
 - **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
   **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
 - **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。コレクションごとに
@@ -156,11 +162,12 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   （EditBase の文書バージョンと同じ考え方）。スナップショットとは別で、保存件数と保存タイミングは
   **設定**で指定します。
 - **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
-  任意のアクセスパスワードや、秘密項目の共有にも対応します。
+  任意のアクセスパスワードや、秘密項目の共有にも対応します。共有は Nextcloud の共有設定に従い、
+  設定に合わなくなった共有は、設定で許可されるまで停止します。
 - **Nextcloud Tables 連携** — Tables のテーブルを新規コレクションとして**取り込み**、
   またはコレクションを Tables へ**書き出し**できます。
-- **20 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
-  Русский · Português · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
+- **21 言語対応** — 日本語 · English · 简体中文 · Español · Français · Deutsch ·
+  Русский · Português (Brasil) · Português (Portugal) · العربية · हिन्दी · 한국어 · Italiano · Čeština · فارسی ·
   Bahasa Indonesia · Polski · ไทย · Türkçe · Українська · Tiếng Việt。
   Nextcloud 本体の言語とは独立に、アプリ内で言語を選べます。
 
@@ -181,7 +188,7 @@ RegiBase は、以下のアプリが入っていれば、それらを利用し�
 
 ### 動作環境
 
-- Nextcloud **30 – 33**
+- Nextcloud **30 – 35**
 - PHP 8.1 以上
 - Nextcloud 対応データベース（MySQL/MariaDB, PostgreSQL, SQLite）
 

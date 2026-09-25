@@ -103,6 +103,7 @@ class TemplateService {
 			if ($label === '') {
 				continue;
 			}
+			$sep = (string)($f['concat_sep'] ?? 'space');
 			$row = [
 				'key' => (string)($f['key'] ?? ''),
 				'label' => $label,
@@ -110,6 +111,14 @@ class TemplateService {
 				'required' => !empty($f['required']),
 				'secret' => !empty($f['secret']),
 				'is_title' => !empty($f['is_title']),
+				// Per-view visibility and concatenation, defaulted the same way
+				// RegiBaseService applies them when a collection is built (J9).
+				'list_show' => array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true,
+				'table_show' => array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true,
+				'card_show' => array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true,
+				'concat' => max(0, (int)($f['concat'] ?? 0)),
+				'concat_sep' => in_array($sep, RegiBaseService::CONCAT_SEPS, true) ? $sep : 'space',
+				'concat_sep_char' => mb_substr((string)($f['concat_sep_char'] ?? ''), 0, 4),
 			];
 			if (isset($f['options']) && $f['options'] !== '' && $f['options'] !== null && $f['options'] !== []) {
 				$row['options'] = $f['options'];

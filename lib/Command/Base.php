@@ -22,12 +22,15 @@ use Symfony\Component\Console\Question\Question;
  * server-side mirror of the app's client-side secret encryption.
  *
  * Encryption (must stay in sync with js/regibase.js rbcrypto):
- *   key   = PBKDF2-SHA256(password, base64_decode(enc_salt), 250000, 32 bytes)
+ *   key   = PBKDF2-SHA256(password, base64_decode(enc_salt), enc_kdf_iter (250000 when unset), 32 bytes)
  *   value = "rbenc1:" + base64(iv[12]) + ":" + base64(ciphertext || tag[16])   [AES-256-GCM]
  * enc_salt / enc_verifier live in the user's preferences; the plaintext key is
  * never stored, so a password is required to reveal secret fields.
  */
 abstract class Base extends Command {
+	/** Whether --reveal was given: without it a secret field is masked even when stored as plain text. */
+	private bool $revealing = false;
+
 	protected const ENC_PREFIX = 'rbenc1:';
 
 	public function __construct(
@@ -94,20 +97,41 @@ abstract class Base extends Command {
 	 * or when encryption is not set up.
 	 */
 	protected function secretKey(string $uid, InputInterface $input, OutputInterface $output): ?string {
-		if (!$input->getOption('reveal')) {
+		$this->revealing = (bool)$input->getOption('reveal');
+		if (!$this->revealing) {
 			return null;
 		}
 		$enabled = $this->config->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1';
 		$salt = $this->config->getUserValue($uid, Application::APP_ID, 'enc_salt', '');
 		$verifier = $this->config->getUserValue($uid, Application::APP_ID, 'enc_verifier', '');
 		if (!$enabled || $salt === '' || $verifier === '') {
-			throw new \RuntimeException("User '$uid' has no encryption set up — nothing to reveal");
+			// no master key: secret fields are stored as they are, and --reveal shows them
+			return null;
 		}
 
 		$password = $this->resolvePassword($input, $output);
-		$key = hash_pbkdf2('sha256', $password, base64_decode($salt), 250000, 32, true);
-		if ($this->decryptWith($key, $verifier) !== 'regibase-ok') {
+		$key = \OCA\RegiBase\Service\Kdf::derive($password, $salt, \OCA\RegiBase\Service\Kdf::iterFor($this->config, $uid));
+		// a verifier that is not encrypted opens with any key (review K14)
+		if (strpos($verifier, self::ENC_PREFIX) !== 0 || $this->decryptWith($key, $verifier) !== 'regibase-ok') {
 			throw new \RuntimeException('Wrong master password');
+		}
+		return $key;
+	}
+
+	/**
+	 * The key a collection's secrets are under: its own key when it has been shared
+	 * with its secrets (kept wrapped with the master key), otherwise the master key.
+	 */
+	protected function collectionKey(?string $masterKey, $collection): ?string {
+		// (Entity getters are magic: method_exists() says no, so it is called directly.)
+		$wrap = (string)($collection->getKeyWrap() ?? '');
+		if ($masterKey === null || $wrap === '') {
+			return $masterKey;
+		}
+		$raw = $this->decryptWith($masterKey, $wrap);
+		$key = $raw === null ? false : base64_decode($raw, true);
+		if ($key === false || strlen($key) !== 32) {
+			throw new \RuntimeException('The collection key could not be opened with this master password');
 		}
 		return $key;
 	}
@@ -116,6 +140,7 @@ abstract class Base extends Command {
 	private function resolvePassword(InputInterface $input, OutputInterface $output): string {
 		$opt = $input->getOption('password');
 		if (is_string($opt) && $opt !== '') {
+			$this->warnPasswordOption($output, 'password');
 			return $opt;
 		}
 		$env = getenv('REGIBASE_PASSWORD');
@@ -135,13 +160,18 @@ abstract class Base extends Command {
 	/**
 	 * Decrypt a stored value. Plaintext (no rbenc1 prefix) passes through.
 	 * Returns null on a decryption failure. $key null means "don't decrypt":
-	 * secret ciphertext is returned masked.
+	 * secret ciphertext is returned masked. A secret field ($secret) is masked without
+	 * --reveal even when it is stored as plain text (a user without a master key): it
+	 * used to be printed as it was, and output is often collected in logs (review P19).
 	 */
-	protected function reveal(?string $key, $value): ?string {
+	protected function reveal(?string $key, $value, bool $secret = false): ?string {
 		if ($value === null) {
 			return null;
 		}
 		$value = (string)$value;
+		if ($secret && !$this->revealing && $value !== '') {
+			return '••••••• (secret; use --reveal)';
+		}
 		if (strpos($value, self::ENC_PREFIX) !== 0) {
 			return $value;
 		}
@@ -150,6 +180,12 @@ abstract class Base extends Command {
 		}
 		$plain = $this->decryptWith($key, $value);
 		return $plain ?? '‹decryption failed›';
+	}
+
+	/** A password given on the command line is seen in the process list and the shell history (review P19). */
+	protected function warnPasswordOption(OutputInterface $output, string $opt): void {
+		$err = $output instanceof \Symfony\Component\Console\Output\ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+		$err->writeln('<comment>Warning: --' . $opt . ' can be seen in the process list and the shell history. Prefer the environment variable or the prompt.</comment>');
 	}
 
 	/** Raw AES-256-GCM decrypt of a rbenc1 value. Returns null on failure. */
@@ -176,14 +212,14 @@ abstract class Base extends Command {
 	protected function titleOf(array $fieldsByKey, array $data, ?string $key): string {
 		foreach ($fieldsByKey as $fk => $f) {
 			if ($f->getIsTitle()) {
-				$v = $this->reveal($key, $data[$fk] ?? '');
+				$v = $this->reveal($key, $data[$fk] ?? '', (bool)$f->getSecret());
 				return $v !== null && $v !== '' ? $v : '(untitled)';
 			}
 		}
 		// Fall back to the first field.
 		$first = array_key_first($fieldsByKey);
 		if ($first !== null) {
-			$v = $this->reveal($key, $data[$first] ?? '');
+			$v = $this->reveal($key, $data[$first] ?? '', (bool)$fieldsByKey[$first]->getSecret());
 			if ($v !== null && $v !== '') {
 				return $v;
 			}

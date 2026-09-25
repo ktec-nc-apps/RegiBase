@@ -18,8 +18,8 @@ class ContactsImport {
 			['key' => 'reading', 'label' => $l->t('Reading (furigana)'), 'type' => 'text'],
 			['key' => 'photo', 'label' => $l->t('Photo'), 'type' => 'image'],
 			['key' => 'company', 'label' => $l->t('Company name'), 'type' => 'text'],
-			['key' => 'mobile', 'label' => $l->t('Mobile phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
-			['key' => 'phone', 'label' => $l->t('Phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 20]],
+			['key' => 'mobile', 'label' => $l->t('Mobile phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 32]],
+			['key' => 'phone', 'label' => $l->t('Phone'), 'type' => 'tel', 'options' => ['charset' => 'phone', 'max' => 32]],
 			['key' => 'email', 'label' => $l->t('Email'), 'type' => 'email'],
 			['key' => 'address', 'label' => $l->t('Address'), 'type' => 'address'],
 			['key' => 'birthday', 'label' => $l->t('Birthday'), 'type' => 'date'],
@@ -59,6 +59,33 @@ class ContactsImport {
 			$phone = $allTels[0]['value'];
 		}
 
+		// What has no field of its own goes to the memo, marked with its vCard name: the second
+		// and later numbers, mail addresses and addresses, and a birthday without a year
+		// (--MM-DD), which a date field cannot hold. They used to be dropped (review K18).
+		$extra = [];
+		// the numbers already in the mobile and phone fields, each skipped once
+		$used = array_filter([$mobile, $phone], static fn ($v) => $v !== '');
+		foreach ($allTels as $t) {
+			$i = array_search($t['value'], $used, true);
+			if ($i !== false) {
+				unset($used[$i]);   // this one is in the mobile or phone field
+				continue;
+			}
+			$extra[] = 'TEL: ' . $t['value'];
+		}
+		foreach (array_slice(self::values($c, 'EMAIL'), 1) as $e) {
+			$extra[] = 'EMAIL: ' . $e['value'];
+		}
+		$adrs = array_values(array_filter(self::values($c, 'ADR'), static fn ($a) => str_contains($a['value'], ';')));
+		foreach (array_slice($adrs, 1) as $a) {
+			$extra[] = 'ADR: ' . self::formatAddress($a['value']);
+		}
+		$bday = trim(self::first($c, 'BDAY'));
+		if (self::normalizeDate($bday) === '' && preg_match('/^--(\d{2})-?(\d{2})$/', $bday, $m)) {
+			$extra[] = 'BDAY: --' . $m[1] . '-' . $m[2];
+		}
+		$memo = trim(self::first($c, 'NOTE') . ($extra !== [] ? "\n" . implode("\n", $extra) : ''));
+
 		$reading = trim(self::first($c, 'X-PHONETIC-LAST-NAME') . ' ' . self::first($c, 'X-PHONETIC-FIRST-NAME'));
 		$data = [
 			'name' => $name,
@@ -69,7 +96,7 @@ class ContactsImport {
 			'email' => self::first($c, 'EMAIL'),
 			'address' => self::formatAddress(self::first($c, 'ADR')),
 			'birthday' => self::normalizeDate(self::first($c, 'BDAY')),
-			'memo' => self::first($c, 'NOTE'),
+			'memo' => $memo,
 		];
 		return array_filter($data, static fn ($v) => $v !== '' && $v !== null);
 	}

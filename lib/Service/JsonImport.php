@@ -18,7 +18,8 @@ class JsonImport {
 	}
 
 	private static function decode(string $text) {
-		$data = json_decode($text, true);
+		// a long number without quotes (a card number) stays as its digits, not 1.2345678901235E+19 (review K18)
+		$data = json_decode($text, true, 512, JSON_BIGINT_AS_STRING);
 		if ($data === null && trim($text) !== 'null') {
 			throw new \RuntimeException('Failed to parse JSON');
 		}
@@ -106,6 +107,7 @@ class JsonImport {
 				$i++;
 			}
 		}
+		$columns = CsvImport::uniqueKeys($columns);
 		$hasTitle = false;
 		foreach ($columns as $c) {
 			if ($c['is_title']) { $hasTitle = true; break; }
@@ -138,6 +140,7 @@ class JsonImport {
 	/** @return array{fields: array, records: array} */
 	public static function buildRecords(string $text, array $columns): array {
 		[, $rows] = self::normalise(self::decode($text));
+		$columns = CsvImport::uniqueKeys(array_values($columns));
 		$fields = [];
 		foreach ($columns as $c) {
 			$fields[] = [

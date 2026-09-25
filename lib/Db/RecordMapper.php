@@ -54,6 +54,21 @@ class RecordMapper extends QBMapper {
 		return $v;
 	}
 
+	/**
+	 * Write a record's data only if its updated_at is still $base, as one statement.
+	 * @return int 1 when written, 0 when somebody saved in between
+	 */
+	public function updateIfUnchanged(RecordEntity $r, string $base): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('data', $qb->createNamedParameter($r->getData()))
+			->set('reading', $qb->createNamedParameter($r->getReading()))
+			->set('updated_at', $qb->createNamedParameter($r->getUpdatedAt()))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter((int)$r->getId(), IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('updated_at', $qb->createNamedParameter($base)));
+		return $qb->executeStatement();
+	}
+
 	public function deleteForCollection(int $collectionId): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())

@@ -37,10 +37,14 @@ use OCP\AppFramework\Db\Entity;
  * @method void setKeySepChar(string $v)
  * @method string getFilesFolder()
  * @method void setFilesFolder(string $v)
+ * @method ?string getKeyWrap()
+ * @method void setKeyWrap(?string $v)
  * @method string getMapProvider()
  * @method void setMapProvider(string $v)
  */
 class CollectionEntity extends Entity implements \JsonSerializable {
+	use CheckedLook;
+
 	protected $userId = '';
 	protected $name = '';
 	protected $icon = '📁';
@@ -60,6 +64,9 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 	// key; it is never serialised to the client.
 	protected $secret = false;
 	protected $secretHash = null;
+	// The collection's own key, wrapped with the owner's master key (rbenc1:…), once
+	// it has been shared with its secrets. Null: its secrets are under the master key.
+	protected $keyWrap = null;
 	protected $createdAt = '';
 	protected $updatedAt = '';
 
@@ -87,6 +94,7 @@ class CollectionEntity extends Entity implements \JsonSerializable {
 			'map_provider' => $this->mapProvider ?? '',
 			// only the flag is exposed — never the hash of the secret key
 			'secret' => (bool)$this->secret,
+			'key_wrap' => $this->keyWrap,
 			'created_at' => $this->createdAt,
 			'updated_at' => $this->updatedAt,
 		];

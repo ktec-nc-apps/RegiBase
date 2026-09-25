@@ -18,9 +18,15 @@ class TablesBridge {
 	/** RegiBase field types that hold attachments (file ids) — cannot go to Tables. */
 	private const ATTACH_TYPES = ['image', 'image_crop', 'file'];
 
+	/**
+	 * Whether Tables can be used by the signed-in user: enabled for them (not only installed;
+	 * an app can be limited to groups) and with the service classes this bridge calls (review P20).
+	 */
 	public function available(): bool {
 		try {
-			return Server::get(IAppManager::class)->isInstalled('tables');
+			$user = Server::get(\OCP\IUserSession::class)->getUser();
+			return Server::get(IAppManager::class)->isEnabledForUser('tables', $user)
+				&& class_exists(\OCA\Tables\Service\TableService::class);
 		} catch (\Throwable $e) {
 			return false;
 		}

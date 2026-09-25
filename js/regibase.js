@@ -34,10 +34,33 @@
     } catch (e) { /* fall through to raw key */ }
     return subst(text, vars);
   }
+  // A count: '1 items' / '1 Einträge' read wrong (review J17). The UI language's plural rule
+  // (Intl.PluralRules: one, two, few, many, zero) picks a form; a language keeps each form as
+  // "<key>|<category>" beside the key, and the key's own translation is the general ("other")
+  // form. Untranslated (the English UI), the English singular or plural given here is used.
+  let pluralLang = null;   // the RegiBase language setting, when it is not 'auto'
+  function pluralCategory(n) {
+    const lang = pluralLang || ((typeof OC !== 'undefined' && OC.getLanguage && OC.getLanguage()) || 'en');
+    try { return new Intl.PluralRules(String(lang).replace('_', '-')).select(Number(n)); } catch (e) { return Number(n) === 1 ? 'one' : 'other'; }
+  }
+  function TN(key, n, one, many, vars) {
+    const v = Object.assign({}, vars || {}, { n });
+    const cat = pluralCategory(n);
+    if (cat !== 'other') {
+      const k = key + '|' + cat;
+      const f = T(k, v);
+      if (f !== subst(k, v)) return f;
+    }
+    const r = T(key, v);
+    if (r !== subst(key, v)) return r;
+    return subst(cat === 'one' ? (one || key) : (many || key), v);
+  }
   let encKey = null; // AES key held in memory only (never reactive, never persisted)
   // Per-shared-collection decryption keys (owner's key, unwrapped with the share
   // password). Held in memory only, keyed by collection id. Never reactive/persisted.
   let sharedKeys = {};
+  // The owner's side: a collection's own key, opened from its key_wrap with the master key.
+  let collKeys = {};
   // Collection ids whose share password has been unlocked this session.
   let sharedUnlocked = {};
   // 6-digit keys entered this session to reveal secret collections. Held in
@@ -53,7 +76,7 @@
     if (res.status === 401) { try { sessionStorage.removeItem('rb-session'); } catch (e) { /* ignore */ } if (rootProxy) rootProxy.authenticated = false; throw new Error('unauthorized'); }
     const ct = res.headers.get('content-type') || '';
     const body = ct.includes('json') ? await res.json() : await res.text();
-    if (!res.ok) throw new Error((body && body.error) || res.statusText);
+    if (!res.ok) { const err = new Error((body && body.error) || res.statusText); err.status = res.status; err.code = body && body.code; throw err; }
     return body;
   }
 
@@ -71,7 +94,26 @@
   // choice types share the same "one option per line" config; radio/select store a
   // single value, checkbox stores several joined by ", ".
   const CHOICE_TYPES = ['select', 'radio', 'checkbox'];
-  const CHARSET_RE = { digits: /^[0-9]*$/, alnum: /^[0-9A-Za-z]*$/, alpha: /^[A-Za-z]*$/, hex: /^[0-9A-Fa-f]*$/, ascii: /^[\x20-\x7E]*$/, phone: /^[0-9+\-() ]*$/ };
+  // A custom format rule (regex): null when it can be used, otherwise why not. It is
+  // checked on its own and wrapped for a whole-value match, so a stray ")|(" that
+  // would break the wrapping is caught too. Long patterns are refused: a nested
+  // repetition like (a+)+ froze the page for seconds on the Save button (review J2).
+  function checkPattern(p) {
+    if (!p) return null;
+    if (p.length > 200) return T('The pattern is too long (200 characters at most).');
+    try { new RegExp(p); new RegExp('^(?:' + p + ')$'); return null; } catch (e) { return e.message || String(e); }
+  }
+  // Examples for the pattern help, each tried with the values shown (PS, review J2).
+  const PATTERN_EXAMPLES = [
+    { use: 'Digits only', p: '[0-9]+', ok: '0123', ng: '12a' },
+    { use: 'Postal code', p: '\\d{3}-?\\d{4}', ok: '123-4567 / 1234567', ng: '12-34567' },
+    { use: 'Phone number (# * - allowed)', p: '[0-9+#*() -]+', ok: '*67 / #31# / 03-1234-5678', ng: '03_1234' },
+    { use: 'Looks like an e-mail address', p: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+', ok: 'taro@example.jp', ng: 'taro@example' },
+    { use: '3 capital letters and 4 digits', p: '[A-Z]{3}\\d{4}', ok: 'ABC1234', ng: 'abc1234' },
+    { use: '8 to 16 letters or digits', p: '[A-Za-z0-9]{8,16}', ok: 'abcd1234', ng: 'abc' },
+    { use: 'Either case', p: '[Aa][Bb][Cc]\\d+', ok: 'aBc12', ng: 'xyz12' },
+  ];
+  const CHARSET_RE = { digits: /^[0-9]*$/, alnum: /^[0-9A-Za-z]*$/, alpha: /^[A-Za-z]*$/, hex: /^[0-9A-Fa-f]*$/, ascii: /^[\x20-\x7E]*$/, phone: /^[0-9+\-() #*.,;]*$/ };   // # * for services, , ; for pauses (review J1)
   const CHARSET_LABEL = { digits: 'Digits', alnum: 'Alphanumeric', alpha: 'Letters', hex: 'Hexadecimal', ascii: 'ASCII characters', phone: 'Phone number (digits, +-() )', custom: 'Specified format' };
 
   // ---- password generator (for secret fields; never leaves the browser) ----
@@ -131,12 +173,19 @@
     b64(buf) { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); },
     unb64(str) { const s = atob(str); const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; },
     randSaltB64() { return this.b64(crypto.getRandomValues(new Uint8Array(16))); },
-    async deriveKey(masterKey, saltB64) {
+    // PBKDF2 rounds (review K17): a master key set before 2026-09 and every share password use
+    // 250000; a master key set or changed from now on uses 600000. The count of the master key
+    // is kept per user (enc_kdf_iter), so an older key goes on opening as it is.
+    KDF_LEGACY: 250000,
+    KDF_CURRENT: 600000,
+    async deriveKey(masterKey, saltB64, iterations = 250000) {
       const base = await crypto.subtle.importKey('raw', this.te.encode(masterKey), 'PBKDF2', false, ['deriveKey']);
-      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: this.unb64(saltB64), iterations: 250000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+      // not extractable: nothing needs the raw key out, and a script injected into the page
+      // could have exported it while unlocked (review, second look)
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: this.unb64(saltB64), iterations, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     },
     async exportKeyB64(key) { return this.b64(await crypto.subtle.exportKey('raw', key)); },
-    async importKeyB64(b64) { return crypto.subtle.importKey('raw', this.unb64(b64), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']); },
+    async importKeyB64(b64, extractable = true) { return crypto.subtle.importKey('raw', this.unb64(b64), { name: 'AES-GCM', length: 256 }, extractable, ['encrypt', 'decrypt']); },
     async encrypt(key, plaintext) {
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, this.te.encode(String(plaintext)));
@@ -149,6 +198,28 @@
       return this.td.decode(pt);
     },
     isEnc(v) { return typeof v === 'string' && v.indexOf(ENC_PREFIX) === 0; },
+    // Whether key opens the verifier. Only for this check: decrypt() hands back a value
+    // without the rbenc1: prefix as it is, so a plain "regibase-ok" verifier (from a
+    // tampered backup) let any key in (review K14).
+    async checkVerifier(key, verifier) {
+      if (!this.isEnc(verifier)) return false;
+      try { return (await this.decrypt(key, verifier)) === 'regibase-ok'; } catch (e) { return false; }
+    },
+    // A key of a collection's own, made when it is first shared with its secrets.
+    async newKey() { return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']); },
+    // What the server is given instead of a share password: derived from it with a salt
+    // of its own, so it opens nothing (the key is wrapped with deriveKey, another salt).
+    async authOf(password, saltB64) {
+      const base = await crypto.subtle.importKey('raw', this.te.encode(password), 'PBKDF2', false, ['deriveBits']);
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: this.unb64(saltB64), iterations: 200000, hash: 'SHA-256' }, base, 256);
+      return this.b64(bits);
+    },
+    // A temporary share password: put in the box for the owner, who may change it.
+    tempPassword(len = 16) {
+      const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+      let out = ''; for (let i = 0; i < len; i++) out += randPick(A);   // unbiased (randBelow)
+      return out;
+    },
   };
 
   // Nextcloud URL helper + Notes app API (same session).
@@ -165,6 +236,12 @@
     return body;
   }
 
+  // BUILD-ONLY SOURCE (review J19). The page loads js/regibase.dist.js, where build.mjs has
+  // compiled this template from its raw text. Do not load this file directly or compile
+  // TEMPLATE at run time: inside this template literal \' becomes ', so the thousands of
+  // t('…\'…') calls below would no longer parse, and the runtime compiler needs eval,
+  // which the page's CSP forbids. Keep the declaration line below as it is: build.mjs finds the
+  // template by it, so its exact text must not appear anywhere above.
   const TEMPLATE = `
 <div v-if="authenticated === null" class="login-wrap"><div class="login-card"><div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="337 403 1329 1010"><path fill="#400099" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="none" stroke="#fff" stroke-width="100" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#2e3192" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#e56b00" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="none" stroke="#fff" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="#f15a24" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/></svg></div><p>{{ t('Loading…') }}</p></div></div>
 
@@ -233,7 +310,7 @@
             <div class="hc-body">
               <div class="hc-name">{{ c.name }}</div>
               <div class="hc-desc">{{ c.description || t('(no description)') }}</div>
-              <div class="hc-count">{{ t('{n} items', {n: c.record_count}) }}</div>
+              <div class="hc-count">{{ tn('{n} items', c.record_count, '{n} item') }}</div>
             </div>
           </button>
         </div>
@@ -256,10 +333,11 @@
               <input class="searchinput" v-model="search" @input="onSearchInput" :placeholder="t('🔍 Search in this collection')" />
               <label class="search-mode" :title="t('Treat the search text as a regular expression')"><input type="checkbox" v-model="searchRegex" @change="onSearchInput" /> {{ t('Regex') }}</label>
               <button v-if="searchRegex" type="button" class="rx-help-btn" :class="{on: showRegexHelp}" @click="showRegexHelp = !showRegexHelp" :title="t('Show usable regular-expression syntax')" :aria-expanded="showRegexHelp ? 'true' : 'false'">?</button>
+              <span v-if="searchRegex && searchBad" class="rx-bad" role="alert" style="color:var(--danger);font-size:12px;white-space:nowrap">⚠️ {{ t('Invalid regular expression') }}</span>
               <label v-if="canEdit && !isLocked" class="replace-toggle" :title="t('Find & replace text across the matched records')"><input type="checkbox" v-model="replaceOn" /> {{ t('Replace') }}</label>
               <template v-if="canEdit && !isLocked && replaceOn">
                 <input class="searchinput replaceinput" v-model="replaceWith" :placeholder="t('Replace with…')" />
-                <span v-if="search" class="replace-info">{{ t('{n} matched', {n: records.length}) }}</span>
+                <span v-if="search" class="replace-info">{{ tn('{n} matched', records.length, '{n} matched') }}</span>
                 <button class="btn sm sr-apply" :disabled="!search || replaceBusy" @click="applyReplace">{{ replaceBusy ? t('Replacing…') : t('Replace all') }}</button>
               </template>
             </div>
@@ -290,7 +368,7 @@
             </div>
           </div>
           <div class="lt-actions">
-            <span class="selcount">{{ selectedIds.length ? t('{n} selected', {n: selectedIds.length}) : t('Select records') }}</span>
+            <span class="selcount">{{ selectedIds.length ? tn('{n} selected', selectedIds.length, '{n} selected') : t('Select records') }}</span>
             <button class="btn sm ghost" @click="selectAll" :disabled="!records.length">{{ t('Select all') }}</button>
             <button class="btn sm ghost" :disabled="!selectedIds.length" @click="clearSelection">{{ t('Clear') }}</button>
             <span class="selspacer"></span>
@@ -458,12 +536,13 @@
 
   <!-- Record form -->
   <div v-if="modal && modal.type==='record'" class="modal-mask">
-    <form class="modal" @submit.prevent="saveRecord">
-      <div class="modal-head"><h3>{{ editingRecordId ? t('Edit record') : t('New record') }}</h3><button type="button" class="icon-btn" @click="modal=null">✕</button></div>
+    <form class="modal" novalidate @submit.prevent="saveRecord">
+      <div class="modal-head"><h3>{{ editingRecordId ? t('Edit record') : t('New record') }}</h3><button type="button" class="icon-btn" @click="closeRecordForm()">✕</button></div>
       <div class="modal-body">
         <div v-if="attachWarn" style="font-size:13px;background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);padding:8px 10px;border-radius:8px;margin-bottom:12px">⚠️ {{ t('Please set a save folder for images and files in this collection’s settings.') }}</div>
         <div v-for="f in current.fields" :key="f.key" class="field">
           <label>{{ f.label }} <span v-if="f.required" class="req">*</span> <span v-if="f.secret" class="chip">{{ t('Secret') }}</span></label>
+          <div v-if="editBroken[f.key]" style="font-size:12px;color:var(--danger);margin:2px 0 4px">⚠️ {{ t('This value could not be decrypted. It is kept as it is unless you type a new one.') }}</div>
           <textarea v-if="f.type==='textarea'" v-model="form[f.key]" :placeholder="f.placeholder||''" :maxlength="ruleMax(f)"></textarea>
           <select v-else-if="f.type==='select'" v-model="form[f.key]">
             <option value="">{{ t('— Select —') }}</option>
@@ -475,6 +554,11 @@
           </div>
           <div v-else-if="f.type==='checkbox'" class="choice-field">
             <label v-for="o in f.options" :key="o" class="choice-opt"><input type="checkbox" :value="o" v-model="form[f.key]" /> <span>{{ o }}</span></label>
+            <label v-for="o in cbOld(f)" :key="'old:'+o" class="choice-opt" :title="t('No longer one of the choices; kept as it was.')"><input type="checkbox" :value="o" v-model="form[f.key]" /> <span>{{ t('(old)') }} {{ o }}</span></label>
+          </div>
+          <div v-else-if="(f.type==='image' || f.type==='image_crop') && !isOwner" class="imgfield">
+            <img v-if="form[f.key]" :src="imgUrl(form[f.key])" class="imgpreview" />
+            <div class="hint">{{ t('Only the owner of the collection can change its attachments.') }}</div>
           </div>
           <div v-else-if="f.type==='image' || f.type==='image_crop'" class="imgfield">
             <div class="dropzone" :class="{over: dropKey===f.key}"
@@ -488,6 +572,14 @@
               <button v-if="form[f.key] && f.type==='image_crop'" type="button" class="btn sm" @click="recropCurrent(f)">{{ t('✂ Re-crop') }}</button>
               <button v-if="form[f.key]" type="button" class="btn sm danger" @click="form[f.key]=''">{{ t('Delete') }}</button>
             </div>
+          </div>
+          <div v-else-if="f.type==='file' && !isOwner" class="filefield">
+            <div v-if="form[f.key]" class="fileattach">
+              <span class="fa-ic">{{ fileIcon(form[f.key]) }}</span>
+              <span class="fa-name">{{ fileName(form[f.key]) }}</span>
+              <button type="button" class="btn sm" @click="downloadAttachment(form[f.key])" :title="t('Download')">⬇</button>
+            </div>
+            <div class="hint">{{ t('Only the owner of the collection can change its attachments.') }}</div>
           </div>
           <div v-else-if="f.type==='file'" class="filefield">
             <div v-if="form[f.key]" class="fileattach">
@@ -510,7 +602,7 @@
             </template>
           </div>
           <div v-else class="control">
-            <input :type="inputType(f)" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
+            <input :type="inputType(f)" :step="inputType(f)==='number' ? 'any' : null" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click.stop="openPwGen('record', f)" :title="t('Generate a password')">🎲</button>
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
           </div>
@@ -520,8 +612,8 @@
       <div class="modal-foot">
         <button v-if="editingRecordId" type="button" class="btn danger" @click="deleteRecord({id:editingRecordId})">{{ t('Delete') }}</button>
         <button v-if="editingRecordId" type="button" class="btn" @click="openVersions(editingRecordId)">🕐 {{ t('Versions') }}</button>
-        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
-        <button type="submit" class="btn primary">{{ t('Save') }}</button>
+        <button type="button" class="btn" @click="closeRecordForm()">{{ t('Cancel') }}</button>
+        <button type="submit" class="btn primary" :disabled="recordSaving">{{ t('Save') }}</button>
       </div>
     </form>
   </div>
@@ -675,7 +767,22 @@
                 <option value="custom">{{ t('Custom (regex)') }}</option>
               </select>
             </label>
-            <label class="cfg" v-if="f._charset==='custom'">{{ t('Pattern') }} <input v-model="f._pattern" :placeholder="t('e.g. [0-9]{3}-[0-9]{4}')" style="min-width:150px" /></label>
+            <label class="cfg" v-if="f._charset==='custom'">{{ t('Pattern') }} <input v-model="f._pattern" :placeholder="t('e.g. [0-9]{3}-[0-9]{4}')" style="min-width:150px" /> <button type="button" class="icon-btn" @click.prevent="f._rxHelp = !f._rxHelp" :title="t('Pattern help')">?</button></label>
+            <div v-if="f._charset==='custom' && patternError(f._pattern)" style="grid-column:1/-1;font-size:12px;color:var(--danger)">⚠️ {{ t('This pattern cannot be used:') }} {{ patternError(f._pattern) }}</div>
+            <div v-if="f._charset==='custom' && f._rxHelp" class="rx-help" style="grid-column:1/-1;font-size:12px;border:1px solid var(--border,#ccc);border-radius:8px;padding:8px 10px;margin:4px 0">
+              <table style="width:100%;border-collapse:collapse">
+                <tr><th style="text-align:left">{{ t('Use') }}</th><th style="text-align:left">{{ t('Pattern') }}</th><th style="text-align:left">{{ t('Matches') }}</th><th style="text-align:left">{{ t('Does not match') }}</th></tr>
+                <tr v-for="x in patternExamples" :key="x.p"><td>{{ t(x.use) }}</td><td><code style="cursor:pointer" @click="f._pattern = x.p" :title="t('Use this pattern')">{{ x.p }}</code></td><td><code>{{ x.ok }}</code></td><td><code>{{ x.ng }}</code></td></tr>
+              </table>
+              <ul style="margin:6px 0 4px 18px;padding:0">
+                <li>{{ t('The whole value has to match (no need to write ^ or $).') }}</li>
+                <li>{{ t('Upper and lower case are told apart; (?i) cannot be used.') }}</li>
+                <li>{{ t('To allow "-" itself, put it last inside [ ].') }}</li>
+                <li>{{ t('Patterns are JavaScript regular expressions.') }}</li>
+              </ul>
+              <label>{{ t('Try it') }} <input v-model="f._rxTry" style="min-width:150px" /></label>
+              <span v-if="f._rxTry !== undefined && f._rxTry !== '' && !patternError(f._pattern)" :style="{color: patternTry(f._pattern, f._rxTry) ? 'var(--success,#16a34a)' : 'var(--danger)'}"> {{ patternTry(f._pattern, f._rxTry) ? '✓ ' + t('Matches') : '✗ ' + t('Does not match') }}</span>
+            </div>
             <label class="cfg">{{ t('Min') }} <input type="number" min="0" max="9999" v-model.number="f._rmin" style="width:66px" /> {{ t('chars') }}</label>
             <label class="cfg">{{ t('Max') }} <input type="number" min="0" max="99999" v-model.number="f._rmax" style="width:74px" /> {{ t('chars') }}</label>
           </div>
@@ -745,7 +852,7 @@
             <button type="button" class="btn sm" :disabled="!reorder.keys.some(k=>k.field)" @click="applyReorderSort">↕ {{ t('Sort now') }}</button>
           </div>
         </div>
-        <div class="reorder-listhead">{{ t('Order preview ({n} records) — drag to fine-tune', {n: reorder.list.length}) }}</div>
+        <div class="reorder-listhead">{{ tn('Order preview ({n} records) — drag to fine-tune', reorder.list.length, 'Order preview ({n} record) — drag to fine-tune') }}</div>
         <div class="reorder-list">
           <div v-for="(r,i) in reorder.list" :key="r.id" class="reorder-row" :class="{dragover: reorder.over===i, dragging: reorder.from===i}" @dragover.prevent="rDragOver(i)" @drop.prevent="rDrop(i)" @dragleave="rDragLeave(i)">
             <span class="drag-handle" draggable="true" @dragstart="rDragStart(i, $event)" @dragend="rDragEnd" :title="t('Drag to reorder')">⠿</span>
@@ -847,6 +954,10 @@
               </select>
               <span v-if="s.has_password" class="share-flag" :title="t('Password protected')">🔑</span>
               <span v-if="s.shares_secrets" class="share-flag" :title="t('Secret fields shared')">🔓</span>
+              <input type="date" class="share-exp" :value="s.expires_at || ''" @change="changeShareExpiry(s, $event.target.value)" :title="t('Last day of the share (blank = no end)')" />
+              <span v-if="s.expired" class="share-flag" style="color:var(--danger)" :title="t('This share has ended; its key has been erased.')">⏰ {{ t('Ended') }}</span>
+              <span v-if="s.paused" class="share-flag" style="color:var(--danger)" :title="t('The sharing settings of the administrator no longer allow this share. It works again when they allow it.')">⏸ {{ t('Paused') }}</span>
+              <button type="button" class="icon-btn" @click="renewSharePassword(s)" :title="t('Make a new share password')">🔄</button>
               <button type="button" class="icon-btn" @click="removeShare(s)" :title="t('Remove share')">🗑</button>
             </div>
           </div>
@@ -873,18 +984,22 @@
             </div>
             <div class="share-opts">
               <div class="so-row">
-                <span class="sub">{{ t('Share password (optional)') }}</span>
+                <span class="sub">{{ t('Share password') }}</span>
                 <div class="control">
                   <input v-model="sharePanel.password" type="text" :placeholder="t('Blank = no password')" autocomplete="off" data-1p-ignore data-lpignore="true" />
                   <button type="button" class="icon-btn" @click.stop="openPwGen('share')" :title="t('Generate a password')">🎲</button>
                 </div>
               </div>
+              <div class="so-row">
+                <span class="sub">{{ t('Last day of the share') }}</span>
+                <div class="control"><input v-model="sharePanel.expires" type="date" :title="t('Last day of the share (blank = no end)')" /></div>
+              </div>
               <div v-if="collectionHasSecret && enc.enabled" class="so-row so-secret">
-                <span class="sub">{{ t('Show secret fields to the recipient') }}</span>
-                <input v-model="sharePanel.master" type="password" :placeholder="t('Your master password (blank = keep secrets hidden)')" autocomplete="off" data-1p-ignore data-lpignore="true" />
-                <div class="muted so-hint">{{ t('Requires a share password (used to protect the key). Secrets stay masked without it.') }}</div>
+                <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" v-model="sharePanel.shareSecrets" /> {{ t('Show secret fields to the recipient') }}</label>
+                <div class="muted so-hint">{{ t('A key of this collection’s own is made and protected with the share password. Your master key is never handed over.') }}</div>
               </div>
             </div>
+            <div v-if="sharePanel.notice" class="share-notice" style="font-size:13px;background:color-mix(in srgb,var(--primary,#3b82f6) 12%,transparent);padding:8px 10px;border-radius:8px;margin:6px 0;user-select:all">{{ sharePanel.notice }}</div>
             <div v-if="sharePanel.err" class="share-err">{{ sharePanel.err }}</div>
             <button type="button" class="btn sm primary" :disabled="!sharePanel.recipient || sharePanel.busy" @click="addShare">{{ t('Share') }}</button>
           </div>
@@ -915,7 +1030,7 @@
           <label>🕐 {{ t('Snapshots (change history)') }}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button type="button" class="btn sm" @click="openHistory">↶ {{ t('Open snapshots') }}</button>
-            <span v-if="history.length" style="font-size:12px;color:var(--muted)">{{ t('{n} snapshots', {n: history.length}) }}</span>
+            <span v-if="history.length" style="font-size:12px;color:var(--muted)">{{ tn('{n} snapshots', history.length, '{n} snapshot') }}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
@@ -1018,7 +1133,7 @@
           <textarea v-model="importCsv" :placeholder="importExamplePh" style="width:100%;min-height:150px;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text)"></textarea>
         </template>
         <template v-else>
-          <div style="margin-bottom:10px"><span class="chip">{{ t('Detected format:') }} {{ importAnalysis.formatLabel }}</span> <span class="chip">{{ t('{n} items', {n: importAnalysis.rowCount}) }}</span></div>
+          <div style="margin-bottom:10px"><span class="chip">{{ t('Detected format:') }} {{ importAnalysis.formatLabel }}</span> <span class="chip">{{ tn('{n} items', importAnalysis.rowCount, '{n} item') }}</span></div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="importColl.name" /></div>
           <div class="field"><label>{{ t('Icon (emoji)') }}</label>
             <div class="iconpick-head">
@@ -1053,7 +1168,7 @@
         <button v-if="importStep===2" type="button" class="btn" @click="importStep=1">{{ t('← Back') }}</button>
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
         <button v-if="importStep===1" type="button" class="btn primary" @click="analyzeImport">{{ t('Analyze') }}</button>
-        <button v-else type="button" class="btn primary" :disabled="importBusy" @click="commitImport">{{ t('Import {n} items', {n: importAnalysis.rowCount}) }}</button>
+        <button v-else type="button" class="btn primary" :disabled="importBusy" @click="commitImport">{{ tn('Import {n} items', importAnalysis.rowCount, 'Import {n} item') }}</button>
       </div>
     </div>
   </div>
@@ -1070,8 +1185,8 @@
           <div class="field">
             <label>{{ t('Address book') }}</label>
             <select v-model="contactsImport.selected">
-              <option value="all">{{ t('All') }}（{{ t('{n} items', {n: contactsTotal}) }}）</option>
-              <option v-for="b in contactsImport.books" :key="b.key" :value="b.key">{{ b.name }}（{{ t('{n} items', {n: b.count}) }}）</option>
+              <option value="all">{{ t('All') }}{{ paren(tn('{n} items', contactsTotal, '{n} item')) }}</option>
+              <option v-for="b in contactsImport.books" :key="b.key" :value="b.key">{{ b.name }}{{ paren(tn('{n} items', b.count, '{n} item')) }}</option>
             </select>
           </div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="contactsImport.name" :placeholder="t('Contacts')" /></div>
@@ -1104,7 +1219,7 @@
           <div class="field">
             <label>{{ t('Source table') }}</label>
             <select v-model="tablesImport.selected">
-              <option v-for="tb in tablesImport.tables" :key="tb.id" :value="tb.id">{{ (tb.emoji ? tb.emoji + ' ' : '') + tb.title }}（{{ t('{n} columns', {n: tb.columns}) }}）</option>
+              <option v-for="tb in tablesImport.tables" :key="tb.id" :value="tb.id">{{ (tb.emoji ? tb.emoji + ' ' : '') + tb.title }}（{{ tn('{n} columns', tb.columns, '{n} column') }}）</option>
             </select>
           </div>
           <div class="field"><label>{{ t('Collection name') }}</label><input v-model="tablesImport.name" :placeholder="tablesSelectedTitle" /></div>
@@ -1131,7 +1246,7 @@
       <div class="modal-body">
         <div class="field">
           <label>{{ t('Target') }}</label>
-          <div style="font-size:14px;color:var(--muted)">{{ t('{n} records', {n: xfer.recordIds.length}) }}</div>
+          <div style="font-size:14px;color:var(--muted)">{{ tn('{n} records', xfer.recordIds.length, '{n} record') }}</div>
         </div>
         <div class="field">
           <label>{{ t('Action') }}</label>
@@ -1339,8 +1454,14 @@
     <div class="modal">
       <div class="modal-head"><h3>{{ t('🔒 Download all data') }}</h3><button class="icon-btn" :disabled="backupForm.busy" @click="modal=null">✕</button></div>
       <form class="modal-body" @submit.prevent="doBackup">
-        <p style="margin-top:0;font-size:13px;color:var(--muted)">{{ t('Enter your login password. The archive (ZIP) is encrypted with the same password.') }}</p>
+        <p v-if="!backupForm.own" style="margin-top:0;font-size:13px;color:var(--muted)">{{ t('Enter your login password. The archive (ZIP) is encrypted with the same password.') }}</p>
         <div class="field"><label>{{ t('Login password') }}</label><input type="password" v-model="backupForm.password" autocomplete="current-password" autofocus /></div>
+        <label class="confirm-check"><input type="checkbox" v-model="backupForm.own" /> {{ t('Give the archive a password of its own') }}</label>
+        <template v-if="backupForm.own">
+          <div class="field" style="margin-top:8px"><label>{{ t('Archive password') }}</label><input type="password" v-model="backupForm.archive" autocomplete="new-password" /></div>
+          <div class="field"><label>{{ t('Archive password (again)') }}</label><input type="password" v-model="backupForm.archive2" autocomplete="new-password" /></div>
+          <p style="font-size:13px;color:var(--muted);margin-top:0">{{ t('Keep this password safe: the archive cannot be opened without it.') }}</p>
+        </template>
         <div v-if="backupForm.err" style="color:var(--danger);font-size:13px">{{ backupForm.err }}</div>
         <div v-if="backupForm.busy" style="font-size:13px;color:var(--muted)">{{ t('Creating…') }}</div>
       </form>
@@ -1362,6 +1483,7 @@
           <span class="filepick-name">{{ restoreForm.fileName || t('Backup file (.zip)') }}</span>
         </label>
         <div class="field" style="margin-top:12px"><label>{{ t('Login password') }}</label><input type="password" v-model="restoreForm.password" autocomplete="current-password" /></div>
+        <div class="field"><label>{{ t('Archive password (if it has one of its own)') }}</label><input type="password" v-model="restoreForm.archive" autocomplete="off" /><div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Leave empty if the archive was made with your login password.') }}</div></div>
         <div class="field">
           <label>{{ t('Restore method') }}</label>
           <div class="radios">
@@ -1391,7 +1513,7 @@
       <div class="modal-body">
         <p style="margin-top:0;font-size:13px">{{ t('Secret fields (passwords, PINs, card numbers, etc.) are encrypted with the ') }}<b>{{ t('Master key') }}</b>{{ t(' you enter on this device. The master key is never given to the server or the administrator. Names, URLs, etc. are not encrypted (for search and sorting).') }}</p>
         <p style="color:var(--danger);font-size:13px;background:color-mix(in srgb,var(--danger) 12%,transparent);padding:8px 10px;border-radius:8px">⚠️ {{ t('If you forget the master key, your encrypted secret fields ') }}<b>{{ t('can never be recovered') }}</b>{{ t('. Be sure to keep it somewhere safe.') }}</p>
-        <div class="field"><label>{{ t('Master key (6+ characters)') }}</label><input type="password" v-model="encForm.next" autocomplete="new-password" /></div>
+        <div class="field"><label>{{ t('Master key (8+ characters)') }}</label><input type="password" v-model="encForm.next" autocomplete="new-password" /></div>
         <div class="field"><label>{{ t('Enter it again to confirm') }}</label><input type="password" v-model="encForm.next2" autocomplete="new-password" /></div>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input type="checkbox" v-model="encForm.remember" /> {{ t('Remember on this device (no re-entry until logout)') }}</label>
         <div v-if="encForm.err" style="color:var(--danger);font-size:13px;margin-top:8px">{{ encForm.err }}</div>
@@ -1411,7 +1533,7 @@
       <div class="modal-body">
         <p style="margin-top:0;font-size:13px;color:var(--muted)">{{ t('All secret fields are re-encrypted with the new master key. Please do not close the page while this runs.') }}</p>
         <div class="field"><label>{{ t('Current master key') }}</label><input type="password" v-model="encForm.cur" autocomplete="off" /></div>
-        <div class="field"><label>{{ t('New master key (6+ characters)') }}</label><input type="password" v-model="encForm.next" autocomplete="new-password" /></div>
+        <div class="field"><label>{{ t('New master key (8+ characters)') }}</label><input type="password" v-model="encForm.next" autocomplete="new-password" /></div>
         <div class="field"><label>{{ t('Enter it again to confirm') }}</label><input type="password" v-model="encForm.next2" autocomplete="new-password" /></div>
         <div v-if="encForm.err" style="color:var(--danger);font-size:13px">{{ encForm.err }}</div>
         <div v-if="encForm.busy" style="font-size:13px;color:var(--muted)">{{ t('Re-encrypting…') }} {{ encForm.progress }}</div>
@@ -1446,13 +1568,13 @@
     <div class="modal">
       <div class="modal-head"><h3>{{ t('⚠️ Delete records') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
-        <p style="font-size:15px;margin-top:0">{{ t('Permanently delete the {n} selected records.', {n: selectedIds.length}) }}</p>
+        <p style="font-size:15px;margin-top:0">{{ tn('Permanently delete the {n} selected records.', selectedIds.length, 'Permanently delete the {n} selected record.') }}</p>
         <p style="color:var(--danger);font-size:13px">{{ t('This action cannot be undone. Deleted data cannot be recovered.') }}</p>
         <label class="confirm-check"><input type="checkbox" v-model="delConfirm" /> {{ t('I understand the above and confirm the deletion') }}</label>
       </div>
       <div class="modal-foot">
         <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
-        <button class="btn danger" :disabled="!delConfirm || busy" @click="commitBulkDelete">{{ t('Delete {n} items', {n: selectedIds.length}) }}</button>
+        <button class="btn danger" :disabled="!delConfirm || busy" @click="commitBulkDelete">{{ tn('Delete {n} items', selectedIds.length, 'Delete {n} item') }}</button>
       </div>
     </div>
   </div>
@@ -1576,7 +1698,7 @@
                 @click="emojiTab = g.key; emojiQuery = ''">{{ g.tab }}</button>
       </div>
       <div class="emoji-palette">
-        <div class="emoji-cat">{{ emojiQuery ? t('{n} items', {n: emojiShown.length}) : t(emojiTab) }}</div>
+        <div class="emoji-cat">{{ emojiQuery ? tn('{n} items', emojiShown.length, '{n} item') : t(emojiTab) }}</div>
         <div v-if="emojiLoading" class="emoji-none">{{ t('Loading…') }}</div>
         <div v-else-if="!emojiShown.length" class="emoji-none">{{ t('No matching emoji') }}</div>
         <div class="emoji-grid">
@@ -1665,7 +1787,7 @@
     data() {
       return {
         authenticated: null,
-        collections: [], current: null, records: [], search: '', searchRegex: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
+        collections: [], current: null, records: [], search: '', searchRegex: false, searchBad: false, showRegexHelp: false, regexHelpPage: 1, replaceOn: false, replaceWith: '', replaceBusy: false,
         sidebarOpen: false, modal: null, folderAsk: { open: false }, pendingCreate: null,
         form: {}, editingRecordId: null, reveal: {}, formBaseline: '',
         templates: [], templatesLoading: false, schemaFields: [],
@@ -1684,23 +1806,25 @@
         schemaSep: 'space', schemaSepChar: '',
         languages: [],
         locale: 0,
-        backupForm: { password: '', busy: false, err: '' },
-        restoreForm: { password: '', busy: false, err: '', fileName: '', dataUrl: '', confirm: false, mode: 'overwrite' },
+        backupForm: { password: '', own: false, archive: '', archive2: '', busy: false, err: '' },
+        restoreForm: { password: '', busy: false, err: '', fileName: '', file: null, archive: '', confirm: false, mode: 'overwrite' },
         contactsImport: { books: [], selected: 'all', name: '', icon: '', busy: false, err: '', loading: false, enabled: true },
         tablesImport: { tables: [], selected: 0, name: '', icon: '', busy: false, err: '', loading: false, available: true },
         tablesExportBusy: false,
         apps: { contacts: true, tables: true, calendar: true },
         tableDrag: { active: false, startX: 0, startScroll: 0, el: null, pid: null },
         theme: 'auto',
-        enc: { enabled: false, unlocked: false, salt: '', verifier: '' },
+        enc: { enabled: false, unlocked: false, salt: '', verifier: '', iter: 250000 },
         openDecrypted: {},
         // internal sharing (owner-side panel inside collection settings)
-        sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false },
+        sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', expires: '', shareSecrets: true, notice: '', err: '', busy: false },
         // recipient-side unlock prompt for a password-protected shared collection
         shareUnlock: { open: false, cid: null, name: '', hasSecrets: false, password: '', err: '', busy: false, next: null },
         // reactive mirror of sharedKeys presence (cid -> true) so the UI reacts to unlock
         secretUnlocked: {},
-        editingOrig: null,
+        editingOrig: null, editingBase: '',
+        editBroken: {},
+        editingCollectionId: null, recordSaving: false, recSeq: 0, autoEncBusy: false,
         permOpen: false,
         iconPickerOpen: false, iconTarget: 'collForm',
         // password generator; `value` is a live secret, so it is cleared on close
@@ -1719,7 +1843,7 @@
           symbolSet: PWGEN_SETS.symbols, noLookalike: true, firstAlpha: true, loaded: false,
         },
         shareExpanded: false,
-        unlockKey: '', unlockErr: '', unlockRemember: true,
+        unlockKey: '', unlockErr: '', unlockRemember: true, remembered: false, deviceTag: '',
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
         cropper: { open: false, key: '', src: '', imgW: 0, imgH: 0, dispW: 0, dispH: 0, ratio: null, ratioLabel: 'free', out: 600, box: { x: 0, y: 0, w: 0, h: 0 }, drag: null, busy: false },
         fileMetaCache: {},
@@ -1772,6 +1896,7 @@
       };
     },
     computed: {
+      patternExamples() { return PATTERN_EXAMPLES; },
       // Localised label for the compact permission picker (shown via an overlaid
       // span so centering never depends on native <select> value alignment).
       permOptions() {
@@ -2109,6 +2234,11 @@
       window.addEventListener('popstate', (e) => {
         if (!this.authenticated) return;
         if (this.modal) {
+          // Back on a record form with unsaved changes asks first (review J7).
+          if (this.modal.type === 'record' && !this.mayDiscardRecord()) {
+            this.pushNav({ cid: this.current ? this.current.id : null });
+            return;
+          }
           this.modal = null;
           this.pushNav({ cid: this.current ? this.current.id : null });
           return;
@@ -2135,7 +2265,11 @@
     methods: {
       // reading this.locale makes every t() call re-evaluate when the language changes
       t(text, vars) { return this.locale, T(text, vars); },
+      tn(key, n, one, many, vars) { return this.locale, TN(key, n, one, many, vars); },
+      // brackets around a count: full-width in Chinese, Japanese and Korean, else ' ( )'
+      paren(s) { return this.isCjkUi ? '（' + s + '）' : ' (' + s + ')'; },
       async applyLanguage(lang) {
+        pluralLang = (lang && lang !== 'auto') ? lang : null;
         if (!lang || lang === 'auto') {
           i18nOverride = null;
         } else {
@@ -2161,8 +2295,8 @@
         const n = this.xfer.recordIds.length;
         const toNew = this.xfer.targetId === '__newcoll__';
         const move = this.xfer.mode === 'move';
-        if (toNew) return move ? T('Move {n} items to new collection', { n }) : T('Copy {n} items to new collection', { n });
-        return move ? T('Move {n} items', { n }) : T('Copy {n} items', { n });
+        if (toNew) return move ? TN('Move {n} items to new collection', n, 'Move {n} item to new collection') : TN('Copy {n} items to new collection', n, 'Copy {n} item to new collection');
+        return move ? TN('Move {n} items', n, 'Move {n} item') : TN('Copy {n} items', n, 'Copy {n} item');
       },
       async boot() {
         // Fire the collections request up front so it overlaps with settings /
@@ -2173,8 +2307,11 @@
           if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false, calendar: s.apps.calendar !== false };
           this.languages = s.languages || [];
           if (s.language && s.language !== 'auto') await this.applyLanguage(s.language);
-          this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '' };
+          this.deviceTag = s.device_tag || '';
+          this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '', iter: Number(s.enc_kdf_iter) || rbcrypto.KDF_LEGACY };
           if (this.enc.enabled) await this.tryAutoUnlock();
+          // a raw key an older version left in localStorage goes, whatever the state (review, second look)
+          else { try { localStorage.removeItem(this.lsKey()); } catch (e) { /* ignore */ } }
         } catch (e) { /* ignore */ }
         this.applyTheme();
         try {
@@ -2305,7 +2442,7 @@
         secretPins.add(pin); this.secretShown = true;
         await this.loadCollections();
         this.modal = null;
-        this.showToast(T('{n} secret collection(s) shown', { n: matches.length }));
+        this.showToast(TN('{n} secret collection(s) shown', matches.length, '{n} secret collection shown', '{n} secret collections shown'));
       },
       // Hide every revealed secret collection again (forget the entered keys).
       async hideSecretCollections() {
@@ -2339,7 +2476,23 @@
         if (this.search && this.searchRegex) params.push('regex=1');
         if (this.current.record_sort) params.push('sort=' + encodeURIComponent(this.normSort(this.current.record_sort)));
         const qs = params.length ? '?' + params.join('&') : '';
-        this.records = await api('collections/' + this.current.id + '/records' + qs);
+        // A newer request (another collection, another search) wins: an answer arriving
+        // late used to put A's records on B's page, and saving one then overwrote it with
+        // B's fields (review J5).
+        const cid = this.current.id;
+        const seq = (this.recSeq = (this.recSeq || 0) + 1);
+        let got;
+        try {
+          got = await api('collections/' + cid + '/records' + qs);
+        } catch (e) {
+          // A broken pattern is refused by the server, not taken as "everything matches" (review P13).
+          if (e.code !== 'bad_regex') throw e;
+          if (seq !== this.recSeq) return;
+          this.searchBad = true; this.records = []; return;
+        }
+        if (seq !== this.recSeq || !this.current || this.current.id !== cid) return;
+        this.searchBad = false;
+        this.records = got;
         this.renderLimit = 200;
         this.refreshUndo();
         // encrypt any import-left plaintext secrets in the background (no await)
@@ -2432,7 +2585,12 @@
         }
         return '';
       },
-      imgUrl(id) { return id ? BASE + 'api/images/' + id : ''; },
+      // In a collection shared with you, attachments are read from the owner's files (?c=).
+      attachQ() { return this.current && this.current.is_owner === false ? '?c=' + this.current.id : ''; },
+      // A file id is a number. The value comes from the record, which an import or the API
+      // can fill with any text: '../../ocs/…' sent a request to another path (review J16).
+      isFileId(id) { return id != null && /^\d+$/.test(String(id)); },
+      imgUrl(id) { return this.isFileId(id) ? BASE + 'api/images/' + id + this.attachQ() : ''; },
       imageSrc(rec) {
         const f = this.current.fields.find((x) => (x.type === 'image' || x.type === 'image_crop') && rec.data[x.key]);
         return f ? this.imgUrl(rec.data[f.key]) : '';
@@ -2627,9 +2785,9 @@
       setFileMeta(id, meta) { this.fileMetaCache = { ...this.fileMetaCache, [String(id)]: meta }; },
       async loadFileMeta(id) {
         id = String(id);
-        if (!id || this.fileMetaCache[id]) return;
+        if (!this.isFileId(id) || this.fileMetaCache[id]) return;
         this.setFileMeta(id, { id, name: T('Loading…'), ext: '', is_note: false, _loading: true });
-        try { this.setFileMeta(id, await api('files/' + id + '/meta')); }
+        try { this.setFileMeta(id, await api('files/' + id + '/meta' + this.attachQ())); }
         catch (e) { this.setFileMeta(id, { id, name: T('(not found)'), ext: '', is_note: false, _missing: true }); }
       },
       preloadFileMetas(fields, data) {
@@ -2642,15 +2800,19 @@
         return ({ pdf: '📕', docx: '📘', xlsx: '📗', odt: '📄', ods: '📊', odp: '📙', md: '📝', txt: '📝' })[ext] || (m && m.is_note ? '📝' : '📎');
       },
       async openAttachment(id) {
+        if (!this.isFileId(id)) return;
         id = String(id);
         let m = this.fileMetaCache[id];
         if (!m || m._loading) { await this.loadFileMeta(id); m = this.fileMetaCache[id]; }
+        // the owner's file is not in your Files: it can be downloaded, not opened there
+        if (!this.isOwner) { this.downloadAttachment(id); return; }
         const url = (m && m.is_note) ? NC('/apps/notes/note/' + id) : NC('/f/' + id);
         window.open(url, '_blank', 'noopener');
       },
       downloadAttachment(id) {
+        if (!this.isFileId(id)) return;
         const a = document.createElement('a');
-        a.href = BASE + 'api/files/' + id; a.download = ''; a.rel = 'noopener';
+        a.href = BASE + 'api/files/' + id + this.attachQ(); a.download = ''; a.rel = 'noopener';
         document.body.appendChild(a); a.click(); a.remove();
       },
       async handleDocFile(file, f) {
@@ -2785,44 +2947,98 @@
       },
       previewTheme() { this.theme = this.settingsForm.theme || 'auto'; this.applyTheme(); },
       // ---- encryption (secret fields, client-side) ----
-      // remember the derived key on this device (localStorage) so reloads skip the prompt
+      // Remember the master key on this device so reloads skip the prompt (review K9): as a key
+      // the browser will use but never hand out (non-extractable, in IndexedDB), and only for
+      // this Nextcloud login (device_tag from the server changes when you sign in again).
+      // Older versions kept the raw key in localStorage; it is moved over once and removed.
+      idb(mode, fn) {
+        return new Promise((resolve) => {
+          let req;
+          try { req = indexedDB.open('regibase', 1); } catch (e) { resolve(null); return; }
+          req.onupgradeneeded = () => { try { req.result.createObjectStore('keys'); } catch (e) { /* exists */ } };
+          req.onerror = () => resolve(null);
+          req.onsuccess = () => {
+            try {
+              const tx = req.result.transaction('keys', mode); const r = fn(tx.objectStore('keys'));
+              tx.oncomplete = () => { req.result.close(); resolve(r && 'result' in r ? r.result : true); };
+              tx.onerror = tx.onabort = () => { req.result.close(); resolve(null); };
+            } catch (e) { resolve(null); }
+          };
+        });
+      },
       lsKey() {
         let u = 'u';
         try { u = (window.OC && OC.getCurrentUser && OC.getCurrentUser() && OC.getCurrentUser().uid) || (document.querySelector('head') && document.querySelector('head').getAttribute('data-user')) || 'u'; } catch (e) { /* ignore */ }
         return 'regibase.enckey.' + u;
       },
-      async rememberKey(key) { try { localStorage.setItem(this.lsKey(), await rbcrypto.exportKeyB64(key)); } catch (e) { /* ignore */ } },
-      forgetKey() { try { localStorage.removeItem(this.lsKey()); } catch (e) { /* ignore */ } },
-      hasRemembered() { try { return !!localStorage.getItem(this.lsKey()); } catch (e) { return false; } },
-      async tryAutoUnlock() {
-        let b64 = null;
-        try { b64 = localStorage.getItem(this.lsKey()); } catch (e) { /* ignore */ }
-        if (!b64) return false;
+      async rememberKey(key) {
         try {
-          const key = await rbcrypto.importKeyB64(b64);
-          if (await rbcrypto.decrypt(key, this.enc.verifier) === 'regibase-ok') { encKey = key; this.enc.unlocked = true; return true; }
-        } catch (e) { /* fall through */ }
+          const fixed = key.extractable ? await rbcrypto.importKeyB64(await rbcrypto.exportKeyB64(key), false) : key;
+          const ok = await this.idb('readwrite', (st) => st.put({ tag: this.deviceTag, key: fixed }, this.lsKey()));
+          this.remembered = !!ok;
+        } catch (e) { this.remembered = false; }
+        try { localStorage.removeItem(this.lsKey()); } catch (e) { /* ignore */ }
+      },
+      forgetKey() {
+        try { localStorage.removeItem(this.lsKey()); } catch (e) { /* ignore */ }
+        this.idb('readwrite', (st) => st.delete(this.lsKey()));
+        this.remembered = false;
+      },
+      hasRemembered() { return this.remembered; },
+      async tryAutoUnlock() {
+        let key = null;
+        const rec = await this.idb('readonly', (st) => st.get(this.lsKey()));
+        if (rec && rec.key && rec.tag === this.deviceTag) key = rec.key;
+        if (!key) {
+          let b64 = null;
+          try { b64 = localStorage.getItem(this.lsKey()); } catch (e) { /* ignore */ }
+          if (b64) { try { key = await rbcrypto.importKeyB64(b64, false); } catch (e) { key = null; } }
+        }
+        if (key) {
+          try {
+            if (await rbcrypto.checkVerifier(key, this.enc.verifier)) {
+              encKey = key; this.enc.unlocked = true;
+              await this.rememberKey(key);   // moves an old localStorage key over, and keeps the tag current
+              return true;
+            }
+          } catch (e) { /* fall through */ }
+        }
         this.forgetKey();
         return false;
       },
-      lockNow() { this.forgetKey(); encKey = null; sharedKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.enc.unlocked = false; this.modal = null; this.openDecrypted = {}; },
+      lockNow() { this.forgetKey(); encKey = null; sharedKeys = {}; collKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.enc.unlocked = false; this.modal = null; this.openDecrypted = {}; },
       async doUnlock() {
         this.unlockErr = '';
         try {
-          const key = await rbcrypto.deriveKey(this.unlockKey, this.enc.salt);
-          if (await rbcrypto.decrypt(key, this.enc.verifier) !== 'regibase-ok') throw new Error('bad');
+          const key = await rbcrypto.deriveKey(this.unlockKey, this.enc.salt, this.enc.iter);
+          if (!(await rbcrypto.checkVerifier(key, this.enc.verifier))) throw new Error('bad');
           encKey = key; this.enc.unlocked = true; this.unlockKey = '';
           if (this.unlockRemember) await this.rememberKey(key); else this.forgetKey();
           await this.loadCollections();
         } catch (e) { this.unlockErr = T('Incorrect master key'); }
       },
+      // The key a collection's secrets are under. Owner: the collection's own key when it
+      // has been shared with its secrets (opened from key_wrap with the master key),
+      // otherwise the master key. Recipient: the collection key given with the share --
+      // never anybody's master key (owner, 2026-09-24; review K3).
+      async keyFor(c) {
+        if (!c) return null;
+        if (c.is_owner === false) return sharedKeys[c.id] || null;
+        if (!this.enc.enabled || !encKey) return null;
+        if (c.key_wrap) {
+          if (!collKeys[c.id]) {
+            try { collKeys[c.id] = await rbcrypto.importKeyB64(await rbcrypto.decrypt(encKey, c.key_wrap)); } catch (e) { return null; }
+          }
+          return collKeys[c.id];
+        }
+        return encKey;
+      },
       async encryptData(data) {
         if (!this.current) return data;
-        // shared-in collection: encrypt secrets with the OWNER's key (unwrapped at unlock),
-        // never the recipient's own key — otherwise the owner could not decrypt them.
-        const shared = this.current.is_owner === false;
-        const key = shared ? sharedKeys[this.current.id] : encKey;
-        if (shared ? !key : (!this.enc.enabled || !key)) return data;
+        // shared-in collection: encrypted with the collection key given with the share,
+        // so the owner can read it too.
+        const key = await this.keyFor(this.current);
+        if (!key) return data;
         const out = { ...data };
         for (const f of this.current.fields) {
           if (f.secret && out[f.key] != null && out[f.key] !== '' && !rbcrypto.isEnc(out[f.key])) {
@@ -2840,8 +3056,9 @@
           if (!k) return '••••••••'; // secrets not shared / not unlocked
           try { return await rbcrypto.decrypt(k, v); } catch (e) { return T('(decryption failed)'); }
         }
-        if (this.enc.enabled && encKey) {
-          try { return await rbcrypto.decrypt(encKey, v); } catch (e) { return T('(decryption failed)'); }
+        const key = await this.keyFor(this.current);
+        if (key) {
+          try { return await rbcrypto.decrypt(key, v); } catch (e) { return T('(decryption failed)'); }
         }
         return String(v);
       },
@@ -2859,25 +3076,85 @@
         if (!cur) { this.encForm.err = T('Enter your current master key'); return; }
         this.encForm.busy = true;
         try {
-          const key = await rbcrypto.deriveKey(cur, this.enc.salt);
-          if (await rbcrypto.decrypt(key, this.enc.verifier) !== 'regibase-ok') { this.encForm.err = T('Current master key is incorrect'); this.encForm.busy = false; return; }
-          // decrypt every secret field back to plain text
-          const plans = await this.collectSecretPlans();
-          let done = 0;
-          for (const p of plans) {
-            const data = { ...p.data }; let changed = false;
-            for (const k of p.sk) { const v = data[k]; if (rbcrypto.isEnc(v)) { const pl = await rbcrypto.decrypt(key, v); if (pl != null) { data[k] = pl; changed = true; } } }
-            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
-            done++; this.encForm.progress = done + ' / ' + plans.length;
-          }
-          // turn encryption off (back to the initial, no-master-password state)
-          await api('settings', { method: 'PUT', body: JSON.stringify({ enc_enabled: false, enc_salt: '', enc_verifier: '' }) });
-          this.forgetKey(); encKey = null; sharedKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.openDecrypted = {};
-          this.enc = { enabled: false, unlocked: false, salt: '', verifier: '' };
+          const key = await rbcrypto.deriveKey(cur, this.enc.salt, this.enc.iter);
+          if (!(await rbcrypto.checkVerifier(key, this.enc.verifier))) { this.encForm.err = T('Current master key is incorrect'); this.encForm.busy = false; return; }
+          // Every secret back to plain text, and encryption off, in one go.
+          await this.rekeyAll(async (v) => (rbcrypto.isEnc(v) ? rbcrypto.decrypt(key, v) : v), { clear: true },
+            // a collection's own key opens its values back to plain text, and then goes
+            async (cid, wrap) => {
+              const dek = await rbcrypto.importKeyB64(await rbcrypto.decrypt(key, wrap));
+              return { wrap: null, dek, values: async (v) => (rbcrypto.isEnc(v) ? rbcrypto.decrypt(dek, v) : v) };
+            },
+            (v) => rbcrypto.decrypt(key, v));
+          this.forgetKey(); encKey = null; sharedKeys = {}; collKeys = {}; sharedUnlocked = {}; this.secretUnlocked = {}; this.openDecrypted = {};
+          this.enc = { enabled: false, unlocked: false, salt: '', verifier: '', iter: rbcrypto.KDF_LEGACY };
           if (this.current) await this.loadRecords();
           this.modal = null; this.showToast(T('Master key removed (secret fields are now plain text)'));
         } catch (e) { this.encForm.err = T('Failed') + ': ' + (e.message || e); }
         finally { this.encForm.busy = false; }
+      },
+      // Every secret value the user owns (hidden collections too, never a collection
+      // shared in by somebody else), worked out with transform() in memory first.
+      // One value that will not come through stops it with nothing written; otherwise
+      // the values and the key settings are written together in one transaction.
+      // A key change that stopped half way used to leave records under a new key whose
+      // salt was never saved -- unreadable for good (review K1, K2).
+      //
+      // A collection with a key of its own (shared with its secrets) is handled by
+      // forWrap(cid, wrap) -> { wrap: new wrap or null to take the key away, values:
+      // a transform for its values, or null to leave them as they are }.
+      // fromMaster(v): opens a value under the current master key. For a collection with a key of
+      // its own, its versions and undo history can still hold values under the master key (from
+      // before the collection got its key): they are opened with it and put under the collection
+      // key, or back to plain text when the key goes (review, second look).
+      async rekeyAll(transform, settings, forWrap, fromMaster) {
+        const r = await api('secrets/owned');
+        const wraps = r.wraps || {};
+        const items = []; const failed = [];
+        const perColl = {}; const collWraps = {}; const collDek = {};
+        for (const cid of Object.keys(wraps)) {
+          let res = null;
+          try { res = forWrap ? await forWrap(cid, wraps[cid]) : null; } catch (e) { res = null; }
+          if (!res) { if (!String(cid).startsWith('h')) failed.push('#' + cid + ' (key)'); continue; }   // "h…": a deleted collection's key in the history
+          collWraps[cid] = res.wrap; perColl[cid] = res.values;
+          if (res.dek) collDek[cid] = res.dek;
+        }
+        const inColl = (cid) => async (v) => {
+          if (!rbcrypto.isEnc(v)) return perColl[cid] ? perColl[cid](v) : v;
+          if (collDek[cid]) { try { await rbcrypto.decrypt(collDek[cid], v); return perColl[cid] ? perColl[cid](v) : v; } catch (e) { /* not under the collection key */ } }
+          if (!fromMaster || !collDek[cid]) throw new Error('cannot open');
+          const p = await fromMaster(v);
+          return perColl[cid] ? p : rbcrypto.encrypt(collDek[cid], p);
+        };
+        // the records, then the same values kept in their versions and the undo history (review P9, K12)
+        const lists = [['items', 'id', items, '#'], ['vers', 'ref', [], 'v'], ['hist', 'ref', [], 'h']];
+        const total = lists.reduce((n, [name]) => n + (r[name] || []).length, 0);
+        let done = 0;
+        for (const [name, idKey, out, mark] of lists) {
+          for (const it of (r[name] || [])) {
+            const data = {}; let changed = false;
+            const tf = wraps[it.collection] ? (mark === '#' ? perColl[it.collection] : inColl(it.collection)) : transform;
+            if (!tf) { done++; continue; }   // values under the collection's own key stay as they are
+            for (const k of Object.keys(it.data || {})) {
+              const v = it.data[k];
+              let nv;
+              try { nv = await tf(v); } catch (e) { nv = null; }
+              // A record value that will not open stops everything. One in a version or the undo
+              // history is already unreadable (left from before this sweep existed): it stays as it is.
+              if (nv == null) { if (mark === '#') failed.push(mark + it[idKey] + ' (' + k + ')'); continue; }
+              if (nv !== v) { data[k] = nv; changed = true; }
+            }
+            if (changed) out.push({ [idKey]: it[idKey], data });
+            done++; this.encForm.progress = done + ' / ' + total;
+          }
+        }
+        if (failed.length) {
+          throw new Error(TN('{n} value(s) could not be decrypted, so nothing was changed: {list}', failed.length, '{n} value could not be decrypted, so nothing was changed: {list}', '{n} values could not be decrypted, so nothing was changed: {list}', { list: failed.slice(0, 20).join(', ') + (failed.length > 20 ? ' …' : '') }));
+        }
+        const all = Object.keys(collWraps).length ? { ...settings, coll_wraps: collWraps } : settings;
+        // the key the values were read under must still be the stored one (review, second look)
+        await api('secrets/rekey', { method: 'POST', body: JSON.stringify({ items, vers: lists[1][2], hist: lists[2][2], settings: all, expect_verifier: this.enc.verifier || '' }) });
+        return items.length;
       },
       async collectSecretPlans() {
         const colls = await api('collections');
@@ -2894,24 +3171,18 @@
       async enableEncryption() {
         this.encForm.err = '';
         const k = this.encForm.next;
-        if (!k || k.length < 6) { this.encForm.err = T('Master key must be at least 6 characters'); return; }
+        if (!k || k.length < 8) { this.encForm.err = T('Master key must be at least 8 characters'); return; }
         if (k !== this.encForm.next2) { this.encForm.err = T('Confirmation does not match'); return; }
         this.encForm.busy = true;
         try {
           const salt = rbcrypto.randSaltB64();
-          const key = await rbcrypto.deriveKey(k, salt);
+          const iter = rbcrypto.KDF_CURRENT;
+          const key = await rbcrypto.deriveKey(k, salt, iter);
           const verifier = await rbcrypto.encrypt(key, 'regibase-ok');
-          // enable server-side first so a partial migration stays consistent (mixed plain/cipher is readable)
-          await api('settings', { method: 'PUT', body: JSON.stringify({ enc_enabled: true, enc_salt: salt, enc_verifier: verifier }) });
-          encKey = key; this.enc = { enabled: true, unlocked: true, salt, verifier };
-          const plans = await this.collectSecretPlans();
-          let done = 0;
-          for (const p of plans) {
-            const data = { ...p.data }; let changed = false;
-            for (const key2 of p.sk) { const v = data[key2]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[key2] = await rbcrypto.encrypt(key, String(v)); changed = true; } }
-            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
-            done++; this.encForm.progress = done + ' / ' + plans.length;
-          }
+          // Every plain secret is encrypted and the key settings saved in one go.
+          await this.rekeyAll(async (v) => (rbcrypto.isEnc(v) ? v : rbcrypto.encrypt(key, String(v))),
+            { enc_enabled: true, enc_salt: salt, enc_verifier: verifier, enc_kdf_iter: iter });
+          encKey = key; this.enc = { enabled: true, unlocked: true, salt, verifier, iter };
           if (this.encForm.remember) await this.rememberKey(key); else this.forgetKey();
           this.modal = null; this.showToast(T('Encryption enabled'));
         } catch (e) { this.encForm.err = T('Failed') + ': ' + (e.message || e); }
@@ -2920,26 +3191,27 @@
       async changeMasterKey() {
         this.encForm.err = '';
         const nk = this.encForm.next;
-        if (!nk || nk.length < 6) { this.encForm.err = T('New master key must be at least 6 characters'); return; }
+        if (!nk || nk.length < 8) { this.encForm.err = T('New master key must be at least 8 characters'); return; }
         if (nk !== this.encForm.next2) { this.encForm.err = T('Confirmation does not match'); return; }
         this.encForm.busy = true;
         try {
-          const oldKey = await rbcrypto.deriveKey(this.encForm.cur, this.enc.salt);
-          if (await rbcrypto.decrypt(oldKey, this.enc.verifier) !== 'regibase-ok') throw new Error(T('Current master key is incorrect'));
+          const oldKey = await rbcrypto.deriveKey(this.encForm.cur, this.enc.salt, this.enc.iter);
+          if (!(await rbcrypto.checkVerifier(oldKey, this.enc.verifier))) throw new Error(T('Current master key is incorrect'));
           const newSalt = rbcrypto.randSaltB64();
-          const newKey = await rbcrypto.deriveKey(nk, newSalt);
+          const newIter = rbcrypto.KDF_CURRENT;
+          const newKey = await rbcrypto.deriveKey(nk, newSalt, newIter);
           const newVerifier = await rbcrypto.encrypt(newKey, 'regibase-ok');
-          const plans = await this.collectSecretPlans();
-          let done = 0;
-          for (const p of plans) {
-            const data = { ...p.data }; let changed = false;
-            for (const key2 of p.sk) { const v = data[key2]; if (rbcrypto.isEnc(v)) { data[key2] = await rbcrypto.encrypt(newKey, await rbcrypto.decrypt(oldKey, v)); changed = true; } }
-            if (changed) await api('records/' + p.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) });
-            done++; this.encForm.progress = done + ' / ' + plans.length;
-          }
-          await api('settings', { method: 'PUT', body: JSON.stringify({ enc_salt: newSalt, enc_verifier: newVerifier }) });
+          // Any plain secret left over is encrypted under the new key as well.
+          await this.rekeyAll(async (v) => rbcrypto.encrypt(newKey, rbcrypto.isEnc(v) ? await rbcrypto.decrypt(oldKey, v) : String(v)),
+            { enc_salt: newSalt, enc_verifier: newVerifier, enc_kdf_iter: newIter },
+            // a collection's own key is wrapped again with the new master key; its values stay
+            async (cid, wrap) => {
+              const raw = await rbcrypto.decrypt(oldKey, wrap);
+              return { wrap: await rbcrypto.encrypt(newKey, raw), values: null, dek: await rbcrypto.importKeyB64(raw) };
+            },
+            (v) => rbcrypto.decrypt(oldKey, v));
           const wasRemembered = this.hasRemembered();
-          encKey = newKey; this.enc.salt = newSalt; this.enc.verifier = newVerifier;
+          encKey = newKey; this.enc.salt = newSalt; this.enc.verifier = newVerifier; this.enc.iter = newIter;
           if (wasRemembered) await this.rememberKey(newKey);
           this.modal = null; this.showToast(T('Master key changed'));
         } catch (e) { this.encForm.err = T('Failed') + ': ' + (e.message || e); }
@@ -2954,17 +3226,28 @@
       // turned on/off in the collection editor) is handled in commitSchema.
       async autoEncryptCurrent() {
         if (!this.current || this.current.is_owner === false) return;
-        if (!this.enc.enabled || !encKey) return;
+        const ck = await this.keyFor(this.current);
+        if (!ck) return;
         const sk = (this.current.fields || []).filter((f) => f.secret).map((f) => f.key);
         if (!sk.length) return;
+        // One at a time, and on the record as it is NOW: it used to write back the data
+        // read when the list loaded, over an edit saved meanwhile (review J13).
+        if (this.autoEncBusy) return;
+        if (!this.records.some((r) => r && r.data && sk.some((k) => r.data[k] != null && r.data[k] !== '' && !rbcrypto.isEnc(r.data[k])))) return;
+        this.autoEncBusy = true;
         let n = 0;
-        for (const r of this.records) {
+        try {
+        for (const r0 of this.records) {
+          if (!r0 || !r0.data || !sk.some((k) => r0.data[k] != null && r0.data[k] !== '' && !rbcrypto.isEnc(r0.data[k]))) continue;
+          let r;
+          try { r = await api('records/' + r0.id); } catch (e) { continue; }
           if (!r || !r.data) continue;
           const data = { ...r.data }; let changed = false;
-          for (const k of sk) { const v = data[k]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[k] = await rbcrypto.encrypt(encKey, String(v)); changed = true; } }
-          if (changed) { try { await api('records/' + r.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true }) }); r.data = data; n++; } catch (e) { /* leave plaintext; will retry next load */ } }
+          for (const k of sk) { const v = data[k]; if (v != null && v !== '' && !rbcrypto.isEnc(v)) { data[k] = await rbcrypto.encrypt(ck, String(v)); changed = true; } }
+          if (changed) { try { await api('records/' + r.id, { method: 'PUT', body: JSON.stringify({ data, _noHistory: true, _base: r.updated_at || '' }) }); r0.data = data; n++; } catch (e) { /* leave plaintext; will retry next load */ } }
         }
-        if (n) this.showToast(T('Encrypted {n} record(s)', { n }));
+        } finally { this.autoEncBusy = false; }
+        if (n) this.showToast(TN('Encrypted {n} record(s)', n, 'Encrypted {n} record', 'Encrypted {n} records'));
       },
       async saveSettings() {
         try {
@@ -3018,7 +3301,7 @@
         this.busy = true;
         try {
           const r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid, downTo: h.id }) });
-          this.showToast(T('Reverted {n} change(s)', { n: (r && r.undone) || 0 }));
+          this.showToast(TN('Reverted {n} change(s)', (r && r.undone) || 0, 'Reverted {n} change', 'Reverted {n} changes'));
           await this.afterUndo(cid);
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
         finally { this.busy = false; }
@@ -3082,17 +3365,22 @@
         catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
       },
       // ---- full backup / restore ----
-      openBackup() { this.backupForm = { password: '', busy: false, err: '' }; this.modal = { type: 'backup' }; },
-      openRestore() { this.restoreForm = { password: '', busy: false, err: '', fileName: '', dataUrl: '', confirm: false, mode: 'overwrite' }; this.modal = { type: 'restore' }; },
+      openBackup() { this.backupForm = { password: '', own: false, archive: '', archive2: '', busy: false, err: '' }; this.modal = { type: 'backup' }; },
+      openRestore() { this.restoreForm = { password: '', busy: false, err: '', fileName: '', file: null, archive: '', confirm: false, mode: 'overwrite' }; this.modal = { type: 'restore' }; },
       async doBackup() {
         if (!this.backupForm.password) { this.backupForm.err = T('Please enter your password'); return; }
+        // A password of the archive's own, so a backup that gets out does not give away the
+        // login password (review K10).
+        const own = this.backupForm.own;
+        if (own && this.backupForm.archive.length < 8) { this.backupForm.err = T('The archive password must be at least 8 characters'); return; }
+        if (own && this.backupForm.archive !== this.backupForm.archive2) { this.backupForm.err = T('The two archive passwords do not match'); return; }
         this.backupForm.busy = true; this.backupForm.err = '';
         try {
           const res = await fetch(BASE + 'api/backup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'requesttoken': TOKEN },
             credentials: 'same-origin',
-            body: JSON.stringify({ password: this.backupForm.password }),
+            body: JSON.stringify(own ? { password: this.backupForm.password, archive_password: this.backupForm.archive } : { password: this.backupForm.password }),
           });
           if (!res.ok) { let m = ''; try { m = (await res.json()).error; } catch (e) { /* ignore */ } throw new Error(m || res.statusText); }
           const blob = await res.blob();
@@ -3110,32 +3398,39 @@
       onRestoreFile(e) {
         const f = e.target.files && e.target.files[0];
         if (!f) return;
+        // Kept as the File itself and sent as an upload: it used to be read whole into a
+        // base64 data URL (review K11).
         this.restoreForm.fileName = f.name;
-        const r = new FileReader();
-        r.onload = () => { this.restoreForm.dataUrl = String(r.result || ''); };
-        r.readAsDataURL(f);
+        this.restoreForm.file = f;
       },
       async doRestore() {
-        if (!this.restoreForm.dataUrl) { this.restoreForm.err = T('Please choose a file'); return; }
+        if (!this.restoreForm.file) { this.restoreForm.err = T('Please choose a file'); return; }
         if (!this.restoreForm.password) { this.restoreForm.err = T('Please enter your password'); return; }
         if (this.restoreForm.mode === 'overwrite' && !this.restoreForm.confirm) { this.restoreForm.err = T('Please check the confirmation box'); return; }
         this.restoreForm.busy = true; this.restoreForm.err = '';
         try {
-          const res = await api('restore', { method: 'POST', body: JSON.stringify({ password: this.restoreForm.password, dataUrl: this.restoreForm.dataUrl, mode: this.restoreForm.mode }) });
+          const fd = new FormData();
+          fd.append('password', this.restoreForm.password);
+          if (this.restoreForm.archive) fd.append('archive_password', this.restoreForm.archive);
+          fd.append('mode', this.restoreForm.mode);
+          fd.append('backup', this.restoreForm.file, this.restoreForm.fileName || 'backup.zip');
+          // no Content-Type here: the browser sets multipart/form-data with its boundary
+          const res = await api('restore', { method: 'POST', headers: { 'requesttoken': TOKEN }, body: fd });
           this.modal = null;
-          this.showToast(T('Restored') + '（' + T('Imported {n} items', { n: res.records }) + '）');
+          this.showToast(T('Restored') + this.paren(TN('Imported {n} items', res.records, 'Imported {n} item')));
+          if (res.attachments_failed) alert(TN('{n} attachment(s) in the backup could not be restored.', res.attachments_failed, '{n} attachment in the backup could not be restored.', '{n} attachments in the backup could not be restored.'));
           await this.reloadAfterRestore();
         } catch (e) { this.restoreForm.err = e.message || String(e); }
         finally { this.restoreForm.busy = false; }
       },
       async reloadAfterRestore() {
-        encKey = null;
+        encKey = null; collKeys = {};
         const s = await api('settings');
         this.settingsForm = s; this.theme = s.theme || 'auto';
         this.languages = s.languages || this.languages;
         await this.applyLanguage(s.language || 'auto');
         this.applyTheme();
-        this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '' };
+        this.enc = { enabled: !!s.enc_enabled, unlocked: false, salt: s.enc_salt || '', verifier: s.enc_verifier || '', iter: Number(s.enc_kdf_iter) || rbcrypto.KDF_LEGACY };
         this.templates = []; // re-fetched lazily when the New collection picker next opens
         this.current = null; this.records = []; this.clearSelection();
         await this.loadCollections();
@@ -3169,7 +3464,7 @@
           }
           this.modal = null; await this.loadCollections(); await this.selectCollection(c.id);
           this.showToast(T('Collection created'));
-        } finally { this.busy = false; }
+        } catch (e) { alert(T('Failed to save') + ': ' + (e.message || e)); } finally { this.busy = false; }
       },
       // Answer the folder-name conflict prompt: reuse=true keeps the same folder,
       // reuse=false creates with a number appended.
@@ -3277,7 +3572,8 @@
       },
       openCollSettings() {
         this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '', files_folder: this.current.files_folder || '', map_provider: this.current.map_provider || '', secret: !!this.current.secret, secret_pin: '' };
-        this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', master: '', shareSecrets: false, err: '', busy: false };
+        // A temporary share password is put in the box; the owner may change it (owner, 2026-09-24).
+        this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: rbcrypto.tempPassword(), expires: '', shareSecrets: true, notice: '', err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
         this.iconPickerOpen = false;
@@ -3339,33 +3635,106 @@
       },
       pickShareUser(u) { this.sharePanel.recipient = u.uid; this.sharePanel.recipientName = u.name; this.sharePanel.recipientType = u.type || 'user'; this.sharePanel.results = []; this.sharePanel.q = ''; },
       clearShareRecipient() { this.sharePanel.recipient = null; this.sharePanel.recipientName = ''; this.sharePanel.recipientType = 'user'; },
+      // The collection's own key, made the first time it is shared with its secrets: its
+      // secret values move from the master key to this key in one go (nothing is written
+      // if one of them cannot be read), and the owner keeps it wrapped with the master key.
+      // The master key itself is never handed to anybody (owner, 2026-09-24; review K3).
+      async ensureCollKey(c) {
+        if (c.key_wrap) { const k = await this.keyFor(c); if (!k) throw new Error(T('The collection key could not be opened.')); return k; }
+        const dek = await rbcrypto.newKey();
+        const wrap = await rbcrypto.encrypt(encKey, await rbcrypto.exportKeyB64(dek));
+        const r = await api('secrets/owned');
+        const items = []; const failed = [];
+        for (const it of (r.items || [])) {
+          if (Number(it.collection) !== Number(c.id)) continue;
+          const data = {};
+          for (const k of Object.keys(it.data || {})) {
+            const v = it.data[k]; let nv = null;
+            try { nv = await rbcrypto.encrypt(dek, rbcrypto.isEnc(v) ? await rbcrypto.decrypt(encKey, v) : String(v)); } catch (e) { nv = null; }
+            if (nv == null) { failed.push('#' + it.id + ' (' + k + ')'); continue; }
+            data[k] = nv;
+          }
+          items.push({ id: it.id, data });
+        }
+        if (failed.length) throw new Error(TN('{n} value(s) could not be decrypted, so nothing was changed: {list}', failed.length, '{n} value could not be decrypted, so nothing was changed: {list}', '{n} values could not be decrypted, so nothing was changed: {list}', { list: failed.slice(0, 20).join(', ') }));
+        // The collection's versions and undo history go under its new key too; they stayed under
+        // the master key and were then read with the wrong one (review, second look). A value that
+        // does not open is left as it is, as in a key change.
+        const side = { vers: [], hist: [] };
+        for (const name of ['vers', 'hist']) {
+          for (const it of (r[name] || [])) {
+            if (String(it.collection) !== String(c.id)) continue;
+            const data = {}; let changed = false;
+            for (const k of Object.keys(it.data || {})) {
+              const v = it.data[k];
+              try { data[k] = await rbcrypto.encrypt(dek, rbcrypto.isEnc(v) ? await rbcrypto.decrypt(encKey, v) : String(v)); changed = true; } catch (e) { /* left as it is */ }
+            }
+            if (changed) side[name].push({ ref: it.ref, data });
+          }
+        }
+        await api('secrets/rekey', { method: 'POST', body: JSON.stringify({ items, vers: side.vers, hist: side.hist, settings: { coll_wraps: { [c.id]: wrap } }, expect_verifier: this.enc.verifier || '' }) });
+        c.key_wrap = wrap; collKeys[c.id] = dek;
+        const inList = (this.collections || []).find((x) => x.id === c.id); if (inList) inList.key_wrap = wrap;
+        return dek;
+      },
+      // The collection key wrapped with a share password, for one share.
+      async wrapForShare(pw) {
+        const dek = await this.ensureCollKey(this.current);
+        const encSalt = rbcrypto.randSaltB64();
+        const wk = await rbcrypto.deriveKey(pw, encSalt);
+        return { enc_key: await rbcrypto.encrypt(wk, await rbcrypto.exportKeyB64(dek)), enc_salt: encSalt };
+      },
       async addShare() {
         const sp = this.sharePanel;
-        sp.err = '';
+        sp.err = ''; sp.notice = '';
         if (!sp.recipient) return;
-        let encKeyWrapped = null, encSalt = null;
-        if (sp.master) {
-          if (!sp.password) { sp.err = T('Set a share password to share secret fields.'); return; }
-          try {
-            const ownerKey = await rbcrypto.deriveKey(sp.master, this.enc.salt);
-            if (await rbcrypto.decrypt(ownerKey, this.enc.verifier) !== 'regibase-ok') { sp.err = T('Incorrect master password'); return; }
-            encSalt = rbcrypto.randSaltB64();
-            const wrapKey = await rbcrypto.deriveKey(sp.password, encSalt);
-            encKeyWrapped = await rbcrypto.encrypt(wrapKey, await rbcrypto.exportKeyB64(ownerKey));
-          } catch (e) { sp.err = T('Could not prepare secret sharing'); return; }
-        }
+        const pw = String(sp.password || '').trim();
+        const body = { recipient: sp.recipient, recipient_type: sp.recipientType || 'user', perm: sp.perm, expires_at: sp.expires || '' };
+        const withSecrets = this.collectionHasSecret && this.enc.enabled && sp.shareSecrets;
+        if (withSecrets && !pw) { sp.err = T('Set a share password to share secret fields.'); return; }
+        if (withSecrets && !encKey) { sp.err = T('Unlock with your master key first to share the secret fields.'); return; }
         sp.busy = true;
         try {
-          const body = { recipient: sp.recipient, recipient_type: sp.recipientType || 'user', perm: sp.perm, password: sp.password || '' };
-          if (encKeyWrapped) { body.enc_key = encKeyWrapped; body.enc_salt = encSalt; }
+          if (pw) {
+            // The password itself never goes to the server: only a value derived from it.
+            const authSalt = rbcrypto.randSaltB64();
+            body.auth = await rbcrypto.authOf(pw, authSalt); body.auth_salt = authSalt;
+            if (withSecrets) Object.assign(body, await this.wrapForShare(pw));
+          }
           const s = await api('collections/' + this.current.id + '/shares', { method: 'POST', body: JSON.stringify(body) });
           this.sharePanel.shares.push(s);
+          const who = sp.recipientName || sp.recipient;
           this.clearShareRecipient();
-          sp.perm = 'view'; sp.password = ''; sp.master = '';
+          if (pw) sp.notice = T('Share password for {name}: {password} — tell it to them yourself; it is not kept anywhere.', { name: who, password: pw });
+          sp.perm = 'view'; sp.password = rbcrypto.tempPassword(); sp.expires = '';
           await this.loadCollections();
+          if (withSecrets) await this.loadRecords();
           this.showToast(T('Shared'));
         } catch (e) { sp.err = e.message || String(e); }
         finally { sp.busy = false; }
+      },
+      async changeShareExpiry(s, date) {
+        const qs = '?recipient_type=' + encodeURIComponent(s.recipient_type || 'user');
+        try { const r = await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid) + qs, { method: 'PATCH', body: JSON.stringify({ expires_at: date || '' }) }); Object.assign(s, r); }
+        catch (e) { this.showToast(e.message || String(e)); }
+      },
+      // A new share password for an existing share (the old wrapped key goes with the old one).
+      async renewSharePassword(s) {
+        const pw = window.prompt(T('New share password for {name} (you may change it):', { name: s.recipient_name || s.recipient_uid }), rbcrypto.tempPassword());
+        if (pw == null) return;
+        const p = String(pw).trim();
+        const body = {};
+        try {
+          if (p) {
+            const authSalt = rbcrypto.randSaltB64();
+            body.auth = await rbcrypto.authOf(p, authSalt); body.auth_salt = authSalt;
+            if (this.collectionHasSecret && this.enc.enabled && encKey) Object.assign(body, await this.wrapForShare(p));
+          } else { body.auth = ''; }
+          const qs = '?recipient_type=' + encodeURIComponent(s.recipient_type || 'user');
+          const r = await api('collections/' + this.current.id + '/shares/' + encodeURIComponent(s.recipient_uid) + qs, { method: 'PATCH', body: JSON.stringify(body) });
+          Object.assign(s, r);
+          if (p) this.sharePanel.notice = T('Share password for {name}: {password} — tell it to them yourself; it is not kept anywhere.', { name: s.recipient_name || s.recipient_uid, password: p });
+        } catch (e) { this.showToast(e.message || String(e)); }
       },
       async changeSharePerm(s, perm) {
         const qs = '?recipient_type=' + encodeURIComponent(s.recipient_type || 'user');
@@ -3390,7 +3759,9 @@
         const su = this.shareUnlock;
         su.err = ''; su.busy = true;
         try {
-          const res = await api('collections/' + su.cid + '/unlock', { method: 'POST', body: JSON.stringify({ password: su.password }) });
+          const coll = (this.collections || []).find((x) => x.id === su.cid) || {};
+          const auth = coll.auth_salt ? await rbcrypto.authOf(su.password, coll.auth_salt) : '';
+          const res = await api('collections/' + su.cid + '/unlock', { method: 'POST', body: JSON.stringify({ auth }) });
           sharedUnlocked[su.cid] = true;
           if (res.enc_key && res.enc_salt) {
             try {
@@ -3841,6 +4212,11 @@
       async saveSchema() {
         // Field names are required — do not silently drop unnamed fields.
         if (this.schemaFields.some((f) => !(f.label || '').trim())) { alert(T('Every field needs a name.')); return; }
+        // A minimum longer than the maximum left the field impossible to fill (review J14).
+        const mm = this.schemaFields.find((f) => Number(f._rmin) > 0 && Number(f._rmax) > 0 && Number(f._rmin) > Number(f._rmax));
+        if (mm) { alert(T('The minimum length is larger than the maximum for {label}.', { label: mm.label || '' })); return; }
+        const bad = this.schemaFields.find((f) => f._charset === 'custom' && checkPattern(f._pattern));
+        if (bad) { alert(T('This pattern cannot be used:') + ' ' + (bad.label || '') + ' — ' + checkPattern(bad._pattern)); return; }
         const newFields = this.serializeSchemaFields();
         if (!newFields.length) { alert(T('Keep at least one field')); return; }
         if (!newFields.some((f) => f.is_title)) newFields[0].is_title = true;
@@ -3876,11 +4252,12 @@
             let v = data[nf.key]; if (v == null || v === '') continue;
             // secret turned OFF: decrypt so the value is not shown/saved as ciphertext
             if (of.secret && !nf.secret && rbcrypto.isEnc(v)) {
-              if (!encKey) { needUnlock = true; continue; }
-              data[nf.key] = await rbcrypto.decrypt(encKey, v); dirty = true; counts.decrypt++; v = data[nf.key];
-            } else if (!of.secret && nf.secret && !rbcrypto.isEnc(v) && this.enc.enabled && encKey) {
+              const ck = await this.keyFor(this.current);
+              if (!ck) { needUnlock = true; continue; }
+              data[nf.key] = await rbcrypto.decrypt(ck, v); dirty = true; counts.decrypt++; v = data[nf.key];
+            } else if (!of.secret && nf.secret && !rbcrypto.isEnc(v) && await this.keyFor(this.current)) {
               // secret turned ON: encrypt the existing plain-text value
-              data[nf.key] = await rbcrypto.encrypt(encKey, String(v)); dirty = true; counts.encrypt++; continue;
+              data[nf.key] = await rbcrypto.encrypt(await this.keyFor(this.current), String(v)); dirty = true; counts.encrypt++; continue;
             }
             // type change: keep compatible values, clean up the rest
             if (of.type !== nf.type) {
@@ -3902,14 +4279,14 @@
         // or clears/removes a value is DESTRUCTIVE and must pass a stricter, gated
         // confirmation (a checkbox the user has to tick) rather than a one-click OK.
         const destructive = [], safe = [];
-        if (counts.attCleared) destructive.push(T('Delete {n} attached file(s) (field is no longer an attachment type)', { n: counts.attCleared }));
-        if (counts.toAtt) destructive.push(T('Clear {n} value(s) that are not compatible with an attachment field', { n: counts.toAtt }));
-        if (counts.dateCleared) destructive.push(T('Clear {n} value(s) that are not valid dates', { n: counts.dateCleared }));
-        if (counts.numCleared) destructive.push(T('Clear {n} value(s) that are not numbers', { n: counts.numCleared }));
-        if (counts.pruned) destructive.push(T('Remove leftover data of {n} value(s) from deleted fields', { n: counts.pruned }));
-        if (counts.decrypt) safe.push(T('Decrypt {n} value(s) back to plain text (Secret turned off)', { n: counts.decrypt }));
-        if (counts.encrypt) safe.push(T('Encrypt {n} value(s) (Secret turned on)', { n: counts.encrypt }));
-        if (counts.selectAdded) safe.push(T('Add {n} existing value(s) to the choices so nothing is lost', { n: counts.selectAdded }));
+        if (counts.attCleared) destructive.push(TN('Delete {n} attached file(s) (field is no longer an attachment type)', counts.attCleared, 'Delete {n} attached file (field is no longer an attachment type)', 'Delete {n} attached files (field is no longer an attachment type)'));
+        if (counts.toAtt) destructive.push(TN('Clear {n} value(s) that are not compatible with an attachment field', counts.toAtt, 'Clear {n} value that is not compatible with an attachment field', 'Clear {n} values that are not compatible with an attachment field'));
+        if (counts.dateCleared) destructive.push(TN('Clear {n} value(s) that are not valid dates', counts.dateCleared, 'Clear {n} value that is not a valid date', 'Clear {n} values that are not valid dates'));
+        if (counts.numCleared) destructive.push(TN('Clear {n} value(s) that are not numbers', counts.numCleared, 'Clear {n} value that is not a number', 'Clear {n} values that are not numbers'));
+        if (counts.pruned) destructive.push(TN('Remove leftover data of {n} value(s) from deleted fields', counts.pruned, 'Remove leftover data of {n} value from deleted fields', 'Remove leftover data of {n} values from deleted fields'));
+        if (counts.decrypt) safe.push(TN('Decrypt {n} value(s) back to plain text (Secret turned off)', counts.decrypt, 'Decrypt {n} value back to plain text (Secret turned off)', 'Decrypt {n} values back to plain text (Secret turned off)'));
+        if (counts.encrypt) safe.push(TN('Encrypt {n} value(s) (Secret turned on)', counts.encrypt, 'Encrypt {n} value (Secret turned on)', 'Encrypt {n} values (Secret turned on)'));
+        if (counts.selectAdded) safe.push(TN('Add {n} existing value(s) to the choices so nothing is lost', counts.selectAdded, 'Add {n} existing value to the choices so nothing is lost', 'Add {n} existing values to the choices so nothing is lost'));
         if (destructive.length) {
           // deletion involved → open the strict, checkbox-gated confirmation modal
           this.schemaPlan = { destructive, safe, fields: newFields, changed };
@@ -3961,21 +4338,66 @@
       },
       async editRecord(rec) {
         if (!this.canEdit) return;
-        this.form = {}; this.reveal = {}; this.editingRecordId = rec.id; this.editingOrig = rec.data;
+        this.form = {}; this.reveal = {}; this.editingRecordId = rec.id; this.editingOrig = rec.data; this.editBroken = {};
+        this.editingBase = rec.updated_at || '';   // when it was opened: another save since then is not overwritten unasked (review J18)
+        this.editingCollectionId = this.current ? this.current.id : null;
         for (const f of this.current.fields) {
           // masked secrets in a shared collection: leave the field blank & read-only,
           // the original ciphertext is preserved on save (see saveRecord)
           if (f.secret && this.secretsMasked) { this.form[f.key] = ''; continue; }
           if (f.type === 'checkbox') { this.form[f.key] = this.cbSplit(rec.data[f.key], f); continue; }
-          this.form[f.key] = f.secret ? await this.secretPlain(rec.data[f.key]) : (rec.data[f.key] ?? '');
+          if (f.secret) {
+            // A secret that could not be read (another key, a key change that stopped
+            // half way) is not put in the form: saving put the words "(decryption
+            // failed)" in its place, encrypted, and the real value was gone (review J4).
+            // The field is left empty; left empty, the original is kept as it is.
+            const plain = await this.secretPlain(rec.data[f.key]);
+            if (plain === T('(decryption failed)')) { this.editBroken[f.key] = true; this.form[f.key] = ''; continue; }
+            this.form[f.key] = plain;
+            continue;
+          }
+          this.form[f.key] = rec.data[f.key] ?? '';
         }
         this.preloadFileMetas(this.current.fields, rec.data);
         this.formBaseline = JSON.stringify(this.form);
         this.modal = { type: 'record' };
       },
+      // A record form closed with ✕, Cancel or Back threw away what was typed without a
+      // word (review J7): the baseline taken when it opened is compared first.
+      mayDiscardRecord() {
+        if (!this.formBaseline || JSON.stringify(this.form) === this.formBaseline) return true;
+        return window.confirm(T('Discard unsaved changes?'));
+      },
+      closeRecordForm() { if (this.mayDiscardRecord()) this.modal = null; },
       async saveRecord() {
-        for (const f of this.current.fields) if (f.required && !String(this.form[f.key] ?? '').trim()) { alert(T('{label} is required', { label: f.label })); return; }
-        for (const f of this.current.fields) { const err = this.validateField(f, this.form[f.key]); if (err) { alert(err); return; } }
+        // One save at a time: pressing Save (or Enter) twice made the same record twice (review J3).
+        if (this.recordSaving) return;
+        // The record being edited must belong to the collection on screen (review J5).
+        if (this.editingRecordId && this.editingCollectionId != null && this.current && this.editingCollectionId !== this.current.id) {
+          this.modal = null; return;
+        }
+        this.recordSaving = true;
+        // A save the server refused used to say nothing: the form stayed open, and nobody
+        // could tell whether it had been saved (review J12).
+        try { await this.saveRecordNow(); } catch (e) { alert(T('Failed to save') + ': ' + (e.message || e)); } finally { this.recordSaving = false; }
+      },
+      async saveRecordNow() {
+        // Only the fields changed in this edit are checked. A value that broke a rule made
+        // stricter later, or that came in by an import, kept every other field of the record
+        // from being saved (review J15). A new record is checked in full.
+        const base = (this.editingRecordId && this.formBaseline) ? JSON.parse(this.formBaseline) : null;
+        const changed = {};
+        for (const f of this.current.fields) changed[f.key] = !base || JSON.stringify(base[f.key] ?? '') !== JSON.stringify(this.form[f.key] ?? '');
+        // A phone number typed with a Japanese input method comes as full-width digits and
+        // dashes (－ ー ‐ −); they are made the plain ones before the check (review J1).
+        for (const f of this.current.fields) {
+          const o = this.fieldRule(f);
+          if ((f.type === 'tel' || (o && o.charset === 'phone')) && typeof this.form[f.key] === 'string') {
+            this.form[f.key] = this.form[f.key].normalize('NFKC').replace(/[‐‑‒–—―−ー－]/g, '-').trim();
+          }
+        }
+        for (const f of this.current.fields) if (changed[f.key] && f.required && !String(this.form[f.key] ?? '').trim()) { alert(T('{label} is required', { label: f.label })); return; }
+        for (const f of this.current.fields) { if (!changed[f.key]) continue; const err = this.validateField(f, this.form[f.key]); if (err) { alert(err); return; } }
         let data = {};
         for (const f of this.current.fields) { let v = this.form[f.key]; if (f.type === 'checkbox') v = this.cbJoin(v); if (v !== '' && v != null) data[f.key] = v; }
         // preserve masked secrets untouched (recipient can't see/change them)
@@ -3986,8 +4408,25 @@
             if (orig != null && orig !== '') data[f.key] = orig; else delete data[f.key];
           }
         }
+        // A secret that could not be read keeps its original value unless a new one was typed (review J4).
+        for (const k of Object.keys(this.editBroken || {})) {
+          const orig = this.editingOrig ? this.editingOrig[k] : undefined;
+          if ((this.form[k] ?? '') === '' && orig != null && orig !== '') data[k] = orig;
+        }
         data = await this.encryptData(data);
-        if (this.editingRecordId) { await api('records/' + this.editingRecordId, { method: 'PUT', body: JSON.stringify({ data }) }); this.showToast(T('Updated')); }
+        if (this.editingRecordId) {
+          try {
+            await api('records/' + this.editingRecordId, { method: 'PUT', body: JSON.stringify({ data, _base: this.editingBase }) });
+          } catch (e) {
+            if (e.code !== 'conflict') throw e;
+            if (!confirm(T('Somebody else saved this record after you opened it.') + '\n' + T('Save yours anyway and replace their changes? Choose Cancel to keep your form open; close it and open the record again to see their changes.'))) return;
+            // Against the record as it is now: a third save made while this question was
+            // open is not overwritten without a word either (review J18).
+            const latest = await api('records/' + this.editingRecordId);
+            await api('records/' + this.editingRecordId, { method: 'PUT', body: JSON.stringify({ data, _base: (latest && latest.updated_at) || '' }) });
+          }
+          this.showToast(T('Updated'));
+        }
         else { await api('collections/' + this.current.id + '/records', { method: 'POST', body: JSON.stringify({ data }) }); this.showToast(T('Registered')); }
         this.modal = null; await this.loadRecords(); await this.loadCollections();
       },
@@ -4018,7 +4457,7 @@
           const res = await api('contacts/import', { method: 'POST', body: JSON.stringify({ addressbook: this.contactsImport.selected, name: this.contactsImport.name || '', icon: this.contactsImport.icon || '' }) });
           this.modal = null;
           await this.loadCollections();
-          this.showToast(T('Imported {n} items', { n: res.imported }));
+          this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
           if (res.collectionId) this.selectCollection(res.collectionId);
         } catch (e) { this.contactsImport.err = e.message || String(e); }
         finally { this.contactsImport.busy = false; }
@@ -4042,7 +4481,7 @@
           const res = await api('tables/import', { method: 'POST', body: JSON.stringify({ tableId: this.tablesImport.selected, name: this.tablesImport.name || '', icon: this.tablesImport.icon || '' }) });
           this.modal = null;
           await this.loadCollections();
-          this.showToast(T('Imported {n} items', { n: res.imported }));
+          this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
           if (res.collectionId) this.selectCollection(res.collectionId);
         } catch (e) { this.tablesImport.err = e.message || String(e); }
         finally { this.tablesImport.busy = false; }
@@ -4052,8 +4491,8 @@
         this.tablesExportBusy = true;
         try {
           const res = await api('collections/' + this.current.id + '/tables-export', { method: 'POST', body: JSON.stringify({}) });
-          let msg = T('Exported {n} rows to Tables', { n: res.exported });
-          if (res.skippedFields) msg += ' ' + T('({n} fields skipped)', { n: res.skippedFields });
+          let msg = TN('Exported {n} rows to Tables', res.exported, 'Exported {n} row to Tables');
+          if (res.skippedFields) msg += ' ' + TN('({n} fields skipped)', res.skippedFields, '({n} field skipped)');
           this.showToast(msg);
         } catch (e) { alert((this.t ? this.t('Export to Tables failed') : 'Export to Tables failed') + ': ' + (e.message || String(e))); }
         finally { this.tablesExportBusy = false; }
@@ -4062,9 +4501,17 @@
         const f = e.target.files && e.target.files[0];
         if (!f) return;
         this.importFileName = f.name;
+        // A CSV saved by Excel in Japan is Shift_JIS, not UTF-8: read as UTF-8 it came in as
+        // replacement characters, beyond repair (review J11). UTF-8 is tried strictly first.
         const r = new FileReader();
-        r.onload = () => { this.importCsv = String(r.result || ''); this.analyzeImport(); };
-        r.readAsText(f);
+        r.onload = () => {
+          const buf = r.result;
+          let text;
+          try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+          catch (err) { try { text = new TextDecoder('shift_jis').decode(buf); } catch (e2) { text = new TextDecoder('utf-8').decode(buf); } }
+          this.importCsv = text.replace(/^\uFEFF/, ''); this.analyzeImport();
+        };
+        r.readAsArrayBuffer(f);
       },
       async analyzeImport() {
         if (!this.importCsv.trim()) { alert(T('Please enter CSV or JSON')); return; }
@@ -4086,7 +4533,7 @@
           this.modal = null;
           await this.loadCollections();
           await this.selectCollection(res.collectionId);
-          this.showToast(T('Imported {n} items', { n: res.imported }));
+          this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
         } catch (e) { alert(T('Import failed') + ': ' + e.message); }
         finally { this.importBusy = false; }
       },
@@ -4106,13 +4553,16 @@
         if (!this.selectedIds.length) return;
         const mapping = {};
         this.current.fields.forEach((f) => (mapping[f.key] = f.key));
-        const res = await api('transfer', { method: 'POST', body: JSON.stringify({
-          sourceCollectionId: this.current.id, targetCollectionId: this.current.id,
-          recordIds: [...this.selectedIds], mode: 'copy', mapping,
-        }) });
+        let res;
+        try {
+          res = await api('transfer', { method: 'POST', body: JSON.stringify({
+            sourceCollectionId: this.current.id, targetCollectionId: this.current.id,
+            recordIds: [...this.selectedIds], mode: 'copy', mapping,
+          }) });
+        } catch (e) { alert(T('Failed to save') + ': ' + (e.message || e)); return; }
         this.clearSelection();
         await this.loadRecords(); await this.loadCollections();
-        this.showToast(T('Copied {n} items', { n: res.count }));
+        this.showToast(TN('Copied {n} items', res.count, 'Copied {n} item'));
       },
       openTransferBulk(mode) {
         this.xfer = { mode, recordIds: [...this.selectedIds], targetId: '', target: null, mapping: {}, appendTo: '', busy: false, newName: '' };
@@ -4126,7 +4576,7 @@
           await api('records/delete', { method: 'POST', body: JSON.stringify({ ids }) });
           this.modal = null; this.clearSelection();
           await this.loadRecords(); await this.loadCollections();
-          this.showToast(T('Deleted {n} items', { n: ids.length }));
+          this.showToast(TN('Deleted {n} items', ids.length, 'Deleted {n} item'));
         } catch (e) { alert(T('Failed to delete') + ': ' + e.message); }
         finally { this.busy = false; }
       },
@@ -4166,6 +4616,8 @@
             const fields = this.current.fields.map((f) => ({
               key: f.key, label: f.label, type: f.type, options: f.options || undefined,
               required: !!f.required, secret: !!f.secret, is_title: !!f.is_title, placeholder: f.placeholder || undefined,
+              list_show: f.list_show !== false, table_show: f.table_show !== false, card_show: f.card_show !== false,
+              concat: f.concat || 0, concat_sep: f.concat_sep || 'space', concat_sep_char: f.concat_sep_char || '',
             }));
             const coll = await api('collections', { method: 'POST', body: JSON.stringify({
               name, icon: this.current.icon, color: this.current.color, view: this.current.view, fields,
@@ -4178,7 +4630,7 @@
             }) });
             this.modal = null; this.clearSelection();
             await this.loadRecords(); await this.loadCollections();
-            this.showToast(T('{op} {n} items to the new collection “{name}”', { name, n: res.count, op: this.xfer.mode === 'move' ? T('Move') : T('Duplicate') }));
+            this.showToast(this.xfer.mode === 'move' ? TN('Moved {n} items to the new collection “{name}”', res.count, 'Moved {n} item to the new collection “{name}”', null, { name }) : TN('Copied {n} items to the new collection “{name}”', res.count, 'Copied {n} item to the new collection “{name}”', null, { name }));
           } catch (e) { alert(T('Operation failed') + ': ' + e.message); }
           finally { this.xfer.busy = false; }
           return;
@@ -4214,7 +4666,7 @@
           this.clearSelection();
           await this.loadRecords();
           await this.loadCollections();
-          this.showToast(T('{op} {n} items', { n: res.count, op: this.xfer.mode === 'move' ? T('Move') : T('Duplicate') }));
+          this.showToast(this.xfer.mode === 'move' ? TN('Moved {n} items', res.count, 'Moved {n} item') : TN('Copied {n} items', res.count, 'Copied {n} item'));
         } catch (e) { alert(T('Operation failed') + ': ' + e.message); }
         finally { this.xfer.busy = false; }
       },
@@ -4231,10 +4683,14 @@
         return (o && typeof o === 'object' && !Array.isArray(o) && (o.charset || o.min || o.max || o.pattern)) ? o : null;
       },
       ruleMax(f) { const o = this.fieldRule(f); return o && o.max ? o.max : null; },
+      patternError(p) { return checkPattern(p); },
+      patternTry(p, v) { try { return new RegExp('^(?:' + p + ')$').test(String(v)); } catch (e) { return false; } },
       ruleHint(f) {
         const o = this.fieldRule(f); if (!o) return '';
         const parts = [];
-        if (o.charset === 'custom') parts.push(T('Format: {p}', { p: o.pattern || '' }));
+        // A broken rule is said so, not silently waved through (review J2).
+        if (o.charset === 'custom' && checkPattern(o.pattern)) parts.push('⚠️ ' + T('The format setting of this field is broken; tell the collection owner.'));
+        else if (o.charset === 'custom') parts.push(T('Format: {p}', { p: o.pattern || '' }));
         else if (o.charset && CHARSET_LABEL[o.charset]) parts.push(T('{charset} only', { charset: T(CHARSET_LABEL[o.charset]) }));
         if (o.min && o.max) parts.push(T('{min}–{max} characters', { min: o.min, max: o.max }));
         else if (o.min) parts.push(T('{min} characters or more', { min: o.min }));
@@ -4244,12 +4700,24 @@
       // checkbox stores multiple choices as a ", "-joined string; convert to/from
       // an array for the checkbox inputs (kept in sync with the field's options).
       cbJoin(arr) { return Array.isArray(arr) ? arr.filter((x) => x != null && x !== '').join(', ') : (arr || ''); },
+      // The ticked values of a checkbox field. Nothing stored is thrown away: a value
+      // no longer among the choices is kept (and shown as an old choice), where it used
+      // to be dropped the moment the record was opened -- and gone with the next save
+      // (review J6). A choice that has ", " in it is read back whole.
       cbSplit(v, f) {
         if (v == null || v === '') return [];
-        const parts = String(v).split(', ').map((s) => s.trim()).filter(Boolean);
-        const opts = Array.isArray(f && f.options) ? f.options : null;
-        return opts ? parts.filter((p) => opts.includes(p)) : parts;
+        const tok = String(v).split(', ').map((s) => s.trim()).filter(Boolean);
+        const opts = Array.isArray(f && f.options) ? f.options : [];
+        const out = [];
+        for (let i = 0; i < tok.length; i += 1) {
+          let took = 1;
+          for (let j = tok.length; j > i + 1; j -= 1) { if (opts.includes(tok.slice(i, j).join(', '))) { took = j - i; break; } }
+          out.push(tok.slice(i, i + took).join(', '));
+          i += took - 1;
+        }
+        return out;
       },
+      cbOld(f) { const opts = Array.isArray(f && f.options) ? f.options : []; return (Array.isArray(this.form[f.key]) ? this.form[f.key] : []).filter((x) => !opts.includes(x)); },
       validateField(f, v) {
         const o = this.fieldRule(f); if (!o) return null;
         const s = String(v == null ? '' : v);
@@ -4470,7 +4938,9 @@
         if (v == null || v === '' || f.secret) return null;
         const s = String(v).trim();
         if (f.type === 'email') return s.includes('@') ? 'mailto:' + s : null;
-        if (f.type === 'tel') { const t = s.replace(/[^\d+]/g, ''); return t ? 'tel:' + t : null; }
+        // # and * are part of a number (an extension, a service code): they were dropped, and
+        // 090-1234-5678#123 dialled 09012345678123 (review J1).
+        if (f.type === 'tel') { const t = s.normalize('NFKC').replace(/[^\d+*#,;]/g, ''); return t ? 'tel:' + t.replace(/#/g, '%23') : null; }
         if (f.type === 'url') {
           if (/^(javascript|data|vbscript):/i.test(s)) return null;
           if (/^https?:\/\//i.test(s)) return s;
@@ -4528,8 +4998,11 @@
         if (!cid || !this.search || this.replaceBusy) return;
         let re;
         try {
+          // (?i) at the start (the search, in PHP, understands it) becomes the 'i' flag here,
+          // where JavaScript would refuse it as an invalid group (review J10).
+          const ci = this.searchRegex && /^\(\?i\)/.test(this.search);
           re = this.searchRegex
-            ? new RegExp(this.search, 'g')
+            ? new RegExp(ci ? this.search.slice(4) : this.search, ci ? 'gim' : 'gm')
             : new RegExp(this.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
         } catch (e) { alert(T('Invalid regular expression') + ': ' + (e.message || e)); return; }
         const repl = this.replaceWith != null ? String(this.replaceWith) : '';
@@ -4544,10 +5017,10 @@
             re.lastIndex = 0;
             if (re.test(v)) { re.lastIndex = 0; nd[f.key] = v.replace(re, repl); hit = true; }
           }
-          if (hit) targets.push({ id: r.id, data: nd });
+          if (hit) targets.push({ id: r.id, data: nd, _base: r.updated_at || '' });
         }
         if (!targets.length) { this.showToast(T('No matches to replace')); return; }
-        if (!confirm(T('Replace in {n} record(s)? This can be undone from snapshots.', { n: targets.length }))) return;
+        if (!confirm(TN('Replace in {n} record(s)? This can be undone from snapshots.', targets.length, 'Replace in {n} record? This can be undone from snapshots.', 'Replace in {n} records? This can be undone from snapshots.'))) return;
         this.replaceBusy = true;
         const grp = 'replace-' + cid + '-' + (this.uidCounter++);
         try {
@@ -4555,7 +5028,9 @@
           // single pass, instead of one HTTP round-trip per record.
           const r = await api('collections/' + cid + '/records/bulk', { method: 'POST', body: JSON.stringify({ updates: targets, _undoGroup: grp }) });
           const n = (r && typeof r.updated === 'number') ? r.updated : targets.length;
-          this.showToast(T('Replaced in {n} record(s)', { n }));
+          this.showToast(TN('Replaced in {n} record(s)', n, 'Replaced in {n} record', 'Replaced in {n} records'));
+          // records somebody saved after the list was loaded are left as they are (review J18)
+          if (r && r.conflicts) alert(T('Somebody else saved this record after you opened it.') + ' (' + r.conflicts + ')');
           await this.loadRecords();
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
         finally { this.replaceBusy = false; }

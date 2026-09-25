@@ -23,7 +23,7 @@ class FindRecords extends Base {
 
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$c = $this->resolveCollection($input);
-		$key = $this->secretKey($c->getUserId(), $input, $output);
+		$key = $this->collectionKey($this->secretKey($c->getUserId(), $input, $output), $c);
 		$rawQuery = (string)$input->getArgument('query');
 		$regex = (bool)$input->getOption('regex');
 		$re = null;
@@ -52,10 +52,10 @@ class FindRecords extends Base {
 			$data = json_decode($r->getData() ?: '{}', true) ?: [];
 			foreach ($fields as $f) {
 				// Secret fields are only searchable once revealed.
-				if ($f->getSecret() && $key === null) {
+				if ($f->getSecret() && !$input->getOption('reveal')) {
 					continue;
 				}
-				$val = $this->reveal($key, $data[$f->getFieldKey()] ?? '');
+				$val = $this->reveal($key, $data[$f->getFieldKey()] ?? '', (bool)$f->getSecret());
 				if ($val !== null && $val !== '' && $match($val)) {
 					$table->addRow([
 						$r->getId(),

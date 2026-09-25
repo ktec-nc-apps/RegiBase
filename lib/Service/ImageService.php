@@ -113,10 +113,32 @@ class ImageService {
 		return mb_substr($name, 0, 120);
 	}
 
-	/** Allow a multi-segment relative base path (e.g. "書類/RegiBase"). */
+	/**
+	 * Allow a multi-segment relative base path (e.g. "書類/RegiBase"). Empty segments
+	 * ("", a leading or trailing "/", "a//b", "..") are dropped before each name is made
+	 * safe: sanitizeName('') is 'Collection', so they used to turn into a folder of that
+	 * name ("/RegiBase" became "Collection/RegiBase", an empty setting "Collection") (review P11).
+	 */
 	private function sanitizePath(string $path): string {
-		$parts = array_filter(array_map([$this, 'sanitizeName'], explode('/', str_replace('\\', '/', $path))), fn ($p) => $p !== '');
+		$parts = [];
+		foreach (explode('/', str_replace('\\', '/', $path)) as $seg) {
+			if (trim($seg, " \t.") !== '') {
+				$parts[] = $this->sanitizeName($seg);
+			}
+		}
 		return implode('/', $parts);
+	}
+
+	/** Whether $path is a folder inside (not the same as) the user's RegiBase save folder (review P18). */
+	public function isInsideBase(string $userId, string $path): bool {
+		$path = $this->sanitizePath(trim($path));
+		$base = $this->getBaseFolder($userId);
+		return $path !== '' && str_starts_with($path . '/', $base . '/') && $path !== $base;
+	}
+
+	/** The folder path as it will be used in Files, so the stored value is that same path (review P11). */
+	public function normalizePath(string $path): string {
+		return $this->sanitizePath(trim($path));
 	}
 
 	/** Ensure a multi-segment Files-relative folder exists (e.g. "RegiBase/Cards"); returns it. */
@@ -223,6 +245,9 @@ class ImageService {
 	 * Only the user's own image files are served.
 	 * @return array{content: string, mime: string}|null
 	 */
+	/** Image types the image endpoint shows (review P17). */
+	private const DISPLAY_MIME = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/bmp'];
+
 	public function resolve(string $userId, string $id): ?array {
 		if (!preg_match('/^\d+$/', $id)) {
 			return null;
@@ -238,8 +263,10 @@ class ImageService {
 			return null;
 		}
 		$mime = $node->getMimeType();
-		if (strpos($mime, 'image/') !== 0) {
-			return null; // never stream non-image user files through this endpoint
+		// Only picture formats: an SVG is a document that can carry script, and it came back
+		// here to be shown as it was (review P17). Pictures are uploaded as PNG / JPEG / WebP.
+		if (!in_array($mime, self::DISPLAY_MIME, true)) {
+			return null; // never stream other user files through this endpoint
 		}
 		return ['content' => $node->getContent(), 'mime' => $mime];
 	}
@@ -316,8 +343,42 @@ class ImageService {
 		}
 	}
 
-	/** Save raw bytes under the base folder's "_restored" subfolder; returns the new fileId (used by restore). */
-	public function saveRaw(string $userId, string $name, string $content): int {
+	/**
+	 * Copy file $id into the local file $dest a chunk at a time and return its name, or
+	 * null when it cannot be read. A backup no longer holds every attachment in memory
+	 * at once (review K11).
+	 */
+	public function copyToLocal(string $userId, string $id, string $dest): ?string {
+		$node = $this->nodeById($userId, $id);
+		if ($node === null) {
+			return null;
+		}
+		try {
+			$in = $node->fopen('r');
+			if (!is_resource($in)) {
+				return null;
+			}
+			$out = fopen($dest, 'wb');
+			if ($out === false) {
+				fclose($in);
+				return null;
+			}
+			$ok = stream_copy_to_stream($in, $out) !== false;
+			fclose($in);
+			fclose($out);
+			return $ok ? $node->getName() : null;
+		} catch (\Throwable $e) {
+			return null;
+		}
+	}
+
+	/**
+	 * Save bytes under the base folder's "_restored" subfolder; returns the new fileId (used
+	 * by restore). $content is a string or a readable stream.
+	 *
+	 * @param string|resource $content
+	 */
+	public function saveRaw(string $userId, string $name, $content): int {
 		$name = $this->safeFilename($name);
 		if ($name === '') {
 			$name = 'file';
@@ -338,6 +399,28 @@ class ImageService {
 			return $dir->newFile($fname, $content)->getId();
 		} catch (NotPermittedException $e) {
 			throw new \RuntimeException('Cannot write to the destination folder');
+		}
+	}
+
+	/** Whether $userId can open file $id in their own Files. */
+	/**
+	 * Whether $userId may put file $id into a record: a file of their own, or one shared with
+	 * them that they may share on. A file shared without that right, attached to a shared
+	 * collection, reached every recipient of it, around Nextcloud's reshare rule (review, second look).
+	 */
+	public function canRead(string $userId, string $id): bool {
+		$node = $this->nodeById($userId, $id);
+		if ($node === null) {
+			return false;
+		}
+		try {
+			$owner = $node->getOwner();
+			if ($owner !== null && $owner->getUID() === $userId) {
+				return true;
+			}
+			return ($node->getPermissions() & \OCP\Constants::PERMISSION_SHARE) !== 0;
+		} catch (\Throwable $e) {
+			return false;
 		}
 	}
 
@@ -446,7 +529,17 @@ class ImageService {
 	 * (i.e. it lives under the user's RegiBase base folder). Files that were
 	 * merely referenced (picked existing files / Notes notes) are left alone.
 	 */
-	public function trashIfOwned(string $userId, string $id): bool {
+	/**
+	 * Move an attachment to the trash, but only one inside $folder, the save folder of the
+	 * collection it was attached in. It used to be anything under the RegiBase base folder, so
+	 * an id put into a record by somebody it was shared with could send the owner's attachment
+	 * of another collection to the trash (review P8).
+	 */
+	public function trashIfOwned(string $userId, string $id, string $folder): bool {
+		$folder = trim($this->sanitizePath($folder), '/');
+		if ($folder === '') {
+			return false;
+		}
 		$node = $this->nodeById($userId, $id);
 		if ($node === null) {
 			return false;
@@ -461,9 +554,8 @@ class ImageService {
 			return false;
 		}
 		$rel = ltrim($rel, '/');
-		$base = $this->getBaseFolder($userId);
-		if ($rel !== $base && strpos($rel, $base . '/') !== 0) {
-			return false; // outside RegiBase folder -> just a reference, keep it
+		if (strpos($rel, $folder . '/') !== 0) {
+			return false; // outside this collection's folder -> just a reference, keep it
 		}
 		try {
 			$node->delete(); // goes to Nextcloud trash (trashbin app)

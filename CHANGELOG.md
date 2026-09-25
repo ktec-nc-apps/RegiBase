@@ -2,6 +2,144 @@
 
 All notable changes to RegiBase.
 
+## 0.20.0 — 2026-09-25
+
+A release of fixes. Every part of RegiBase was reviewed line by line — the page, the server,
+encryption, sharing, backup and restore — and everything the review found is fixed here. Several
+of the fixes close security gaps, so **updating is recommended for every installation**.
+（修正の版。画面・サーバー・暗号化・共有・バックアップと復元のすべてを一行ずつ点検し、
+見つかったものをすべて直した。安全に関わる直しを含むので、**すべての環境で更新を勧める**。）
+
+### Security
+
+- **Shared collections are more tightly confined.** Undo, version history, attachments and bulk
+  edits now respect the share's permission level, its edit lock and its removal; an editor can
+  only write the collection's own fields, and can attach only files they own or may reshare.
+  A hidden (secret) collection can no longer be opened by its id without the 6-digit key.
+  （共有されたコレクションの扱いを厳しくした。取り消し・版・添付・一括編集が、共有の権限・
+  編集ロック・共有の解除に従う。編集者は今ある欄にだけ書け、添付できるのは自分のファイルか
+  再共有できるファイルだけ。隠しコレクションは、6 桁のキーなしでは ID を指定しても開けない。）
+- **Sharing follows your Nextcloud sharing settings** — sharing off, group sharing off, "only
+  with members of your own groups" and excluded groups — when searching for people, when
+  sharing, and when restoring a backup. If the administrator tightens those settings later, a
+  share they no longer allow is paused (it cannot be listed or opened) until they allow it
+  again; the owner sees it marked **⏸ Paused**.
+  （共有は Nextcloud の共有設定に従う — 相手の検索・共有・バックアップの復元のいずれでも。
+  管理者が後から設定を厳しくすると、合わなくなった共有は、合わない間は使えない（一覧に出ず、
+  開けない）。オーナーの画面には **⏸ 停止中** と出る。設定を戻せば元どおり使える。）
+- **Repeated wrong passwords are slowed down** — for the backup password, share passwords and
+  the secret-collection key.
+  （バックアップのパスワード・共有パスワード・隠しコレクションのキーを何度も間違えると、
+  間隔を空けないと試せない。）
+- **An unlocked share is tied to that share and its password**: changing the share password
+  or sharing again locks it.
+  （共有の解錠は、その共有とパスワードに結びつく。共有パスワードの変更や再共有で解錠は解ける。）
+- Deleting a user or group now removes their shares, so a new account with the same name
+  does not inherit them. Images are served only in image formats (no SVG). Reading a
+  collection no longer creates folders, and "delete the folder too" only ever removes folders
+  under RegiBase's own save folder.
+  （ユーザーやグループを削除すると、その共有も消える。同じ名前で作り直したアカウントが
+  共有を引き継がない。画像は画像形式だけで返す（SVG は返さない）。コレクションを読むだけでは
+  フォルダを作らず、「フォルダも削除」は RegiBase の保存先の中のフォルダだけを対象にする。）
+
+### Encryption
+
+- **Secret fields shared with others no longer use your own key.** A share carries the
+  collection's own key, wrapped with the share password, and the share password itself never
+  reaches the server.
+  （秘密項目を共有するとき、自分の鍵そのものではなく、コレクション専用の鍵を共有パスワードで
+  包んで渡す。共有パスワードそのものはサーバーに届かない。）
+- **Changing or removing the master key now covers everything** — hidden collections, record
+  versions and the undo history included — and is all-or-nothing: if anything cannot be
+  converted, nothing is changed.
+  （マスターキーの変更・解除が、隠しコレクション・レコードの版・取り消しの履歴まで含めて
+  すべてに及ぶ。一つでも変換できなければ、何も変えない。）
+- **New or changed master keys must be at least 8 characters** and are strengthened with
+  600,000 PBKDF2 rounds (was 250,000). **Your current master key keeps working unchanged.**
+  （新しく設定・変更するマスターキーは 8 文字以上。PBKDF2 は 60 万回（これまでは 25 万回）。
+  **今のマスターキーはそのまま使える。**）
+- The remembered key is kept in the browser in a form that cannot be read out, per device and
+  per login; a device where encryption is off no longer keeps an old key.
+  （記憶した鍵は、ブラウザの中で取り出せない形で、端末ごと・ログインごとに持つ。暗号化を
+  切った端末には古い鍵を残さない。）
+- A failed decryption no longer overwrites the secret value when the record is saved.
+  （復号に失敗したレコードを保存しても、秘密の値を上書きしない。）
+
+### Backup and restore
+
+- **A backup can have a password of its own**, instead of your login password. Restoring
+  always asks for your login password first (and the archive's own password, if it has one).
+  （**バックアップに専用のパスワードを付けられる**。付けない場合はこれまでどおりログイン
+  パスワード。復元では、まずログインパスワードで本人確認をする（専用のパスワードがあれば、それも）。）
+- Backup and restore stream the data instead of loading it all into memory, so large
+  attachments no longer fail.
+  （バックアップと復元は、全部をメモリに載せずに流して処理する。大きな添付でも失敗しない。）
+- A backup now also brings back settings, shares, templates, hidden collections and the date
+  each record was created. An overwrite restore checks the archive first and changes nothing
+  if it is not whole; if saving an attachment fails, the files already saved are cleaned up.
+  （設定・共有・テンプレート・隠しコレクション・レコードの登録日も戻る。上書きの復元は、
+  先に中身を確かめ、欠けていれば何も変えない。添付の保存に失敗したら、保存した分を片付ける。）
+- Merge and add match fields by name and type (secret fields only with secret fields), refuse
+  a backup made with a different master key, and never merge into a locked collection.
+  （統合・追加は、欄を名前と型で合わせる（秘密の欄は秘密の欄とだけ）。別のマスターキーの
+  バックアップは断り、ロック中のコレクションには統合しない。）
+
+### Editing records
+
+- **Two people editing the same record no longer overwrite each other silently**: the later
+  save is stopped and you are asked what to do. Replace-all skips records someone else has
+  saved since you loaded them, and tells you how many.
+  （同じレコードを 2 人が編集しても、黙って上書きしない。後から保存した側には確認を出す。
+  一括置換は、読み込んだ後にほかの人が保存したレコードを飛ばし、その件数を知らせる。）
+- Decimal numbers, URLs without `https://` and e-mail addresses with international domains
+  can be saved. Phone fields accept `#`, `*` and full-width hyphens. Only the fields you changed
+  are checked against the input rules, and the server now checks them too.
+  （数値欄の小数、`https://` のない URL、日本語ドメインのメールを保存できる。電話欄は
+  `#`・`*`・全角のハイフンを受け付ける。入力規則で確かめるのは変えた欄だけで、サーバーでも確かめる。）
+- Saving twice quickly no longer creates two records; switching collections quickly no longer
+  shows or edits the wrong records; checkbox values are kept; closing an editor with unsaved
+  changes asks first; failed saves are reported.
+  （保存の連打で 2 件できない。コレクションをすばやく切り替えても、別のレコードを表示・
+  編集しない。チェックボックスの値が消えない。未保存のまま閉じると確認する。保存の失敗を知らせる。）
+- Saving a template, or editing one, keeps its view and join settings. Bulk edits keep record
+  versions.
+  （テンプレートの保存・編集で、表示設定と連結設定が消えない。一括編集でも版を残す。）
+
+### Search and import
+
+- Normal search looks only in the values; regular-expression search has help that matches what
+  it does, and an invalid or too-heavy pattern is reported instead of matching everything.
+  （通常の検索は値だけを探す。正規表現の検索は、ヘルプを実際の動きに合わせ、誤ったパターンや
+  重すぎるパターンは、全件を返さずに知らせる。）
+- CSV import reads Shift_JIS files (Excel's Japanese CSV) and detects `,` `;` or tab
+  separators. Columns whose headings would give the same key are no longer overwritten.
+  Contacts import keeps second and later phone numbers, e-mails and birthdays without a year
+  (in the notes); JSON import keeps large whole numbers exactly.
+  （CSV の取り込みは Shift_JIS（Excel の日本語 CSV）を読み、区切り（`,` `;` タブ）を判断する。
+  見出しから同じキーになる列を上書きしない。連絡先の 2 件目以降の電話・メールと、年のない
+  誕生日はメモに残す。JSON の大きな整数を丸めない。）
+
+### Other
+
+- `occ` commands mask secret fields unless `--reveal` is given (also for accounts without
+  encryption), and `regibase:master` no longer leaves data half-converted.
+  （`occ` は `--reveal` がなければ秘密項目を伏せる（暗号化していないアカウントでも）。
+  `regibase:master` がデータを変換途中で残さない。）
+- Error responses no longer show internal messages; names, icons and colours are checked
+  against what the database and the page can hold.
+  （エラーの応答に内部のメッセージを出さない。名前・アイコン・色は、データベースと画面に
+  合う長さと形だけを受け付ける。）
+- **21 languages**: Portuguese now comes as **Brazilian Portuguese** and **European
+  Portuguese** (the previous "Português" was Brazilian and stays selected). All languages were
+  reviewed by a second translator, and counts use the right singular or plural form in every
+  language (for example "1 Eintrag" / "2 Einträge", or the one / few / many forms of Russian, Polish
+  and Czech).
+  （**21 言語**。ポルトガル語は **ブラジル** と **ポルトガル** の 2 つになった（これまでの
+  「Português」はブラジル版で、選んでいた人はそのまま）。全言語の訳を見直し、件数の単数・複数を全言語で正した（ドイツ語の「1 Eintrag／2 Einträge」、
+  ロシア語・ポーランド語・チェコ語の数による形の違いなど）。）
+- The unused full build of Vue is no longer shipped.
+  （使っていない Vue のフルビルドを同梱しない。）
+
 ## 0.19.2 — 2026-09-17
 
 ### Changed
