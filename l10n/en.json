@@ -962,7 +962,19 @@
         "Master key (8+ characters)": "Master key (8+ characters)",
         "New master key (8+ characters)": "New master key (8+ characters)",
         "Paused": "Paused",
-        "The sharing settings of the administrator no longer allow this share. It works again when they allow it.": "The sharing settings of the administrator no longer allow this share. It works again when they allow it."
+        "The sharing settings of the administrator no longer allow this share. It works again when they allow it.": "The sharing settings of the administrator no longer allow this share. It works again when they allow it.",
+        "Open versions": "Open versions",
+        "{n} versions": "{n} versions",
+        "{n} version": "{n} version",
+        "Every change and deletion in this collection is kept as a snapshot, with no limit. A version begins when a record is first changed or deleted, and holds everything done until the browser is closed or you sign out. Putting the collection back to before a version clears its snapshots.": "Every change and deletion in this collection is kept as a snapshot, with no limit. A version begins when a record is first changed or deleted, and holds everything done until the browser is closed or you sign out. Putting the collection back to before a version clears its snapshots.",
+        "No versions yet. One begins when a record is changed or deleted.": "No versions yet. One begins when a record is changed or deleted.",
+        "Changed {c} · deleted {d} · added {a}": "Changed {c} · deleted {d} · added {a}",
+        "Fields changed": "Fields changed",
+        "This session": "This session",
+        "Back to before this": "Back to before this",
+        "Put the collection back to how it was before this version ({when})? Every newer version goes back too, and the snapshots of this collection are cleared.": "Put the collection back to how it was before this version ({when})? Every newer version goes back too, and the snapshots of this collection are cleared.",
+        "Put back: {n} records": "Put back: {n} records",
+        "Move %s records to “%s” (deleted here)": "Move %s records to “%s” (deleted here)"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

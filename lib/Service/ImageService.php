@@ -565,6 +565,80 @@ class ImageService {
 		}
 	}
 
+	/** Where a collection keeps the attachments of what was deleted or replaced. */
+	public const HOLD = '.snapshot';
+
+	/**
+	 * Keep an attachment instead of trashing it (owner, 2026-09-29): the attachment of
+	 * a record that was deleted, or one that an edit replaced, goes to a hidden folder
+	 * inside the collection's folder, where it keeps its file id. Putting the record
+	 * back with a snapshot or a version then finds the very same file, and it is moved
+	 * back beside the others. Only a file inside $folder is held, as with trashing.
+	 */
+	public function holdIfOwned(string $userId, string $id, string $folder): bool {
+		$folder = trim($this->sanitizePath($folder), '/');
+		$node = $folder === '' ? null : $this->nodeById($userId, $id);
+		if ($node === null) {
+			return false;
+		}
+		try {
+			$userFolder = $this->rootFolder->getUserFolder($userId);
+			$rel = ltrim((string)$userFolder->getRelativePath($node->getPath()), '/');
+			if (strpos($rel, $folder . '/') !== 0 || strpos($rel, $folder . '/' . self::HOLD . '/') === 0) {
+				return false;
+			}
+			$hold = $userFolder->nodeExists($folder . '/' . self::HOLD)
+				? $userFolder->get($folder . '/' . self::HOLD)
+				: $userFolder->newFolder($folder . '/' . self::HOLD);
+			$node->move($hold->getPath() . '/' . $node->getId() . '-' . $node->getName());
+			return true;
+		} catch (\Throwable $e) {
+			return false;
+		}
+	}
+
+	/** Put a held attachment back beside the others in $folder (its own name, made unique). */
+	public function unholdIfHeld(string $userId, string $id, string $folder): bool {
+		$folder = trim($this->sanitizePath($folder), '/');
+		$node = $folder === '' ? null : $this->nodeById($userId, $id);
+		if ($node === null) {
+			return false;
+		}
+		try {
+			$userFolder = $this->rootFolder->getUserFolder($userId);
+			$rel = ltrim((string)$userFolder->getRelativePath($node->getPath()), '/');
+			if (strpos($rel, $folder . '/' . self::HOLD . '/') !== 0) {
+				return false;
+			}
+			$name = preg_replace('/^\d+-/', '', $node->getName());
+			$dot = strrpos($name, '.');
+			$base = $dot ? substr($name, 0, $dot) : $name;
+			$ext = $dot ? substr($name, $dot) : '';
+			$try = $name;
+			for ($i = 2; $userFolder->nodeExists($folder . '/' . $try); $i++) {
+				$try = $base . ' (' . $i . ')' . $ext;
+			}
+			$node->move($userFolder->getPath() . '/' . $folder . '/' . $try);
+			return true;
+		} catch (\Throwable $e) {
+			return false;
+		}
+	}
+
+	/** @return string[] the ids of the attachments held for a collection */
+	public function heldIds(string $userId, string $folder): array {
+		$folder = trim($this->sanitizePath($folder), '/');
+		try {
+			$userFolder = $this->rootFolder->getUserFolder($userId);
+			if ($folder === '' || !$userFolder->nodeExists($folder . '/' . self::HOLD)) {
+				return [];
+			}
+			return array_map(fn ($n) => (string)$n->getId(), $userFolder->get($folder . '/' . self::HOLD)->getDirectoryListing());
+		} catch (\Throwable $e) {
+			return [];
+		}
+	}
+
 	/**
 	 * Resolve an attached file for download (documents + notes only).
 	 * @return array{content:string,mime:string,name:string}|null

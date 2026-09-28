@@ -56,6 +56,9 @@ return [
 
 		// undo / change history
 		['name' => 'api#history', 'url' => '/api/history', 'verb' => 'GET'],
+		// versions by session (owner, 2026-09-29)
+		['name' => 'api#sessionVersions', 'url' => '/api/collections/{id}/sessions', 'verb' => 'GET'],
+		['name' => 'api#restoreSessionVersion', 'url' => '/api/collections/{id}/sessions/{vid}/restore', 'verb' => 'POST'],
 		['name' => 'api#undo', 'url' => '/api/history/undo', 'verb' => 'POST'],
 		['name' => 'api#clearHistory', 'url' => '/api/history', 'verb' => 'DELETE'],
 

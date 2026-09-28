@@ -36,10 +36,6 @@ fields you set up yourself.
   your master key or the plaintext. The master key is at least 8 characters and is
   strengthened with 600,000 PBKDF2 rounds. *Forgetting the master key means the data
   cannot be recovered.*
-- **Password-protected backup & restore** — download all data (collections,
-  records, settings, shares, templates, attachments) as an **AES-256 encrypted ZIP**,
-  protected by your login password or by a password of its own, and restore it later
-  (overwrite / merge / add). Large attachments are streamed, not held in memory.
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
 - **Attachments** — attach images and files from **Nextcloud Files** or **Notes**. Each collection
@@ -50,9 +46,24 @@ fields you set up yourself.
 - **Organise** — move, copy or merge records between collections.
 - **Duplicate a collection** — copy just the fields, or the whole thing **including
   its records**.
-- **Version history** — keep the last few versions of each record and **put any one back**
-  (like EditBase's document versions). Separate from Snapshots; how many to keep and when they
-  are taken are set in **Settings**.
+- **Three layers of protection against losing data**
+  1. **Snapshots** — every change and every deletion in a collection is kept, with no limit.
+     Undo the last one (Ctrl+Z) or go back to any earlier point. A move is kept in both
+     collections, because from the one a record left, a moved record is a deleted record. The
+     attachment of a deleted record, and one an edit replaced, is kept in a hidden `.snapshot`
+     folder inside the collection's folder, and comes back with the record.
+  2. **Versions by session** — a version begins when a record is first changed or deleted, and
+     holds everything done until the browser is closed or you sign out. A collection can be put
+     back to how it was before any version: changed records get their contents back, deleted and
+     moved records come back (and leave the collection they were moved to), records added in it
+     go, and changed fields are put back. Putting a version back clears the collection's
+     snapshots, since they describe changes that are no longer there.
+  3. **Password-protected backup** — download all data (collections, records, settings, shares,
+     templates, attachments) as an **AES-256 encrypted ZIP**, protected by your login password or
+     by a password of its own. Restoring it with **overwrite** returns everything to the state it
+     was backed up in, and clears the snapshots, the versions and the held attachments of what was
+     there before; **merge** and **add** keep what is there. Large attachments are streamed, not
+     held in memory.
 - **Collection sharing** — share with other Nextcloud users at three levels
   (**view / edit / delete**), with an optional access password and optional
   secret-field sharing. Sharing follows your Nextcloud sharing settings; a share they no
@@ -146,10 +157,6 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   ブラウザ内で **AES-GCM** により暗号化されます。サーバーはマスターキーも平文も一切見ません。
   マスターキーは 8 文字以上で、PBKDF2 60 万回で強化します。
   *マスターキーを忘れるとデータは復元できません。*
-- **パスワード付きバックアップ／復元** — 全データ（コレクション・レコード・設定・共有・
-  テンプレート・添付）を **AES-256 暗号化 ZIP** でダウンロードし、あとから復元（上書き／マージ／
-  追加）できます。ZIP のパスワードは、ログインパスワードか、専用のパスワードを選べます。
-  大きな添付も、メモリに載せずに処理します。
 - **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
   **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
 - **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。コレクションごとに
@@ -158,9 +165,22 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   確認します（データはそのまま残ります）。コレクションを削除する際は、保存先フォルダをゴミ箱へ移動することもできます。
 - **整理** — レコードをコレクション間で移動・コピー・マージできます。
 - **コレクションの複製** — 項目だけ、または**レコードごと**丸ごと複製できます。
-- **バージョン履歴** — レコードごとに直近数件のバージョンを保存し、いつでも**任意の版に戻せます**
-  （EditBase の文書バージョンと同じ考え方）。スナップショットとは別で、保存件数と保存タイミングは
-  **設定**で指定します。
+- **データを失わないための3重の保護**
+  1. **スナップショット** — コレクションでの変更と削除を、上限なくすべて残します。直前の1つを
+     元に戻す（Ctrl+Z）ことも、前の任意の時点まで戻すこともできます。移動は、移動元と移動先の
+     両方に残ります（移動元から見れば、移動は削除と同じだからです）。削除したレコードの添付や、
+     編集で差し替えた添付は、コレクションのフォルダー内の隠しフォルダー `.snapshot` に保管され、
+     レコードと一緒に戻ります。
+  2. **セッションごとのバージョン** — レコードを最初に変更または削除したときにバージョンが始まり、
+     ブラウザを閉じるかサインアウトするまでの作業がそのバージョンに入ります。どのバージョンの前の
+     状態にも、コレクションを戻せます。変更したレコードは元の中身に、削除・移動したレコードは元どおりに
+     （移動先からは消えます）、そのときに追加したレコードは取り除かれ、項目の設定も戻ります。
+     バージョンで戻すと、もう無い変更を指すことになるスナップショットは消去されます。
+  3. **パスワード付きバックアップ** — 全データ（コレクション・レコード・設定・共有・テンプレート・
+     添付）を **AES-256 暗号化 ZIP** でダウンロードできます。ZIP のパスワードは、ログインパスワードか
+     専用のパスワードを選べます。**上書き**で復元すると、すべてがバックアップした時点の状態に戻り、
+     それまでのスナップショット・バージョン・保管していた添付は消去されます。**マージ**と**追加**では、
+     今ある中身を残します。大きな添付も、メモリに載せずに処理します。
 - **コレクション共有** — 他の Nextcloud ユーザーと **閲覧 / 編集 / 削除** の3段階で共有。
   任意のアクセスパスワードや、秘密項目の共有にも対応します。共有は Nextcloud の共有設定に従い、
   設定に合わなくなった共有は、設定で許可されるまで停止します。

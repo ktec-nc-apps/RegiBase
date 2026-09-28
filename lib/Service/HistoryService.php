@@ -47,10 +47,10 @@ class HistoryService {
 
 	/** Append one inverse entry, then prune to the retention limit. */
 	public function record(string $userId, string $op, ?int $collectionId, string $summary, array $undo, ?string $grp = null): void {
-		$limit = $this->getLimit($userId);
-		if ($limit <= 0) {
-			return; // history disabled
-		}
+		// Every change and deletion in a collection is kept (owner, 2026-09-29): a
+		// count limit shared by all collections let one saved form of 29 records
+		// push a move out of another collection before anyone could undo it. They
+		// go when the collection is put back to an earlier version.
 		$e = new HistoryEntity();
 		$e->setUserId($userId);
 		$e->setOp($op);
@@ -61,13 +61,15 @@ class HistoryService {
 		$e->setUndone(false);
 		$e->setCreatedAt(gmdate('Y-m-d\TH:i:s\Z'));
 		$this->mapper->insert($e);
-		$this->mapper->pruneToLimit($userId, $limit);
 	}
 
 	/** @return array<int,array> history rows (json) newest first, optionally scoped to one collection */
 	public function listForUser(string $userId, ?int $collectionId = null): array {
-		$limit = max(self::DEFAULT_LIMIT, $this->getLimit($userId));
-		return array_map(fn (HistoryEntity $h) => $h->jsonSerialize(), $this->mapper->listForUser($userId, $limit, $collectionId));
+		return array_map(fn (HistoryEntity $h) => $h->jsonSerialize(), $this->mapper->listForUser($userId, 100000, $collectionId));
+	}
+
+	public function clearCollection(int $collectionId): void {
+		$this->mapper->deleteForCollection($collectionId);
 	}
 
 	public function clearForUser(string $userId, ?int $collectionId = null): void {

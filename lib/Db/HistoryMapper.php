@@ -104,4 +104,28 @@ class HistoryMapper extends QBMapper {
 		}
 		$qb->executeStatement();
 	}
+
+	/** Every snapshot of a collection, whoever made it, and the ones grouped with them elsewhere. */
+	public function deleteForCollection(int $collectionId): void {
+		// A move is kept in both collections as one group, and only one of the two
+		// carries the undo. Left in the other collection, it would undo a move the
+		// version already put back, and bring the records back a second time.
+		$g = $this->db->getQueryBuilder();
+		$g->selectDistinct('grp')->from($this->getTableName())
+			->where($g->expr()->eq('collection_id', $g->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)))
+			->andWhere($g->expr()->isNotNull('grp'));
+		$r = $g->executeQuery();
+		$grps = array_values(array_filter(array_column($r->fetchAll(), 'grp'), fn ($x) => (string)$x !== ''));
+		$r->closeCursor();
+		if ($grps) {
+			$d = $this->db->getQueryBuilder();
+			$d->delete($this->getTableName())
+				->where($d->expr()->in('grp', $d->createNamedParameter($grps, IQueryBuilder::PARAM_STR_ARRAY)));
+			$d->executeStatement();
+		}
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('collection_id', $qb->createNamedParameter($collectionId, IQueryBuilder::PARAM_INT)));
+		$qb->executeStatement();
+	}
 }

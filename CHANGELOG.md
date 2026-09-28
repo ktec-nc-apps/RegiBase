@@ -2,6 +2,48 @@
 
 All notable changes to RegiBase.
 
+## 0.20.3 — 2026-09-29
+
+Three layers of protection against losing data. A move made on 2026-09-27 could not be undone:
+snapshots were limited to a small number shared by every collection, one saved form rewrote each
+of its records as a snapshot of its own and pushed everything older out, and a move was only kept
+in the collection the records went to.
+（データを失わないための3重の保護。移動を元に戻せなかった件がきっかけ：スナップショットの件数が
+全コレクション共通の少ない上限で、項目の保存1回でレコードの数だけ記録されて古いものが押し出され、
+移動は移動先にしか残らなかった。）
+
+### Added
+
+- **Versions by session.** A version of a collection begins when a record is first changed or
+  deleted, and holds everything done until the browser is closed or the user signs out. Any
+  version can be put back: changed records get their contents back, deleted and moved records come
+  back (and leave the collection they were moved to), records added in it go, and changed fields
+  are put back. Open them from the collection's settings.
+  （セッションごとのバージョン。レコードを最初に変更・削除したときに始まり、ブラウザを閉じるか
+  サインアウトするまでの作業が入る。どのバージョンの前にも戻せる。コレクション設定から開く。）
+
+### Changed
+
+- **Snapshots keep every change and deletion in a collection, with no limit.** A move is kept in
+  both collections — from the one it left, a moved record is a deleted record — and undoing either
+  puts the records back.
+  （スナップショットは上限なく、コレクションの変更と削除をすべて残す。移動は移動元と移動先の両方に残る。）
+- **Attachments are kept, not trashed.** The attachment of a deleted record, and one an edit
+  replaced, goes to a hidden `.snapshot` folder inside the collection's folder, keeps its file id,
+  and comes back with the record. It goes to the trash only when nothing can bring it back any more.
+  （削除や編集で外れた添付は、ゴミ箱ではなく隠しフォルダー `.snapshot` に保管し、レコードと一緒に戻る。）
+- **Putting a version back clears the collection's snapshots**, and the other half of any move in
+  them, so nothing left can undo a change that is no longer there.
+  （バージョンで戻すと、そのコレクションのスナップショットと、対になった移動の記録も消去する。）
+- **Restoring a backup with "overwrite" returns everything to the backed-up state** and clears the
+  snapshots, the versions and the held attachments of what was there before. "Merge" and "add" keep
+  what is there.
+  （バックアップを「上書き」で復元すると、バックアップ時点の状態に戻り、それまでのスナップショット・
+  バージョン・保管していた添付を消去する。「マージ」「追加」では今の中身を残す。）
+- The per-record versions and the snapshot limit are no longer shown; the versions by session take
+  their place.
+  （レコードごとのバージョンとスナップショットの件数の設定は、表示しなくなった。）
+
 ## 0.20.0 — 2026-09-25
 
 A release of fixes. Every part of RegiBase was reviewed line by line — the page, the server,

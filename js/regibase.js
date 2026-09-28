@@ -67,9 +67,20 @@
   // memory only (never persisted); cleared on reload or when hiding again.
   let secretPins = new Set();
 
+  // Which browser session this is: a cookie with no expiry lives until the browser is
+  // closed. The server adds the Nextcloud sign-in to it, so a version of a collection
+  // runs until the browser is closed or the user signs out (owner, 2026-09-29).
+  function browserSession() {
+    const m = document.cookie.match(/(?:^|; )rb_session=([A-Za-z0-9-]{8,64})/);
+    if (m) return m[1];
+    const v = Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, '0')).join('');
+    document.cookie = 'rb_session=' + v + '; path=/; SameSite=Strict' + (location.protocol === 'https:' ? '; Secure' : '');
+    return v;
+  }
+
   async function api(path, opts = {}) {
     const res = await fetch(BASE + 'api/' + path, {
-      headers: { 'Content-Type': 'application/json', 'requesttoken': TOKEN },
+      headers: { 'Content-Type': 'application/json', 'requesttoken': TOKEN, 'X-RegiBase-Session': browserSession() },
       credentials: 'same-origin',
       ...opts,
     });
@@ -611,7 +622,7 @@
       </div>
       <div class="modal-foot">
         <button v-if="editingRecordId" type="button" class="btn danger" @click="deleteRecord({id:editingRecordId})">{{ t('Delete') }}</button>
-        <button v-if="editingRecordId" type="button" class="btn" @click="openVersions(editingRecordId)">🕐 {{ t('Versions') }}</button>
+        <button v-if="false" type="button" class="btn" @click="openVersions(editingRecordId)">🕐 {{ t('Versions') }}</button>
         <button type="button" class="btn" @click="closeRecordForm()">{{ t('Cancel') }}</button>
         <button type="submit" class="btn primary" :disabled="recordSaving">{{ t('Save') }}</button>
       </div>
@@ -646,7 +657,7 @@
         <button v-if="canDelete" class="btn danger" @click="deleteRecord(modal.rec)">{{ t('Delete') }}</button>
         <button class="btn" @click="copyRecord(modal.rec)">{{ t('⧉ Copy all') }}</button>
         <button v-if="isOwner && !isLocked" class="btn" @click="openTransfer(modal.rec)">{{ t('↔ Move / Copy') }}</button>
-        <button class="btn" @click="openVersions(modal.rec.id)">🕐 {{ t('Versions') }}</button>
+        <button v-if="false" class="btn" @click="openVersions(modal.rec.id)">🕐 {{ t('Versions') }}</button>
         <button v-if="canEdit" class="btn primary" @click="editRecord(modal.rec)">{{ t('Edit') }}</button>
       </div>
     </div>
@@ -1032,12 +1043,11 @@
             <button type="button" class="btn sm" @click="openHistory">↶ {{ t('Open snapshots') }}</button>
             <span v-if="history.length" style="font-size:12px;color:var(--muted)">{{ tn('{n} snapshots', history.length, '{n} snapshot') }}</span>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
-            <input type="number" min="0" max="1000" v-model.number="settingsForm.undo_limit" @change="saveSnapLimit" style="width:88px" />
-            <span style="font-size:13px;color:var(--muted)">{{ t('changes') }}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+            <button type="button" class="btn sm" @click="openSessVersions">🗂 {{ t('Open versions') }}</button>
+            <span v-if="sessVers.list.length" style="font-size:12px;color:var(--muted)">{{ tn('{n} versions', sessVers.list.length, '{n} version') }}</span>
           </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change to this collection is snapshotted. Open to review, undo the latest, or restore to an earlier point. Set 0 to turn snapshots off. (The keep limit applies to all collections.)') }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Every change and deletion in this collection is kept as a snapshot, with no limit. A version begins when a record is first changed or deleted, and holds everything done until the browser is closed or you sign out. Putting the collection back to before a version clears its snapshots.') }}</div>
         </div>
 
         <div class="field">
@@ -1330,7 +1340,7 @@
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.') }}</div>
         </div>
-        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+        <div v-if="false" class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <label>🕐 {{ t('Record versions') }}</label>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
@@ -1425,6 +1435,22 @@
   </div>
 
   <!-- スナップショット（コレクション単位の変更履歴） -->
+  <!-- Versions of a collection, by session (owner, 2026-09-29) -->
+  <div v-if="sessVers.open" class="modal-mask" @click.self="sessVers.open=false">
+    <div class="modal">
+      <div class="modal-head"><h3>🗂 {{ t('Versions') }}<span v-if="current" style="font-weight:400;font-size:14px;color:var(--muted)"> — {{ current.icon }} {{ current.name }}</span></h3><button class="icon-btn" @click="sessVers.open=false">✕</button></div>
+      <div class="modal-body">
+        <div v-if="!sessVers.list.length" class="empty"><p>{{ t('No versions yet. One begins when a record is changed or deleted.') }}</p></div>
+        <div v-else class="hist-list">
+          <div v-for="v in sessVers.list" :key="v.id" class="hist-row">
+            <span class="hist-when">{{ fmtHistTime(v.started_at) }} – {{ fmtHistTime(v.updated_at) }}</span>
+            <span class="hist-sum">{{ t('Changed {c} · deleted {d} · added {a}', { c: v.changed, d: v.deleted, a: v.added }) }}<span v-if="v.fields"> · {{ t('Fields changed') }}</span> <span v-if="v.current" class="hist-tag">{{ t('This session') }}</span></span>
+            <button class="btn xs" :disabled="busy" @click="restoreSessVersion(v)">↶ {{ t('Back to before this') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div v-if="modal && modal.type==='history'" class="modal-mask" @click.self="modal=null">
     <div class="modal">
       <div class="modal-head"><h3>🕐 {{ t('Snapshots') }}<span v-if="current" style="font-weight:400;font-size:14px;color:var(--muted)"> — {{ current.icon }} {{ current.name }}</span></h3><button class="icon-btn" @click="modal=null">✕</button></div>
@@ -1815,6 +1841,7 @@
         tableDrag: { active: false, startX: 0, startScroll: 0, el: null, pid: null },
         theme: 'auto',
         enc: { enabled: false, unlocked: false, salt: '', verifier: '', iter: 250000 },
+        sessVers: { open: false, list: [] },
         openDecrypted: {},
         // internal sharing (owner-side panel inside collection settings)
         sharePanel: { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: '', expires: '', shareSecrets: true, notice: '', err: '', busy: false },
@@ -3270,6 +3297,26 @@
         } catch (e) { alert(T('Failed to save') + ': ' + (e.message || e)); }
       },
       // ---- snapshots (per-collection change history / undo) ----
+      // ---- versions by session (owner, 2026-09-29) ----
+      async loadSessVersions() {
+        const cid = this.current && this.current.id;
+        if (!cid) { this.sessVers.list = []; return; }
+        try { const r = await api('collections/' + cid + '/sessions'); this.sessVers.list = r.versions || []; } catch (e) { this.sessVers.list = []; }
+      },
+      async openSessVersions() { this.sessVers.open = true; await this.loadSessVersions(); },
+      async restoreSessVersion(v) {
+        const cid = this.current && this.current.id;
+        if (!cid || this.busy) return;
+        if (!confirm(T('Put the collection back to how it was before this version ({when})? Every newer version goes back too, and the snapshots of this collection are cleared.', { when: this.fmtHistTime(v.started_at) }))) return;
+        this.busy = true;
+        try {
+          const r = await api('collections/' + cid + '/sessions/' + v.id + '/restore', { method: 'POST' });
+          this.showToast(T('Put back: {n} records', { n: r.records || 0 }));
+          await this.afterUndo(cid);
+          await this.loadSessVersions();
+        } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
+        finally { this.busy = false; }
+      },
       async refreshUndo() {
         try {
           const cid = this.current && this.current.id;
@@ -3580,6 +3627,7 @@
         this.shareExpanded = false;
         if (this.isOwner) this.loadShares();
         this.refreshUndo(); // load this collection's snapshot count
+        this.loadSessVersions();
         api('settings').then((s) => { if (s) this.settingsForm = s; }).catch(() => {}); // for the keep-limit field
       },
       // ---- icon (emoji) picker ----

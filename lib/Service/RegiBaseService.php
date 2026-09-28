@@ -55,6 +55,7 @@ class RegiBaseService {
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
 		private IShareManager $shareManager,
+		private VersionJournal $journal,
 	) {
 	}
 
@@ -245,7 +246,65 @@ class RegiBaseService {
 		foreach ($attachFields as $f) {
 			$v = $data[$f['key']] ?? '';
 			if ($v !== '' && $v !== null) {
-				$this->images->trashIfOwned($userId, (string)$v, $folder);
+				$this->images->holdIfOwned($userId, (string)$v, $folder);
+			}
+		}
+	}
+
+	/**
+	 * A record put back (a snapshot, a version): the attachments it names that were held
+	 * when it was deleted or edited go back beside the others (owner, 2026-09-29).
+	 */
+	private function unholdAttachments(int $collectionId, array $data): void {
+		try {
+			$c = $this->collections->findById($collectionId);
+		} catch (\Throwable $e) {
+			return;
+		}
+		$folder = (string)$c->getFilesFolder();
+		foreach ($this->attachmentFields($collectionId) as $f) {
+			$v = $data[$f['key']] ?? '';
+			if (is_scalar($v) && preg_match('/^\d+$/', (string)$v)) {
+				$this->images->unholdIfHeld((string)$c->getUserId(), (string)$v, $folder);
+			}
+		}
+	}
+
+	/**
+	 * The held attachments nothing can bring back any more -- no record names them and
+	 * no version keeps a record that does -- go to the trash. Called when a collection's
+	 * snapshots are cleared.
+	 */
+	private function purgeHeld(int $collectionId): void {
+		try {
+			$c = $this->collections->findById($collectionId);
+		} catch (\Throwable $e) {
+			return;
+		}
+		$owner = (string)$c->getUserId();
+		$folder = (string)$c->getFilesFolder();
+		$held = $this->images->heldIds($owner, $folder);
+		if (!$held) {
+			return;
+		}
+		$keys = array_map(fn ($f) => $f['key'], $this->attachmentFields($collectionId));
+		$used = [];
+		$note = function (array $d) use (&$used, $keys) {
+			foreach ($keys as $k) {
+				if (isset($d[$k]) && is_scalar($d[$k])) {
+					$used[(string)$d[$k]] = true;
+				}
+			}
+		};
+		foreach ($this->records->findForCollection($collectionId) as $r) {
+			$note(json_decode($r->getData() ?: '{}', true) ?: []);
+		}
+		foreach ($this->journal->heldData($collectionId) as $d) {
+			$note($d);
+		}
+		foreach ($held as $id) {
+			if (!isset($used[$id])) {
+				$this->images->trashIfOwned($owner, $id, $folder);
 			}
 		}
 	}
@@ -888,12 +947,105 @@ class RegiBaseService {
 
 	public function clearHistory(string $userId, ?int $collectionId = null): void {
 		$this->history->clearForUser($userId, $collectionId);
+		if ($collectionId !== null) {
+			$this->purgeHeld($collectionId);
+		}
 	}
 
 	/**
 	 * Revert the most recent change (or the whole most-recent grouped action).
 	 * @return array{undone:int, summary?:string, collection_id?:?int}
 	 */
+	/** The versions of a collection (owner only), newest first. */
+	public function sessionVersions(string $userId, int $collectionId): array {
+		$this->collections->findForUser($collectionId, $userId);
+		return $this->journal->listFor($collectionId);
+	}
+
+	/**
+	 * Put a collection back to how it was before a version began: the versions from
+	 * the newest down to that one are put back one by one, newest first. Records a
+	 * version changed get back what they had, records it deleted come back, records
+	 * it added go, and fields it changed are put back. The versions put back are
+	 * gone afterwards, and so are the snapshots of the collection (owner, 2026-09-29).
+	 */
+	public function restoreSessionVersion(string $userId, int $collectionId, int $versionId): array {
+		$c = $this->collections->findForUser($collectionId, $userId);
+		$this->assertEditable($c);
+		$vers = $this->journal->fromUp($collectionId, $versionId);
+		if (!$vers || (int)$vers[count($vers) - 1]['id'] !== $versionId) {
+			throw new DoesNotExistException('version not found');
+		}
+		$remap = [];
+		$put = 0;
+		$this->journal->suspend(true);
+		try {
+			foreach ($vers as $v) {
+				foreach ($v['items'] as $it) {
+					$rid = $remap[(int)$it['record_id']] ?? (int)$it['record_id'];
+					$cur = null;
+					try {
+						$cur = $this->records->find($rid);
+					} catch (DoesNotExistException $e) {
+						$cur = null;
+					}
+					if ($it['kind'] === 'new') {
+						if ($cur !== null && (int)$cur->getCollectionId() === $collectionId) {
+							$this->records->delete($cur);
+							$put++;
+						}
+						continue;
+					}
+					$pre = json_decode((string)$it['data'], true) ?: [];
+					// moved away in that version: the copy in the other collection goes,
+					// or putting the collection back would leave the record in both
+					if (!empty($pre['moved_to'])) {
+						try {
+							$copy = $this->records->find((int)$pre['moved_to']);
+							if ((int)$copy->getCollectionId() !== $collectionId) {
+								$this->records->delete($copy);
+							}
+						} catch (DoesNotExistException $e) {
+						}
+					}
+					if ($cur !== null && (int)$cur->getCollectionId() === $collectionId) {
+						$cur->setData((string)($pre['data'] ?? '{}'));
+						$cur->setReading((string)($pre['reading'] ?? ''));
+						$cur->setSort((int)($pre['sort'] ?? 0));
+						$cur->setUpdatedAt((string)($pre['updated_at'] ?? gmdate('Y-m-d\TH:i:s\Z')));
+						$this->records->update($cur);
+					} else {
+						$e = new RecordEntity();
+						$e->setCollectionId($collectionId);
+						$e->setData((string)($pre['data'] ?? '{}'));
+						$e->setReading((string)($pre['reading'] ?? ''));
+						$e->setSort((int)($pre['sort'] ?? 0));
+						$e->setCreatedAt((string)($pre['created_at'] ?? gmdate('Y-m-d\TH:i:s\Z')));
+						$e->setUpdatedAt((string)($pre['updated_at'] ?? gmdate('Y-m-d\TH:i:s\Z')));
+						$e = $this->records->insert($e);
+						$remap[(int)$it['record_id']] = (int)$e->getId();
+						$this->journal->renumber($collectionId, $rid, (int)$e->getId());
+					}
+					$this->unholdAttachments($collectionId, json_decode((string)($pre['data'] ?? '{}'), true) ?: []);
+					$put++;
+				}
+				if ($v['fields_before'] !== null && $v['fields_before'] !== '') {
+					$fields = json_decode((string)$v['fields_before'], true);
+					if (is_array($fields)) {
+						$this->fields->deleteForCollection($collectionId);
+						$this->restoreFields($collectionId, $fields);
+					}
+				}
+			}
+		} finally {
+			$this->journal->suspend(false);
+		}
+		$this->journal->dropFromUp($collectionId, $versionId);
+		$this->history->clearCollection($collectionId);
+		$this->purgeHeld($collectionId);
+		return ['records' => $put, 'versions' => count($vers)];
+	}
+
 	public function undo(string $userId, ?int $collectionId = null): array {
 		$batch = $this->history->nextUndoBatch($userId, $collectionId); // newest-first
 		if (!$batch) {
@@ -1005,6 +1157,7 @@ class RegiBaseService {
 				$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
 				$r->setUpdatedAt($this->now());
 				$this->records->update($r);
+				$this->unholdAttachments($cid, $data);
 				return $cid;
 			case 'reinsert':
 				$rec = is_array($p['record'] ?? null) ? $p['record'] : [];
@@ -1110,6 +1263,7 @@ class RegiBaseService {
 		$e->setCreatedAt((string)($rec['createdAt'] ?? $this->now()));
 		$e->setUpdatedAt($this->now());
 		$this->records->insert($e);
+		$this->unholdAttachments($cid, $data);
 		return $cid;
 	}
 
@@ -1219,6 +1373,7 @@ class RegiBaseService {
 	public function replaceFields(string $userId, int $id, array $fields, ?string $grp = null): array {
 		$this->assertEditable($this->collections->findForUser($id, $userId)); // ownership + not locked
 		$oldFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
+		$this->journal->fieldsBefore($id, $oldFields);
 		$this->rec($userId, 'fields.replace', $id, $this->l->t('Edit fields'), ['kind' => 'restore_fields', 'collectionId' => $id, 'fields' => $oldFields], $grp);
 		$this->fields->deleteForCollection($id);
 		$this->insertFields($id, $fields);
@@ -1608,7 +1763,7 @@ class RegiBaseService {
 				$old = $oldData[$f['key']] ?? '';
 				$new = $data[$f['key']] ?? '';
 				if ($old !== '' && (string)$old !== (string)$new) {
-					$this->images->trashIfOwned($userId, (string)$old, (string)$c->getFilesFolder());
+					$this->images->holdIfOwned($userId, (string)$old, (string)$c->getFilesFolder());
 				}
 			}
 		}
@@ -1755,7 +1910,7 @@ class RegiBaseService {
 				$old = $oldData[$f['key']] ?? '';
 				$new = $data[$f['key']] ?? '';
 				if ($old !== '' && (string)$old !== (string)$new) {
-					$this->images->trashIfOwned($userId, (string)$old, (string)$c->getFilesFolder());
+					$this->images->holdIfOwned($userId, (string)$old, (string)$c->getFilesFolder());
 				}
 			}
 			$n++;
@@ -1860,6 +2015,7 @@ class RegiBaseService {
 	public function appendFields(string $userId, int $collectionId, array $fields): array {
 		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // ownership + not locked
 		$existingFields = $this->fields->findForCollection($collectionId);
+		$this->journal->fieldsBefore($collectionId, array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields));
 		$this->rec($userId, 'fields.append', $collectionId, $this->l->t('Add fields'), ['kind' => 'restore_fields', 'collectionId' => $collectionId, 'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields)]);
 		$existing = [];
 		$maxSort = 0;
@@ -2037,9 +2193,25 @@ class RegiBaseService {
 				}
 			}
 		}
+		if ($mode === 'move') {
+			foreach ($moveIds as $i => $mid) {
+				if (isset($createdIds[$i])) {
+					$this->journal->movedTo($sourceId, (int)$mid, (int)$createdIds[$i]);
+				}
+			}
+		}
+		// Seen from the collection they left, moved records are deleted records: the
+		// move is kept there as well, and undoing either one puts them back (owner,
+		// 2026-09-29). The two entries are one group, and only one carries the undo.
+		$grp = $mode === 'move' ? ('xfer-' . bin2hex(random_bytes(8))) : null;
 		$this->rec($userId, 'record.transfer', $targetId,
 			$mode === 'move' ? $this->l->t('Move %s records', [count($createdIds)]) : $this->l->t('Copy %s records', [count($createdIds)]),
-			['kind' => 'undo_transfer', 'createdIds' => $createdIds, 'restore' => $movedBack]);
+			['kind' => 'undo_transfer', 'createdIds' => $createdIds, 'restore' => $movedBack], $grp);
+		if ($mode === 'move' && $sourceId !== $targetId) {
+			$this->rec($userId, 'record.transfer', $sourceId,
+				$this->l->t('Move %s records to “%s” (deleted here)', [count($createdIds), (string)$tgtEntity->getName()]),
+				['kind' => 'none'], $grp);
+		}
 		return ['count' => count($createdIds)];
 	}
 
@@ -2213,9 +2385,15 @@ class RegiBaseService {
 		// has been written (an overwrite that failed half way used to leave the records
 		// pointing at files already in the trash, review K16).
 		$oldAttachments = [];
+		$oldIds = [];
+		$oldFolders = [];
 		if ($mode === 'overwrite') {
 			foreach ($this->collections->findAllForUser($userId) as $c) {
 				$cid0 = (int)$c->getId();
+				$oldIds[] = $cid0;
+				if ((string)$c->getFilesFolder() !== '') {
+					$oldFolders[(string)$c->getFilesFolder()] = true;
+				}
 				$keys0 = $this->attachmentKeys(array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($cid0)));
 				foreach ($this->records->findForCollection($cid0) as $r) {
 					$d = json_decode($r->getData() ?: '{}', true) ?: [];
@@ -2227,6 +2405,10 @@ class RegiBaseService {
 				}
 				$this->deleteCollection($userId, $cid0, false, false);
 			}
+			// A backup put back in place of everything is the state to return to, and
+			// the snapshots and versions of what was there before would name
+			// collections and records that are gone: they go too (owner, 2026-09-29).
+			$this->journal->dropForCollections($oldIds);
 			$this->restoreTemplates($userId, is_array($struct['templates'] ?? null) ? $struct['templates'] : [], true);
 		} elseif (is_array($struct['templates'] ?? null)) {
 			$this->restoreTemplates($userId, $struct['templates'], false);
@@ -2346,7 +2528,12 @@ class RegiBaseService {
 				}
 			}
 		}
-		return ['collections' => $colCount, 'records' => $recCount, 'mode' => $mode, '_trash' => $oldAttachments];
+		if ($mode === 'overwrite') {
+			// Last, so that making the collections of the backup again leaves no
+			// snapshot either: undoing one would take the restored collection away.
+			$this->history->clearForUser($userId);
+		}
+		return ['collections' => $colCount, 'records' => $recCount, 'mode' => $mode, '_trash' => $oldAttachments, '_held' => array_keys($oldFolders)];
 	}
 
 	/**
@@ -2401,9 +2588,15 @@ class RegiBaseService {
 	}
 
 	/** Move to the trash the old attachments a finished overwrite restore no longer uses. */
-	public function trashAfterRestore(string $userId, array $oldAttachments): void {
+	public function trashAfterRestore(string $userId, array $oldAttachments, array $heldFolders = []): void {
 		foreach ($oldAttachments as $id => $folder) {
 			$this->images->trashIfOwned($userId, (string)$id, (string)$folder);
+		}
+		// and what was held for the snapshots and versions that went with the restore
+		foreach ($heldFolders as $folder) {
+			foreach ($this->images->heldIds($userId, (string)$folder) as $id) {
+				$this->images->trashIfOwned($userId, (string)$id, (string)$folder);
+			}
 		}
 	}
 

@@ -803,6 +803,28 @@ class ApiController extends Controller {
 	}
 
 	#[NoAdminRequired]
+	public function sessionVersions(int $id): JSONResponse {
+		try {
+			return new JSONResponse(['versions' => $this->service->sessionVersions($this->uid(), $id)]);
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
+	public function restoreSessionVersion(int $id, int $vid): JSONResponse {
+		try {
+			return new JSONResponse($this->service->restoreSessionVersion($this->uid(), $id, $vid));
+		} catch (LockedException $e) {
+			return $this->locked();
+		} catch (ForbiddenException $e) {
+			return $this->forbidden();
+		} catch (DoesNotExistException $e) {
+			return $this->notFound();
+		}
+	}
+
+	#[NoAdminRequired]
 	public function undo(): JSONResponse {
 		$cid = $this->request->getParam('collection');
 		$cid = ($cid !== null && $cid !== '') ? (int)$cid : null;
@@ -1356,8 +1378,8 @@ class ApiController extends Controller {
 			return new JSONResponse(['error' => $l->t('The restore could not be completed. Nothing was changed.')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 		// only now that it is all in: the old attachments nothing points at any more go to the trash
-		$this->service->trashAfterRestore($uid, $result['_trash'] ?? []);
-		unset($result['_trash']);
+		$this->service->trashAfterRestore($uid, $result['_trash'] ?? [], $result['_held'] ?? []);
+		unset($result['_trash'], $result['_held']);
 		$result['attachments_failed'] = $failedFiles;
 		return new JSONResponse($result);
 	}
