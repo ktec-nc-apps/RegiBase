@@ -93,5 +93,12 @@ return [
 		['name' => 'api#tablesList', 'url' => '/api/tables/list', 'verb' => 'GET'],
 		['name' => 'api#tablesImport', 'url' => '/api/tables/import', 'verb' => 'POST'],
 		['name' => 'api#tablesExport', 'url' => '/api/collections/{id}/tables-export', 'verb' => 'POST'],
+
+		// AI assistant (through AI-Hub)
+		['name' => 'ai#status', 'url' => '/api/ai/status', 'verb' => 'GET'],
+		['name' => 'ai#ask', 'url' => '/api/ai/ask', 'verb' => 'POST'],
+		['name' => 'ai#result', 'url' => '/api/ai/result/{id}', 'verb' => 'GET'],
+		['name' => 'ai#forget', 'url' => '/api/ai/forget', 'verb' => 'POST'],
+		['name' => 'ai#saveAdmin', 'url' => '/api/ai/admin', 'verb' => 'POST'],
 	],
 ];

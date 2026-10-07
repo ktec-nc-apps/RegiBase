@@ -23,6 +23,7 @@ Features:
 - Move / copy / merge records between collections
 - Password-protected full backup & restore (AES-256 ZIP)
 - Command-line access via occ — list / get / export / find (with regex), plus master-key management (set / change / remove) — with opt-in secret decryption
+- An AI assistant, through the AI-Hub app: a chat beside the open collection that answers in words and writes out what to type. It never sees the value of a secret field. Without AI-Hub it is simply not shown
 - Available in 21 languages (Portuguese in both Brazilian and European forms)]]></description>
 	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
 
@@ -43,8 +44,9 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 - レコードのコレクション間での移動・コピー・マージ
 - パスワード保護された全体バックアップ／復元（AES-256 ZIP）
 - occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
+- AI-Hub アプリを通した AI アシスタント。開いているコレクションの横のチャットが、答えを言葉で返し、入力すべきことを書き出します。秘密項目の値は見ません。AI-Hub が無ければ表示されません
 - 21言語対応（ポルトガル語はブラジルとポルトガルの両方）]]></description>
-	<version>0.20.3</version>
+	<version>0.21.0</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
@@ -64,6 +66,10 @@ RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files�
 	<dependencies>
 		<nextcloud min-version="30" max-version="35"/>
 	</dependencies>
+	<settings>
+		<admin>OCA\RegiBase\Settings\AiAdmin</admin>
+		<admin-section>OCA\RegiBase\Settings\AiSection</admin-section>
+	</settings>
 	<navigations>
 		<navigation>
 			<name>RegiBase</name>

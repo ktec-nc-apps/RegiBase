@@ -141,12 +141,115 @@ class RegiBaseService {
 		}
 	}
 
+	/** The session key under which a hidden collection is marked open (TemplateService checks it too). */
+	public static function secretOpenKey(int $collectionId): string {
+		return 'regibase_secret_ok_' . $collectionId;
+	}
 	/** A hidden collection whose 6-digit key was given in this session. */
 	private function secretOpen(int $collectionId): bool {
-		return $this->session->get('regibase_secret_ok_' . $collectionId) === true;
+		return $this->session->get(self::secretOpenKey($collectionId)) === true;
 	}
 	private function markSecretOpen(int $collectionId): void {
-		$this->session->set('regibase_secret_ok_' . $collectionId, true);
+		$this->session->set(self::secretOpenKey($collectionId), true);
+	}
+
+	/**
+	 * The user's own collection, for every owner-only path (settings, fields, shares, duplicate,
+	 * versions, transfer). A hidden (secret) collection is answered as "not found" until its
+	 * 6-digit key was given in this session, as resolve() answers: the owner paths used to take
+	 * findForUser() alone, so the key could be replaced, hiding switched off, or the collection
+	 * duplicated and shared without ever giving it (review).
+	 * @throws DoesNotExistException
+	 */
+	private function findOwned(string $userId, int $id): CollectionEntity {
+		$c = $this->collections->findForUser($id, $userId);
+		if ($c->getSecret() && !$this->secretOpen($id)) {
+			// answered as "not found": its very existence is what is kept hidden
+			throw new DoesNotExistException('no access to collection');
+		}
+		return $c;
+	}
+
+	/** $s cut to the length of its database column, as mb_substr() is used for key_sep_char. */
+	private static function cut($s, int $max): string {
+		return mb_substr((string)($s ?? ''), 0, $max);
+	}
+	// column lengths (lib/Migration): a longer value used to fail the insert with a 500 (review)
+	private const NAME_MAX = 255;
+	private const ICON_MAX = 64;
+	private const COLOR_MAX = 32;
+	private const FIELD_KEY_MAX = 191;
+	private const LABEL_MAX = 255;
+	private const TYPE_MAX = 24;
+	private const PLACEHOLDER_MAX = 255;
+
+	/**
+	 * Secret fields are the owner's. Somebody the collection is shared with gets a value only
+	 * when the share carries the collection key (enc_key) and the value is ciphertext they can
+	 * open with it. Plain text in a secret field (no master key set, an import not yet
+	 * encrypted) and every secret where no key was shared are left out of what they are sent:
+	 * the page's mask was only a mask, the API gave the value as it was (review). Every read
+	 * path (list, one record, a version, export; the search looks at the result) goes through here.
+	 */
+	private function hideSecrets(array $data, array $fieldsJson, bool $isOwner, ?ShareEntity $share): array {
+		if ($isOwner) {
+			return $data;
+		}
+		$hasKey = $share !== null && ($share->getEncKey() ?? '') !== '';
+		foreach ($fieldsJson as $f) {
+			$k = (string)$f['key'];
+			if (empty($f['secret']) || !array_key_exists($k, $data)) {
+				continue;
+			}
+			$v = $data[$k];
+			if (!$hasKey || !is_string($v) || !str_starts_with($v, 'rbenc1:')) {
+				unset($data[$k]);
+			}
+		}
+		return $data;
+	}
+
+	/**
+	 * What a recipient was not shown they cannot take away. A secret value hideSecrets() kept
+	 * from them stays as it is when their save leaves the field empty (their form never had it),
+	 * and without the collection key they cannot write a secret field at all (the page shows it
+	 * read-only). Applied to every write by somebody who is not the owner.
+	 */
+	private function keepHiddenSecrets(string $userId, CollectionEntity $c, ?ShareEntity $share, array $fieldsJson, array $new, array $old): array {
+		if ((string)$c->getUserId() === $userId) {
+			return $new;
+		}
+		$hasKey = $share !== null && ($share->getEncKey() ?? '') !== '';
+		$shown = $this->hideSecrets($old, $fieldsJson, false, $share);
+		foreach ($fieldsJson as $f) {
+			$k = (string)$f['key'];
+			if (empty($f['secret'])) {
+				continue;
+			}
+			$hadOld = isset($old[$k]) && $old[$k] !== '';
+			$newEmpty = !isset($new[$k]) || $new[$k] === '';
+			if (!$hasKey || ($hadOld && !array_key_exists($k, $shown) && $newEmpty)) {
+				if ($hadOld) {
+					$new[$k] = $old[$k];
+				} else {
+					unset($new[$k]);
+				}
+			}
+		}
+		return $new;
+	}
+
+	/**
+	 * The title for a history summary. The summary is stored and listed in plain, so a title
+	 * field marked secret is left out of it (its value, plain or ciphertext, went in; review).
+	 */
+	private function summaryTitle(array $fields, array $data): string {
+		foreach ($fields as $f) {
+			if (!empty($f['secret'])) {
+				unset($data[$f['key']]);
+			}
+		}
+		return $this->titleFor($fields, $data);
 	}
 
 	private function unlockKey(int $collectionId): string {
@@ -181,15 +284,10 @@ class RegiBaseService {
 	 */
 	private function resolve(string $userId, int $id): array {
 		try {
-			$c = $this->collections->findForUser($id, $userId);
 			// A hidden (secret) collection opens only after its 6-digit key was given in
 			// this session: it used to be left out of the list and nothing more, and
-			// asking for its id read it all (review P4).
-			if ($c->getSecret() && !$this->secretOpen($id)) {
-				// answered as "not found": its very existence is what is kept hidden
-				throw new DoesNotExistException('no access to collection');
-			}
-			return [$c, 'owner', true, null];
+			// asking for its id read it all (review P4). findOwned() answers "not found".
+			return [$this->findOwned($userId, $id), 'owner', true, null];
 		} catch (DoesNotExistException $e) {
 			// fall through: maybe it is shared to this user
 		}
@@ -464,8 +562,9 @@ class RegiBaseService {
 			// sending it: the salt of the value derived from it.
 			$j['auth_salt'] = $share->getAuthSalt();
 			$j['expires_at'] = $share->getExpiresAt();
-			// The owner's wrapped key is the owner's business only.
-			unset($j['key_wrap']);
+			// The owner's wrapped key is the owner's business only, and so is where in the
+			// owner's Files the attachments are kept (review).
+			unset($j['key_wrap'], $j['files_folder']);
 		}
 		return $j;
 	}
@@ -623,11 +722,24 @@ class RegiBaseService {
 		return $used;
 	}
 
-	/** The folder a new collection would use for this input: "<base>/<name>". */
+	/** The folder a new collection would use for this input: the one given, else "<base>/<name>". */
 	private function intendedFolderFor(string $userId, array $input, IL10N $l): string {
+		$given = $this->givenFolder($input);
+		if ($given !== '') {
+			return $given;
+		}
 		$tpl = isset($input['template_key']) ? Templates::byKey($l, (string)$input['template_key']) : null;
 		$name = (string)($input['name'] ?? ($tpl['name'] ?? $l->t('New collection')));
-		return $this->images->getBaseFolder($userId) . '/' . $name;
+		return $this->images->getBaseFolder($userId) . '/' . self::cut($name, self::NAME_MAX);
+	}
+
+	/**
+	 * A save folder named in the input of a new collection (a restore brings the collection's
+	 * own folder along), with the same checks as the one set in the collection's settings;
+	 * '' when none is named.
+	 */
+	private function givenFolder(array $input): string {
+		return is_string($input['files_folder'] ?? null) ? mb_substr($this->images->normalizePath($input['files_folder']), 0, 512) : '';
 	}
 
 	/**
@@ -666,10 +778,10 @@ class RegiBaseService {
 		$tpl = isset($input['template_key']) ? Templates::byKey($l, (string)$input['template_key']) : null;
 		$c = new CollectionEntity();
 		$c->setUserId($userId);
-		$c->setName($input['name'] ?? ($tpl['name'] ?? $l->t('New collection')));
-		$c->setIcon($input['icon'] ?? ($tpl['icon'] ?? '📁'));
-		$c->setColor($input['color'] ?? ($tpl['color'] ?? '#3b82f6'));
-		$c->setDescription($input['description'] ?? ($tpl['description'] ?? ''));
+		$c->setName(self::cut($input['name'] ?? ($tpl['name'] ?? $l->t('New collection')), self::NAME_MAX));
+		$c->setIcon(self::cut($input['icon'] ?? ($tpl['icon'] ?? '📁'), self::ICON_MAX));
+		$c->setColor(self::cut($input['color'] ?? ($tpl['color'] ?? '#3b82f6'), self::COLOR_MAX));
+		$c->setDescription((string)($input['description'] ?? ($tpl['description'] ?? '')));
 		// New collections default to the spreadsheet (table) view; callers that
 		// clone an existing collection (transfer/import) pass their own view.
 		$view = $input['view'] ?? 'table';
@@ -683,9 +795,12 @@ class RegiBaseService {
 		// caller chose "add a number" for a name that clashes with another
 		// collection's folder, pick the first free "<name> (n)" instead.
 		$base = $this->images->getBaseFolder($userId);
-		$c->setFilesFolder(((string)($input['folder_choice'] ?? '') === 'suffix')
+		// A folder named in the input (a restore: the collection's own folder) is taken as it
+		// is; the default "<base>/<name>" used to be made first and left behind empty (review).
+		$given = $this->givenFolder($input);
+		$c->setFilesFolder($given !== '' ? $given : (((string)($input['folder_choice'] ?? '') === 'suffix')
 			? $this->uniqueFolder($userId, $base, $c->getName())
-			: $base . '/' . $c->getName());
+			: $base . '/' . $c->getName()));
 		$c->setMapProvider('');
 		// Optional: create the collection already secret (hidden behind a 6-digit key).
 		if (!empty($input['secret']) && isset($input['secret_pin'])
@@ -696,18 +811,45 @@ class RegiBaseService {
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
-		$c = $this->collections->insert($c);
+		$fields = $input['fields'] ?? ($tpl['fields'] ?? []);
+		// The collection and its fields are one write: a field that failed to insert used to
+		// leave a collection without fields behind (review).
+		$c = $this->atomic(function () use ($c, $fields): CollectionEntity {
+			$c = $this->collections->insert($c);
+			$this->insertFields((int)$c->getId(), is_array($fields) ? $fields : []);
+			return $c;
+		});
 		if ($c->getSecret()) {
 			$this->markSecretOpen((int)$c->getId());   // created with its key: open for its creator
 		}
 		// Create the attachment folder on disk now, so it exists in Files even
 		// before the first attachment is added (best-effort).
 		$this->images->ensureFolderExists($userId, (string)$c->getFilesFolder());
-
-		$fields = $input['fields'] ?? ($tpl['fields'] ?? []);
-		$this->insertFields((int)$c->getId(), $fields);
 		$this->rec($userId, 'collection.create', (int)$c->getId(), $this->l->t('Create the collection “%s”', [$c->getName()]), ['kind' => 'del_collection', 'id' => (int)$c->getId()]);
 		return $this->getCollection($userId, (int)$c->getId());
+	}
+
+	/**
+	 * Run $fn inside a database transaction, unless one is already open (a restore runs the
+	 * whole import in one): then it simply runs within that one.
+	 * @template T
+	 * @param callable(): T $fn
+	 * @return T
+	 */
+	private function atomic(callable $fn) {
+		$db = \OCP\Server::get(\OCP\IDBConnection::class);
+		if ($db->inTransaction()) {
+			return $fn();
+		}
+		$db->beginTransaction();
+		try {
+			$out = $fn();
+			$db->commit();
+			return $out;
+		} catch (\Throwable $e) {
+			$db->rollBack();
+			throw $e;
+		}
 	}
 
 	/**
@@ -716,12 +858,12 @@ class RegiBaseService {
 	 * files so the copy is fully independent of the original.
 	 */
 	public function duplicateCollection(string $userId, int $id, bool $withRecords, ?string $name = null): array {
-		$src = $this->collections->findForUser($id, $userId); // owner only
+		$src = $this->findOwned($userId, $id); // owner only
 		$srcFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
 
 		$c = new CollectionEntity();
 		$c->setUserId($userId);
-		$c->setName(($name !== null && trim($name) !== '') ? trim($name) : trim($src->getName() . ' ' . $this->l->t('(copy)')));
+		$c->setName(self::cut(($name !== null && trim($name) !== '') ? trim($name) : trim($src->getName() . ' ' . $this->l->t('(copy)')), self::NAME_MAX));
 		$c->setIcon($src->getIcon());
 		$c->setColor($src->getColor());
 		$c->setDescription($src->getDescription() ?? '');
@@ -782,7 +924,7 @@ class RegiBaseService {
 		// Collection settings (name/icon/color/description/lock/key/view/sort) are
 		// owner-only. Share recipients — at any level, including 'delete' — cannot
 		// change them; their record-level rights are enforced elsewhere.
-		$c = $this->collections->findForUser($id, $userId); // owner only
+		$c = $this->findOwned($userId, $id); // owner only
 		$oldName = $c->getName();
 		// Don't clutter the undo history with pure display-preference switches
 		// (view / sort). Only real settings changes are worth an undo entry.
@@ -790,13 +932,13 @@ class RegiBaseService {
 			$this->rec($userId, 'collection.update', $id, $this->l->t('Change settings of “%s”', [$c->getName()]), ['kind' => 'restore_collection', 'id' => $id, 'settings' => $c->jsonSerialize()]);
 		}
 		if (isset($patch['name'])) {
-			$c->setName((string)$patch['name']);
+			$c->setName(self::cut($patch['name'], self::NAME_MAX));
 		}
 		if (isset($patch['icon'])) {
-			$c->setIcon((string)$patch['icon']);
+			$c->setIcon(self::cut($patch['icon'], self::ICON_MAX));
 		}
 		if (isset($patch['color'])) {
-			$c->setColor((string)$patch['color']);
+			$c->setColor(self::cut($patch['color'], self::COLOR_MAX));
 		}
 		if (isset($patch['description'])) {
 			$c->setDescription((string)$patch['description']);
@@ -893,7 +1035,7 @@ class RegiBaseService {
 	}
 
 	public function deleteCollection(string $userId, int $id, bool $deleteFolder = false, bool $trashAttachments = true): void {
-		$c = $this->collections->findForUser($id, $userId);
+		$c = $this->findOwned($userId, $id);
 		$folder = (string)$c->getFilesFolder();
 		// Snapshot the whole collection (settings + fields + record data) so the
 		// deletion can be reversed. Attachment files are trashed below; on undo the
@@ -916,6 +1058,10 @@ class RegiBaseService {
 			$this->versions->drop((int)$r->getId());
 		}
 		$this->records->deleteForCollection($id);
+		// The versions by session go with the collection. Deleting its records wrote every
+		// one of them into the version of this session, and nothing removed those or the
+		// older versions: the records, secret fields and all, stayed for good (review).
+		$this->journal->dropForCollections([$id]);
 		$this->shares->deleteForCollection($id);
 		$this->collections->delete($c);
 		// Optionally move this collection's save folder to the trash. Off by
@@ -958,7 +1104,7 @@ class RegiBaseService {
 	 */
 	/** The versions of a collection (owner only), newest first. */
 	public function sessionVersions(string $userId, int $collectionId): array {
-		$this->collections->findForUser($collectionId, $userId);
+		$this->findOwned($userId, $collectionId);
 		return $this->journal->listFor($collectionId);
 	}
 
@@ -970,7 +1116,7 @@ class RegiBaseService {
 	 * gone afterwards, and so are the snapshots of the collection (owner, 2026-09-29).
 	 */
 	public function restoreSessionVersion(string $userId, int $collectionId, int $versionId): array {
-		$c = $this->collections->findForUser($collectionId, $userId);
+		$c = $this->findOwned($userId, $collectionId);
 		$this->assertEditable($c);
 		$vers = $this->journal->fromUp($collectionId, $versionId);
 		if (!$vers || (int)$vers[count($vers) - 1]['id'] !== $versionId) {
@@ -1110,7 +1256,7 @@ class RegiBaseService {
 	}
 	/** Collection-level undo (fields, settings, the collection itself, transfers): the owner only. */
 	private function undoOwnerOnly(string $userId, int $collectionId): void {
-		$this->assertEditable($this->collections->findForUser($collectionId, $userId));
+		$this->assertEditable($this->findOwned($userId, $collectionId));
 	}
 	private function recordCollectionId(int $recordId): ?int {
 		try {
@@ -1213,12 +1359,13 @@ class RegiBaseService {
 			case 'del_collection':
 				$id = (int)($p['id'] ?? 0);
 				try {
-					$c = $this->collections->findForUser($id, $userId);   // the owner only
+					$c = $this->findOwned($userId, $id);   // the owner only
 					$this->fields->deleteForCollection($id);
 					foreach ($this->records->findForCollection($id) as $r) {
 						$this->versions->drop((int)$r->getId());
 					}
 					$this->records->deleteForCollection($id);
+					$this->journal->dropForCollections([$id]);   // its versions by session go too (review)
 					$this->shares->deleteForCollection($id);
 					$this->collections->delete($c);
 				} catch (DoesNotExistException $e) {
@@ -1275,9 +1422,9 @@ class RegiBaseService {
 			}
 			$e = new FieldEntity();
 			$e->setCollectionId($cid);
-			$e->setFieldKey((string)($f['key'] ?? ''));
-			$e->setLabel((string)($f['label'] ?? ''));
-			$e->setType((string)($f['type'] ?? 'text'));
+			$e->setFieldKey(self::cut($f['key'] ?? '', self::FIELD_KEY_MAX));
+			$e->setLabel(self::cut($f['label'] ?? '', self::LABEL_MAX));
+			$e->setType(self::cut($f['type'] ?? 'text', self::TYPE_MAX));
 			$e->setOptions(!empty($f['options']) ? json_encode($f['options']) : null);
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
@@ -1285,7 +1432,7 @@ class RegiBaseService {
 			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
 			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
 			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
-			$e->setPlaceholder($f['placeholder'] ?? null);
+			$e->setPlaceholder(isset($f['placeholder']) ? self::cut($f['placeholder'], self::PLACEHOLDER_MAX) : null);
 			$e->setSort((int)($f['sort'] ?? 0));
 			$e->setConcat((int)($f['concat'] ?? 0));
 			$e->setConcatSep(self::oneOf($f['concat_sep'] ?? null, self::CONCAT_SEPS, 'space'));
@@ -1371,12 +1518,16 @@ class RegiBaseService {
 	}
 
 	public function replaceFields(string $userId, int $id, array $fields, ?string $grp = null): array {
-		$this->assertEditable($this->collections->findForUser($id, $userId)); // ownership + not locked
+		$this->assertEditable($this->findOwned($userId, $id)); // ownership + not locked
 		$oldFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
 		$this->journal->fieldsBefore($id, $oldFields);
 		$this->rec($userId, 'fields.replace', $id, $this->l->t('Edit fields'), ['kind' => 'restore_fields', 'collectionId' => $id, 'fields' => $oldFields], $grp);
-		$this->fields->deleteForCollection($id);
-		$this->insertFields($id, $fields);
+		// Old fields out and new ones in as one write: a field that failed to insert used to
+		// leave the collection with no fields at all (review).
+		$this->atomic(function () use ($id, $fields): void {
+			$this->fields->deleteForCollection($id);
+			$this->insertFields($id, $fields);
+		});
 		$this->dropForeignInNewAttachFields($userId, $id, $oldFields);
 		return $this->getCollection($userId, $id);
 	}
@@ -1442,9 +1593,9 @@ class RegiBaseService {
 			$seenKeys[$key] = true;
 			$e = new FieldEntity();
 			$e->setCollectionId($collectionId);
-			$e->setFieldKey($key);
-			$e->setLabel((string)($f['label'] ?? ''));
-			$e->setType((string)($f['type'] ?? 'text'));
+			$e->setFieldKey(self::cut($key, self::FIELD_KEY_MAX));
+			$e->setLabel(self::cut($f['label'] ?? '', self::LABEL_MAX));
+			$e->setType(self::cut($f['type'] ?? 'text', self::TYPE_MAX));
 			$e->setOptions(!empty($f['options']) ? json_encode($f['options']) : null);
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
@@ -1452,7 +1603,7 @@ class RegiBaseService {
 			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
 			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
 			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
-			$e->setPlaceholder($f['placeholder'] ?? null);
+			$e->setPlaceholder(isset($f['placeholder']) ? self::cut($f['placeholder'], self::PLACEHOLDER_MAX) : null);
 			$e->setSort($idx);
 			$e->setConcat((int)($f['concat'] ?? 0));
 			$e->setConcatSep(self::oneOf($f['concat_sep'] ?? null, self::CONCAT_SEPS, 'space'));
@@ -1528,7 +1679,7 @@ class RegiBaseService {
 	}
 
 	public function listRecords(string $userId, int $collectionId, ?string $q, ?string $sort, bool $regex = false): array {
-		[$c] = $this->resolve($userId, $collectionId); // any recipient level may read
+		[$c, , $isOwner, $share] = $this->resolve($userId, $collectionId); // any recipient level may read
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		$mode = ($sort && in_array($sort, self::ALLOWED_SORTS, true)) ? $sort : $c->getRecordSort();
 
@@ -1536,6 +1687,8 @@ class RegiBaseService {
 		$rows = [];
 		foreach ($this->records->findForCollection($collectionId) as $r) {
 			$j = $r->jsonSerialize();
+			// before the title and the search below, so neither can tell a hidden value
+			$j['data'] = $this->hideSecrets(is_array($j['data']) ? $j['data'] : [], $fieldsJson, $isOwner, $share);
 			$j['title'] = $this->titleFor($fieldsJson, $j['data'], $sep);
 			$rows[] = $j;
 		}
@@ -1603,23 +1756,25 @@ class RegiBaseService {
 		return $rows;
 	}
 
+	/** @return array{0: RecordEntity, 1: CollectionEntity, 2: bool, 3: ?ShareEntity} record, collection, isOwner, share */
 	private function collectionOfRecord(string $userId, int $recordId): array {
 		$r = $this->records->find($recordId);
-		[$c] = $this->resolve($userId, (int)$r->getCollectionId()); // owner or share recipient
-		return [$r, $c];
+		[$c, , $isOwner, $share] = $this->resolve($userId, (int)$r->getCollectionId()); // owner or share recipient
+		return [$r, $c, $isOwner, $share];
 	}
 
 	/** Like collectionOfRecord() but require at least $min permission. */
 	private function recordWithPerm(string $userId, int $recordId, string $min): array {
 		$r = $this->records->find($recordId);
-		[$c] = $this->require($userId, (int)$r->getCollectionId(), $min);
-		return [$r, $c];
+		[$c, , $isOwner, $share] = $this->require($userId, (int)$r->getCollectionId(), $min);
+		return [$r, $c, $isOwner, $share];
 	}
 
 	public function getRecord(string $userId, int $id): array {
-		[$r, $c] = $this->collectionOfRecord($userId, $id);
+		[$r, $c, $isOwner, $share] = $this->collectionOfRecord($userId, $id);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$j = $r->jsonSerialize();
+		$j['data'] = $this->hideSecrets(is_array($j['data']) ? $j['data'] : [], $fieldsJson, $isOwner, $share);
 		$j['title'] = $this->titleFor($fieldsJson, $j['data'], $this->keySep($c));
 		return $j;
 	}
@@ -1702,12 +1857,12 @@ class RegiBaseService {
 		$e->setCreatedAt($this->now());
 		$e->setUpdatedAt($this->recordNow());
 		$e = $this->records->insert($e);
-		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Added: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
+		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Added: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
 		return $this->getRecord($userId, (int)$e->getId());
 	}
 
 	public function updateRecord(string $userId, int $id, array $data, ?string $grp = null, bool $noHistory = false, bool $manualVersion = false, ?string $base = null, bool $checkRules = true): array {
-		[$r, $c] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
+		[$r, $c, , $share] = $this->recordWithPerm($userId, $id, self::PERM_EDIT);
 		$this->assertEditable($c);
 		// $base: when the writer opened the record. Somebody else's save since then is not
 		// silently overwritten (review J18).
@@ -1722,6 +1877,7 @@ class RegiBaseService {
 		$this->assertAttachmentsKept($userId, $c, $fieldsJson, $data, $oldData);
 		$this->checkAttachments($userId, $fieldsJson, $data, $oldData);
 		$data = $this->keepForeignKeys($userId, $c, $fieldsJson, $data, $oldData);
+		$data = $this->keepHiddenSecrets($userId, $c, $share, $fieldsJson, $data, $oldData);
 		$oldReading = (string)$r->getReading();
 		$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 		$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
@@ -1739,7 +1895,7 @@ class RegiBaseService {
 		// edits and must not enter the snapshot history — undoing one would revert
 		// the encryption and expose the plaintext.
 		if (!$noHistory) {
-			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
 			// A numbered version of the record as it stood just before this write,
 			// kept beside it the way EditBase keeps versions beside a document —
 			// independent of the account-wide undo log above, and surviving past
@@ -1797,10 +1953,12 @@ class RegiBaseService {
 
 	/** What one version of a record held: the same shape as getRecord()'s `data`. */
 	public function readRecordVersion(string $userId, int $id, int $number): array {
-		[, $c] = $this->recordWithPerm($userId, $id, self::PERM_VIEW);
-		unset($c);
+		[, $c, $isOwner, $share] = $this->recordWithPerm($userId, $id, self::PERM_VIEW);
 		$snap = $this->versions->read($id, $number);
-		return is_array($snap['data'] ?? null) ? $snap['data'] : [];
+		$data = is_array($snap['data'] ?? null) ? $snap['data'] : [];
+		// a version is read the way the record is: secrets not shared stay with the owner
+		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
+		return $this->hideSecrets($data, $fieldsJson, $isOwner, $share);
 	}
 
 	/**
@@ -1841,7 +1999,7 @@ class RegiBaseService {
 	 *         _base); those are left as they are (review J18)
 	 */
 	public function bulkUpdateRecords(string $userId, int $collectionId, array $updates, ?string $grp = null): array {
-		[$c] = $this->requireEditable($userId, $collectionId, self::PERM_EDIT); // owner/edit + not locked
+		[$c, , , $share] = $this->requireEditable($userId, $collectionId, self::PERM_EDIT); // owner/edit + not locked
 		// versions follow the owner's setting, as in updateRecord (review P22)
 		$owner = (string)$c->getUserId();
 		$keep = $this->versions->keep($owner);
@@ -1885,6 +2043,7 @@ class RegiBaseService {
 			}
 			$oldData = json_decode($r->getData() ?: '{}', true) ?: [];
 			$data = $this->keepForeignKeys($userId, $c, $fieldsJson, $u['data'], $oldData);
+			$data = $this->keepHiddenSecrets($userId, $c, $share, $fieldsJson, $data, $oldData);
 			$oldReading = (string)$r->getReading();
 			$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 			$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
@@ -1898,7 +2057,7 @@ class RegiBaseService {
 			} else {
 				$this->records->update($r);
 			}
-			$this->rec($userId, 'record.update', $collectionId, $this->l->t('Edited: %s', [$this->titleFor($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			$this->rec($userId, 'record.update', $collectionId, $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
 			if ($autoVersion && $oldData !== []) {
 				try {
 					$this->versions->take($id, ['data' => $oldData, 'reading' => $oldReading], $keep);
@@ -1937,7 +2096,7 @@ class RegiBaseService {
 	public function deleteRecord(string $userId, int $id): void {
 		$snap = $this->deleteRecordCapture($userId, $id);
 		$fj = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$snap['collectionId']));
-		$this->rec($userId, 'record.delete', $snap['collectionId'], $this->l->t('Deleted: %s', [$this->titleFor($fj, $snap['data'])]), ['kind' => 'reinsert', 'record' => $snap]);
+		$this->rec($userId, 'record.delete', $snap['collectionId'], $this->l->t('Deleted: %s', [$this->summaryTitle($fj, $snap['data'])]), ['kind' => 'reinsert', 'record' => $snap]);
 	}
 
 	public function deleteRecords(string $userId, array $ids): int {
@@ -1948,8 +2107,10 @@ class RegiBaseService {
 				$s = $this->deleteRecordCapture($userId, (int)$id);
 				$snaps[] = $s;
 				$cid = $s['collectionId'];
-			} catch (DoesNotExistException | ForbiddenException $e) {
-				// skip records the user cannot delete
+			} catch (DoesNotExistException | ForbiddenException | LockedException $e) {
+				// skip records the user cannot delete. A record of a locked share among them
+				// used to stop the call with a 500, and what was deleted before it had no
+				// undo entry (review).
 			}
 		}
 		if ($snaps) {
@@ -2013,7 +2174,7 @@ class RegiBaseService {
 	 * Skips keys that already exist; forces is_title=false. Returns keys added.
 	 */
 	public function appendFields(string $userId, int $collectionId, array $fields): array {
-		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // ownership + not locked
+		$this->assertEditable($this->findOwned($userId, $collectionId)); // ownership + not locked
 		$existingFields = $this->fields->findForCollection($collectionId);
 		$this->journal->fieldsBefore($collectionId, array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields));
 		$this->rec($userId, 'fields.append', $collectionId, $this->l->t('Add fields'), ['kind' => 'restore_fields', 'collectionId' => $collectionId, 'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields)]);
@@ -2032,9 +2193,9 @@ class RegiBaseService {
 			}
 			$e = new FieldEntity();
 			$e->setCollectionId($collectionId);
-			$e->setFieldKey($key);
-			$e->setLabel((string)($f['label'] ?? ''));
-			$e->setType((string)($f['type'] ?? 'text'));
+			$e->setFieldKey(self::cut($key, self::FIELD_KEY_MAX));
+			$e->setLabel(self::cut($f['label'] ?? '', self::LABEL_MAX));
+			$e->setType(self::cut($f['type'] ?? 'text', self::TYPE_MAX));
 			$e->setOptions(!empty($f['options']) ? json_encode($f['options']) : null);
 			$e->setRequired(!empty($f['required']));
 			$e->setSecret(!empty($f['secret']));
@@ -2042,7 +2203,7 @@ class RegiBaseService {
 			$e->setListShow(array_key_exists('list_show', $f) ? (bool)$f['list_show'] : true);
 			$e->setTableShow(array_key_exists('table_show', $f) ? (bool)$f['table_show'] : true);
 			$e->setCardShow(array_key_exists('card_show', $f) ? (bool)$f['card_show'] : true);
-			$e->setPlaceholder($f['placeholder'] ?? null);
+			$e->setPlaceholder(isset($f['placeholder']) ? self::cut($f['placeholder'], self::PLACEHOLDER_MAX) : null);
 			$e->setSort($maxSort + $i);
 			$this->fields->insert($e);
 			$existing[$key] = true;
@@ -2126,9 +2287,9 @@ class RegiBaseService {
 			throw new \RuntimeException('recordIds is required');
 		}
 
-		$srcEntity = $this->collections->findForUser($sourceId, $userId); // transfer is owner-only (both sides)
+		$srcEntity = $this->findOwned($userId, $sourceId); // transfer is owner-only (both sides)
 		$source = $this->getCollection($userId, $sourceId); // fields
-		$tgtEntity = $this->collections->findForUser($targetId, $userId); // ownership of target
+		$tgtEntity = $this->findOwned($userId, $targetId); // ownership of target
 		$this->assertEditable($tgtEntity); // target is always written to
 		if ($mode === 'move') {
 			$this->assertEditable($srcEntity); // move also deletes from the source
@@ -2239,6 +2400,13 @@ class RegiBaseService {
 
 	private function csvCell($v): string {
 		$s = (string)$v;
+		// A cell beginning with = + - @ or a tab / CR is taken for a formula by Excel and
+		// LibreOffice (=HYPERLINK(...), =cmd|...), so it is written as text behind an
+		// apostrophe, as the spreadsheets themselves do. A plain number such as -5 is left
+		// alone: it cannot be a formula, and the apostrophe would make it text (review).
+		if ($s !== '' && str_contains("=+-@\t\r", $s[0]) && !preg_match('/^[+-]?\d+([.,]\d+)?$/', $s)) {
+			$s = "'" . $s;
+		}
 		if (preg_match('/["\r\n,]/', $s)) {
 			$s = '"' . str_replace('"', '""', $s) . '"';
 		}
@@ -2250,11 +2418,12 @@ class RegiBaseService {
 	 * @return array{filename: string, mime: string, content: string}
 	 */
 	public function exportCollection(string $userId, int $id, string $format): array {
-		[$c] = $this->resolve($userId, $id); // owner or any share recipient may export
+		[$c, , $isOwner, $share] = $this->resolve($userId, $id); // owner or any share recipient may export
 		$fields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
 		$rows = [];
 		foreach ($this->records->findForCollection($id) as $r) {
 			$j = $r->jsonSerialize();
+			$j['data'] = $this->hideSecrets(is_array($j['data']) ? $j['data'] : [], $fields, $isOwner, $share);
 			$rows[] = $j;
 		}
 		usort($rows, fn ($a, $b) => $a['id'] - $b['id']);
@@ -2469,7 +2638,9 @@ class RegiBaseService {
 				continue;
 			}
 
-			// overwrite / add / merge-with-no-matching-collection → create a new collection
+			// overwrite / add / merge-with-no-matching-collection → create a new collection.
+			// Its own save folder goes in with it (the same checks as one set in the settings):
+			// the default "<base>/<name>" used to be made first and left behind empty (review).
 			$created = $this->createCollection($userId, [
 				'name' => $name,
 				'icon' => $col['icon'] ?? '📁',
@@ -2479,6 +2650,7 @@ class RegiBaseService {
 				'key_head' => $col['key_head'] ?? false,
 				'key_sep' => $col['key_sep'] ?? 'space',
 				'key_sep_char' => $col['key_sep_char'] ?? '',
+				'files_folder' => is_string($col['files_folder'] ?? null) ? $col['files_folder'] : '',
 				'fields' => $fields,
 			]);
 			$cid = (int)$created['id'];
@@ -2491,11 +2663,6 @@ class RegiBaseService {
 				$ce->setSecretHash($col['secret_hash']);
 			}
 			$ce->setLocked(!empty($col['locked']));
-			// the same checks as a folder or map set in the collection's settings
-			$folder = is_string($col['files_folder'] ?? null) ? mb_substr($this->images->normalizePath($col['files_folder']), 0, 512) : '';
-			if ($folder !== '') {
-				$ce->setFilesFolder($folder);
-			}
 			// an empty choice is left unset, as the collection had it (not stored as '')
 			if (is_string($col['map_provider'] ?? null) && $col['map_provider'] !== '' && in_array($col['map_provider'], self::MAP_PROVIDERS, true)) {
 				$ce->setMapProvider($col['map_provider']);
@@ -2696,7 +2863,7 @@ class RegiBaseService {
 
 	/** Insert many records (from data arrays) into a collection the user owns. */
 	public function bulkAddRecords(string $userId, int $collectionId, array $dataArray): int {
-		$this->assertEditable($this->collections->findForUser($collectionId, $userId)); // owner + not locked
+		$this->assertEditable($this->findOwned($userId, $collectionId)); // owner + not locked
 		$ids = $this->bulkInsertRecordsIds($collectionId, $dataArray);
 		if ($ids) {
 			$this->rec($userId, 'record.bulk_add', $collectionId, $this->l->t('Import %s records', [count($ids)]), ['kind' => 'del_many', 'ids' => $ids]);
@@ -2708,7 +2875,7 @@ class RegiBaseService {
 
 	/** List a collection's shares (owner only). @return array[] */
 	public function listShares(string $ownerUid, int $collectionId): array {
-		$this->collections->findForUser($collectionId, $ownerUid); // owner only
+		$this->findOwned($ownerUid, $collectionId); // owner only
 		$list = $this->shares->findForCollection($collectionId);
 		foreach ($list as $s) {
 			$this->purgeIfExpired($s);
@@ -2727,7 +2894,7 @@ class RegiBaseService {
 	 */
 	public function addShare(string $ownerUid, int $collectionId, string $recipientUid, string $perm,
 		?string $auth, ?string $authSalt, ?string $encKey, ?string $encSalt, ?string $expiresAt, string $recipientType = 'user'): array {
-		$this->collections->findForUser($collectionId, $ownerUid); // owner only
+		$this->findOwned($ownerUid, $collectionId); // owner only
 		$recipientType = ($recipientType === 'group') ? 'group' : 'user';
 		if ($recipientType === 'user') {
 			if ($recipientUid === $ownerUid) {
@@ -2792,7 +2959,7 @@ class RegiBaseService {
 
 	/** Change a share's permission / password / wrapped key (owner only). */
 	public function updateShare(string $ownerUid, int $collectionId, string $recipientUid, array $patch, string $recipientType = 'user'): array {
-		$this->collections->findForUser($collectionId, $ownerUid); // owner only
+		$this->findOwned($ownerUid, $collectionId); // owner only
 		$s = $this->shares->findOne($collectionId, $recipientUid, $recipientType);
 		if ($s === null) {
 			throw new DoesNotExistException('no such share');
@@ -2822,7 +2989,7 @@ class RegiBaseService {
 
 	/** Remove a share (owner only). */
 	public function removeShare(string $ownerUid, int $collectionId, string $recipientUid, string $recipientType = 'user'): void {
-		$this->collections->findForUser($collectionId, $ownerUid); // owner only
+		$this->findOwned($ownerUid, $collectionId); // owner only
 		$s = $this->shares->findOne($collectionId, $recipientUid, $recipientType);
 		if ($s !== null) {
 			$this->shares->delete($s);

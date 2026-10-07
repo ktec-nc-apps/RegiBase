@@ -1,0 +1,8 @@
+#regibase-ai-admin fieldset[disabled] { opacity: .5; }
+#regibase-ai-admin fieldset[disabled] * { cursor: not-allowed; }
+#regibase-ai-admin h3 { margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
+#regibase-ai-admin .rb-ai-state { padding: 6px 10px; border-radius: 6px; background: var(--color-background-dark, #f2f2f2); display: inline-block; }
+#regibase-ai-admin .rb-ai-state.warn { background: var(--color-warning-hover, #fff3cd); }
+#regibase-ai-admin .rb-ai-groups { margin-left: 28px; }
+#regibase-ai-admin .rb-ai-groups.dim { opacity: .5; }
+#regibase-ai-admin .rb-ai-save { margin-top: 16px; display: flex; gap: 12px; align-items: center; }

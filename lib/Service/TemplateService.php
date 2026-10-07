@@ -11,6 +11,7 @@ use OCA\RegiBase\Db\TemplateEntity;
 use OCA\RegiBase\Db\TemplateMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IL10N;
+use OCP\ISession;
 
 /**
  * User-defined collection templates plus per-user overrides of the built-in
@@ -23,6 +24,7 @@ class TemplateService {
 		private CollectionMapper $collections,
 		private FieldMapper $fields,
 		private IL10N $l,
+		private ISession $session,
 	) {
 	}
 
@@ -171,6 +173,11 @@ class TemplateService {
 	/** Create a custom template from an existing collection's fields. */
 	public function fromCollection(string $userId, int $collectionId, ?string $name): array {
 		$c = $this->collections->findForUser($collectionId, $userId); // ownership check
+		// a hidden collection is "not found" until its 6-digit key was given in this session,
+		// as every other owner path answers (RegiBaseService::findOwned; review)
+		if ($c->getSecret() && $this->session->get(RegiBaseService::secretOpenKey($collectionId)) !== true) {
+			throw new DoesNotExistException('no access to collection');
+		}
 		$fields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId));
 		return $this->create($userId, [
 			'name' => ($name !== null && trim($name) !== '') ? $name : $c->getName(),

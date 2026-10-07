@@ -2,6 +2,27 @@
 
 All notable changes to RegiBase.
 
+## 0.21.0 — 2026-10-08
+
+An AI assistant, through the new AI-Hub app, and the fixes from a review of the whole app.
+（新しいアプリ AI-Hub を通した AI アシスタントと、アプリ全体の点検で見つかったものの修正。）
+
+### Added
+
+- **An AI assistant, through the AI-Hub app.** A chat beside the open collection that knows RegiBase. It answers in words and writes out what to type; it changes nothing. **It never sees the value of a secret field**: the browser strips them before anything is sent, and the server drops them again as a second line of defence. Administration settings → RegiBase → AI assistant: on or off, who may use it, what it may read. Shown only when AI-Hub is installed.
+  （**AI-Hub アプリを通した AI アシスタント。** RegiBase を知っているチャットが開いているコレクションの横に出る。答えを言葉で返し、入力すべきことを書き出す。何も変更しない。**秘密項目の値は決して見ない**（ブラウザが送る前に外し、サーバーでも二重に外す）。管理者設定 → RegiBase → AI アシスタントで、使うかどうか・使える人・読める範囲を決める。AI-Hub が入っているときだけ表示される。）
+
+### Fixed
+
+- **Someone a collection is shared with, view-only, no longer receives its secret fields** in records, exports or searches. They were returned as they stood, in plain text when the owner had not set a master key.
+  （**閲覧のみで共有された相手に、秘密項目が渡らない。** 記録・書き出し・検索で、そのまま返っていた（所有者がマスターキー未設定なら平文）。）
+- **Putting a session version back no longer brings back plain secrets.** Encrypting, or changing the master key, now covers the versions kept by session as well; they were left as they were, and restoring one wrote the old text back.
+  （**セッションごとのバージョンを戻しても、平文の秘密が戻らない。** 暗号化・マスターキー変更の対象に、セッションごとのバージョンも含めた。）
+- **A hidden collection's PIN is asked on every path to it**, including the owner's own: changing, duplicating or sharing it, and listing its secrets. Only some of them asked before.
+  （**隠しコレクションの PIN を、持ち主の操作を含むすべての経路で求める。** 変更・複製・共有・秘密の一覧など、これまで求めない経路があった。）
+- **Deleting an account clears the versions kept for it**; they were left behind.
+  （アカウントを消すと、そのバージョンも消える。これまでは残っていた。）
+
 ## 0.20.3 — 2026-09-29
 
 Three layers of protection against losing data. A move made on 2026-09-27 could not be undone:

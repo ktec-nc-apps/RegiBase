@@ -38,6 +38,10 @@ fields you set up yourself.
   cannot be recovered.*
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
+  An import is written by the server as it comes in, secret fields included: with a master
+  key set, they are encrypted as soon as you open the collection with the key unlocked
+  (RegiBase says so after the import if it is locked). Until then they are never sent to
+  anybody the collection is shared with.
 - **Attachments** — attach images and files from **Nextcloud Files** or **Notes**. Each collection
   has its own save folder, **created automatically** under a **base folder** (default `RegiBase`,
   configurable in **Settings**) as *base folder / collection name*. When you rename the collection,
@@ -84,6 +88,7 @@ RegiBase can use a few other Nextcloud apps when they happen to be installed:
 - **Files** — attach any document, or pick images, straight from your Files.
 - **Notes** — attach a note to a record.
 - **Calendar** — add a reminder from a date field; it opens Calendar's new-event editor prefilled with the date.
+- **AI-Hub** — an AI assistant beside the open collection that answers in words and writes out what to type. It changes nothing and never sees the value of a secret field. The AI service, its key and its limits are set once in AI-Hub, for every app on the server; without AI-Hub the assistant is simply not shown.
 
 An **Address** field type adds a 🌐 button that opens the value in Google Maps,
 OpenStreetMap or Apple Maps (chosen in Settings).
@@ -159,6 +164,9 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   *マスターキーを忘れるとデータは復元できません。*
 - **インポート** — **CSV / JSON**（例：Google パスワードマネージャーのエクスポート）や、
   **Nextcloud 連絡先**（写真含む）から取り込めます。一方向で、連絡先側は変更しません。
+  取り込んだ内容は秘密項目も含めてそのままサーバーに保存されます。マスターキーを設定していれば、
+  キーを解錠した状態でそのコレクションを開いた時点で暗号化されます（施錠中に取り込むと、取り込み後に
+  その旨をお知らせします）。それまでの間も、共有先には秘密項目の値は一切送られません。
 - **添付** — **Nextcloud Files** や **Notes** から画像・ファイルを添付できます。コレクションごとに
   保存先フォルダを持ち、そのフォルダは**基準フォルダ**（既定 `RegiBase`、**設定**で変更可能）の下に
   「基準フォルダ／コレクション名」で**自動作成**されます。タイトルを変更するとフォルダ名も合わせて変更するか
@@ -200,6 +208,7 @@ RegiBase は、以下のアプリが入っていれば、それらを利用し�
 - **Files（ファイル）** — 任意のファイルの添付や、画像の選択を Files から直接。
 - **Notes（メモ）** — レコードにメモを添付。
 - **Calendar（カレンダー）** — 日付項目からリマインダーを追加。日付を入れた新規イベント画面が開きます。
+- **AI-Hub** — 開いているコレクションの横の AI アシスタントが、答えを言葉で返し、入力すべきことを書き出します。何も変更せず、秘密項目の値は決して見ません。AI サービス・キー・制限は AI-Hub でサーバー内の全アプリ分を一度に設定します。AI-Hub が無ければアシスタントは表示されません。
 
 項目タイプ「住所」を使うと、その値に 🌐 ボタンが付き、Google マップ／OpenStreetMap／Apple マップ
 （設定で選択）で開けます。

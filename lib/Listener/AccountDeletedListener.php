@@ -14,8 +14,8 @@ use Psr\Log\LoggerInterface;
 
 /**
  * When an account goes, its RegiBase data goes with it: the collections it owns (fields,
- * records, record versions, shares, and everybody's undo history for them), its templates
- * and its own history, and every share addressed to it. A deleted group loses the shares
+ * records, record versions, versions by session, shares, and everybody's undo history for
+ * them), its templates and its own history, and every share addressed to it. A deleted group loses the shares
  * addressed to it. Otherwise an account created later under the same uid/gid would inherit them.
  *
  * @template-implements IEventListener<Event>
@@ -45,7 +45,14 @@ class AccountDeletedListener implements IEventListener {
 				foreach (array_chunk($rids, 1000) as $r) {
 					$this->deleteIn('regibase_rec_vers', 'record_id', $r);
 				}
-				foreach (['regibase_records', 'regibase_fields', 'regibase_shares', 'regibase_history'] as $t) {
+				// the versions by session and what they keep (they stayed behind, review)
+				$vq = $this->db->getQueryBuilder();
+				$vq->select('id')->from('regibase_versions')->where($vq->expr()->in('collection_id', $vq->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+				$vids = array_map('intval', $vq->executeQuery()->fetchAll(\PDO::FETCH_COLUMN));
+				foreach (array_chunk($vids, 1000) as $v) {
+					$this->deleteIn('regibase_version_items', 'version_id', $v);
+				}
+				foreach (['regibase_records', 'regibase_fields', 'regibase_shares', 'regibase_history', 'regibase_versions'] as $t) {
 					$this->deleteIn($t, 'collection_id', $chunk);
 				}
 				$this->deleteIn('regibase_collections', 'id', $chunk);

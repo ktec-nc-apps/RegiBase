@@ -439,7 +439,9 @@ class ApiController extends Controller {
 		if (in_array($cls, [\RuntimeException::class, \InvalidArgumentException::class], true) || str_starts_with($cls, 'OCA\\RegiBase\\')) {
 			return new JSONResponse(['error' => $this->appL10n()->t($e->getMessage())], $status);
 		}
-		\OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('RegiBase: ' . $e->getMessage(), ['app' => Application::APP_ID, 'exception' => $e]);
+		// The class and the message only. With the exception itself the log took its stack
+		// trace, arguments and all, and those can hold record data (review).
+		\OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('RegiBase: ' . $cls . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')', ['app' => Application::APP_ID]);
 		return new JSONResponse(['error' => $this->appL10n()->t('Operation failed')], $status);
 	}
 
@@ -951,6 +953,8 @@ class ApiController extends Controller {
 			// taken: every edit, or only the ones the writer asks for.
 			'version_keep' => $this->service->versionKeep($uid),
 			'version_when' => $this->service->versionWhen($uid),
+			// Width of the AI assistant's column ("500px" or "30%").
+			'ai_width' => $c->getUserValue($uid, Application::APP_ID, 'ai_width', '500px'),
 			// client-side encryption metadata (server never sees the key or plaintext)
 			'enc_enabled' => $c->getUserValue($uid, Application::APP_ID, 'enc_enabled', '0') === '1',
 			'enc_salt' => $c->getUserValue($uid, Application::APP_ID, 'enc_salt', ''),
@@ -969,7 +973,7 @@ class ApiController extends Controller {
 	/** l10n bundle codes shipped with the app, with human names (endonyms). */
 	private function availableLanguages(): array {
 		$names = [
-			'ja' => '日本語', 'en' => 'English', 'zh' => '简体中文', 'es' => 'Español',
+			'ja' => '日本語', 'en' => 'English', 'zh_CN' => '简体中文', 'es' => 'Español',
 			'fr' => 'Français', 'de' => 'Deutsch', 'ru' => 'Русский', 'pt_BR' => 'Português (Brasil)', 'pt_PT' => 'Português (Portugal)',
 			'ar' => 'العربية', 'hi' => 'हिन्दी', 'ko' => '한국어', 'it' => 'Italiano',
 			'cs' => 'Čeština', 'fa' => 'فارسی', 'id' => 'Bahasa Indonesia', 'pl' => 'Polski',
@@ -978,6 +982,9 @@ class ApiController extends Controller {
 		$out = [];
 		foreach (glob(__DIR__ . '/../../l10n/*.json') ?: [] as $path) {
 			$code = basename($path, '.json');
+			if (isset(Application::OLD_LANGUAGES[$code])) {
+				continue; // l10n/zh.json: the same strings as zh_CN, kept for the browser fallback
+			}
 			$out[] = ['code' => $code, 'name' => $names[$code] ?? $code];
 		}
 		return $out;
@@ -985,11 +992,12 @@ class ApiController extends Controller {
 
 	/**
 	 * The RegiBase language setting. The Portuguese strings are Brazilian and were shipped
-	 * as "pt" until 2026-09; a stored "pt" now means "pt_BR".
+	 * as "pt" until 2026-09, the Chinese as "zh" until 2026-10; a stored "pt" now means
+	 * "pt_BR" and a stored "zh" "zh_CN" (Application::OLD_LANGUAGES).
 	 */
 	private function userLanguage(string $uid): string {
 		$lang = $this->config->getUserValue($uid, Application::APP_ID, 'language', 'auto');
-		return $lang === 'pt' ? 'pt_BR' : $lang;
+		return Application::OLD_LANGUAGES[$lang] ?? $lang;
 	}
 
 	private function languageCodes(): array {
@@ -1056,6 +1064,7 @@ class ApiController extends Controller {
 		}
 		if (array_key_exists('language', $params)) {
 			$lang = (string)$params['language'];
+			$lang = Application::OLD_LANGUAGES[$lang] ?? $lang;
 			if ($lang === 'auto' || in_array($lang, $this->languageCodes(), true)) {
 				$this->config->setUserValue($uid, Application::APP_ID, 'language', $lang);
 			}
@@ -1077,6 +1086,12 @@ class ApiController extends Controller {
 			if (in_array($when, ['manual', 'auto'], true)) {
 				$this->service->setVersionWhen($uid, $when);
 			}
+		}
+		// Width of the AI assistant's column: pixels (240-1200) or a percentage (15-60).
+		if (array_key_exists('ai_width', $params) && preg_match('/^(\d+(?:\.\d+)?)(px|%)$/', (string)$params['ai_width'], $m)) {
+			$n = (float)$m[1];
+			$n = $m[2] === '%' ? min(60.0, max(15.0, $n)) : min(1200.0, max(240.0, $n));
+			$this->config->setUserValue($uid, Application::APP_ID, 'ai_width', (round($n * 100) / 100) . $m[2]);
 		}
 		// Encryption metadata: salt + verifier (ciphertext) + on/off flag. No key material.
 		if (array_key_exists('enc_salt', $params) && self::encValueOk('enc_salt', $params['enc_salt'])) {
@@ -1332,6 +1347,9 @@ class ApiController extends Controller {
 			// settings are only restored for a full overwrite; merge/add keep current settings
 			if ($mode === 'overwrite' && is_array($struct['settings'] ?? null)) {
 				$s = $struct['settings'];
+				if (isset($s['language']) && is_string($s['language'])) {
+					$s['language'] = Application::OLD_LANGUAGES[$s['language']] ?? $s['language']; // a backup from before the rename
+				}
 				if (isset($s['files_folder'])) {
 					$this->images->setBaseFolder($uid, (string)$s['files_folder']);
 				}
@@ -1581,6 +1599,12 @@ class ApiController extends Controller {
 			return $this->images->getBaseFolder($this->uid()) . '/' . $this->l->t('Uncategorized');
 		}
 		$coll = $this->service->getCollection($this->uid(), $collectionId);
+		// Attachments of a shared collection are the owner's: somebody it is shared with cannot
+		// add one, whatever their permission (owner, 2026-09-24), yet the upload itself went
+		// through and made a folder in their own Files (review).
+		if (empty($coll['is_owner'])) {
+			throw new \RuntimeException('Only the owner of the collection can change its attachments.');
+		}
 		$folder = trim((string)($coll['files_folder'] ?? ''));
 		if ($folder === '') {
 			throw new \RuntimeException('Set a save folder in the collection settings first.');

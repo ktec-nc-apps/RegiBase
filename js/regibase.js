@@ -9,8 +9,26 @@
   const { createApp } = Vue;
 
   const BASE = ((window.OC && OC.generateUrl) ? OC.generateUrl('/apps/regibase') : '/apps/regibase') + '/';
+  // AI-Hub's own pages for a remembered conversation: read back, saved, summed up (the owner, 2026-10-06).
+  const HUB = ((window.OC && OC.generateUrl) ? OC.generateUrl('/apps/ai_hub') : '/apps/ai_hub') + '/conversation';
+  /** Where this tab keeps the token of its conversation with the AI (sessionStorage). */
+  const AI_CONV_KEY = 'regibase.ai.conversation';
+  /** A request to AI-Hub's conversation pages: GET without a body, POST with one. */
+  async function hub(path, body) {
+    const res = await fetch(HUB + path, {
+      method: body ? 'POST' : 'GET', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', requesttoken: (window.OC && OC.requestToken) || TOKEN },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const ct = res.headers.get('content-type') || '';
+    const data = ct.includes('json') ? await res.json() : null;
+    if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+    return data;
+  }
   const TOKEN = (window.OC && OC.requestToken) ? OC.requestToken : '';
   let rootProxy = null;
+  // the contextmenu event a row or a collection has already answered (the root listener then stays out)
+  let ctxSeen = null;
 
   // i18n: Japanese strings are the source/keys. Nextcloud loads l10n/<ncLang>.js server-side.
   // When the RegiBase 'language' setting is not 'auto', we install a client-side override
@@ -247,6 +265,20 @@
     return body;
   }
 
+  // Width of the AI assistant's column (the owner, 2026-10-04): pixels 240-1200, or a
+  // percentage 15-60 of the window, kept as the user setting ai_width ("500px", "30%").
+  function parseAiWidth(w) {
+    const m = /^(\d+(?:\.\d+)?)(px|%)$/.exec(String(w || '').trim());
+    return m ? { w: Number(m[1]), u: m[2] } : { w: 500, u: 'px' };
+  }
+  function clampAiWidth(w, u) {
+    u = u === '%' ? '%' : 'px';
+    let n = Number(w);
+    if (!(n > 0)) n = u === '%' ? 30 : 500;
+    n = u === '%' ? Math.min(60, Math.max(15, n)) : Math.min(1200, Math.max(240, n));
+    return (Math.round(n * 100) / 100) + u;
+  }
+
   // BUILD-ONLY SOURCE (review J19). The page loads js/regibase.dist.js, where build.mjs has
   // compiled this template from its raw text. Do not load this file directly or compile
   // TEMPLATE at run time: inside this template literal \' becomes ', so the thousands of
@@ -268,13 +300,13 @@
   </form>
 </div>
 
-<div v-else class="layout">
+<div v-else class="layout" :class="{ 'has-ai': ai.show }">
   <div class="backdrop" :class="{show: sidebarOpen}" @click="sidebarOpen=false"></div>
   <aside class="sidebar" :class="{open: sidebarOpen}">
     <div class="brand"><span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="337 403 1329 1010"><path fill="#400099" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="none" stroke="#fff" stroke-width="100" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#2e3192" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#e56b00" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="none" stroke="#fff" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="#f15a24" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/></svg></span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
     <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
     <nav class="coll-list">
-      <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
+      <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" @contextmenu="ctxColl($event, c)" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
         <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span v-if="c.secret" class="ci-lock" :title="t('Secret collection')">🕶️</span><span v-if="c.locked" class="ci-lock" :title="t('Edit lock (view only)')">🔒</span><span class="ct">{{ c.record_count }}</span>
       </button>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
@@ -408,7 +440,7 @@
         <template v-else>
           <!-- カード型 -->
           <div v-if="curView==='card'" class="rec-grid">
-            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap card" :class="{sel: isSelected(r.id)}">
+            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap card" :class="{sel: isSelected(r.id)}" @contextmenu="ctxRecord($event, r)">
               <input type="checkbox" class="rec-check" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
               <button class="rec-copy" @click.stop="copyRecord(r)" :title="t('Copy the whole card')">⧉</button>
               <button class="rec-card" @click="openRecord(r)">
@@ -419,7 +451,7 @@
           </div>
           <!-- リスト型（既定・detail/image からのフォールバック先） -->
           <div v-else-if="curView==='list'" class="rec-list">
-            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap row" :class="{sel: isSelected(r.id)}">
+            <div v-for="r in visibleRecords" :key="r.id" class="rec-wrap row" :class="{sel: isSelected(r.id)}" @contextmenu="ctxRecord($event, r)">
               <input type="checkbox" class="rec-check inline" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" />
               <button class="rec-row" @click="openRecord(r)">
                 <span class="rr-title">{{ r.title }}</span>
@@ -442,15 +474,15 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in visibleRecords" :key="r.id" :class="{sel: isSelected(r.id)}">
-                  <td class="rt-frozen">
+                <tr v-for="r in visibleRecords" :key="r.id" :class="{sel: isSelected(r.id)}" @contextmenu="ctxRecord($event, r)">
+                  <td class="rt-frozen" @contextmenu="ctxRecord($event, r, tableFrozenCol)">
                     <label class="rt-fcell" @click.stop><input type="checkbox" :checked="isSelected(r.id)" @change="toggleSelect(r.id)" /></label>
                     <span class="rt-fval" :class="{mono: tableFrozenCol && tableFrozenCol.secret, 'rt-keycol': tableFrozenCol && tableFrozenCol.keycol}" @click="openRecord(r)" :title="t('Edit')">
                       <img v-if="colImg(r, tableFrozenCol)" :src="colImg(r, tableFrozenCol)" class="rt-thumb" loading="lazy" />
                       <template v-else>{{ colText(r, tableFrozenCol) }}</template>
                     </span>
                   </td>
-                  <td v-for="col in tableScrollCols" :key="col.id" :class="{mono: col.secret, 'rt-keycol': col.keycol}">
+                  <td v-for="col in tableScrollCols" :key="col.id" :class="{mono: col.secret, 'rt-keycol': col.keycol}" @contextmenu="ctxRecord($event, r, col)">
                     <img v-if="colImg(r, col)" :src="colImg(r, col)" class="rt-thumb" loading="lazy" />
                     <span v-else>{{ colText(r, col) }}</span>
                   </td>
@@ -464,7 +496,7 @@
           <div v-else-if="curView==='note'" class="note-view">
             <div class="note-pane note-titles">
               <div class="note-list">
-                <button v-for="r in visibleRecords" :key="r.id" type="button" class="note-titem" :class="{on: note.id===r.id}" @click="selNoteRec(r)">
+                <button v-for="r in visibleRecords" :key="r.id" type="button" class="note-titem" :class="{on: note.id===r.id}" @click="selNoteRec(r)" @contextmenu="ctxRecord($event, r)">
                   <span class="nt-title">{{ r.title }}</span>
                   <span class="nt-sub" v-if="summary(r)">{{ summary(r) }}</span>
                 </button>
@@ -482,7 +514,7 @@
                   </div>
                 </div>
                 <div class="note-cbody">
-                  <div v-for="f in current.fields" :key="f.key" class="detail-row" v-show="noteCur.data[f.key] != null && noteCur.data[f.key] !== ''">
+                  <div v-for="f in current.fields" :key="f.key" class="detail-row" v-show="(noteCur.data[f.key] != null && noteCur.data[f.key] !== '') || (f.secret && secretsMasked)">
                     <div class="dk">{{ f.label }}</div>
                     <div class="dv" v-if="f.type==='image' || f.type==='image_crop'"><img :src="imgUrl(noteCur.data[f.key])" class="imgpreview lg" /></div>
                     <div class="dv" v-else-if="f.type==='file'">
@@ -516,6 +548,61 @@
       <button class="scrollnav-btn" @click="scrollToBottom" :title="t('To bottom')">▼</button>
     </div>
   </main>
+
+  <!-- AI assistant (through AI-Hub) at the far right (the owner, 2026-10-04). Shut: a narrow
+       strip with the name written downwards and a triangle pointing the way it opens; open, a
+       column as wide as Settings says. It reads only what the browser sends, never a secret
+       field, and changes nothing. -->
+  <div class="rb-aibar" v-if="ai.show && !ai.open">
+    <button type="button" class="hnd" @click="aiToggle" :title="t('Show') + ' — ' + t('AI assistant')">◀</button>
+    <span class="lb">{{ t('AI assistant') }}</span>
+  </div>
+  <section class="rb-ai" :class="{ 'is-drop': ai.drop }" v-if="ai.show && ai.open" :style="{ '--rb-ai-width': aiWidth() }"
+    @dragover="aiDragOver" @dragleave="aiDragLeave" @drop="aiDrop">
+    <!-- The edge between the work and the assistant (the owner, 2026-10-06): dragged, the
+         column takes the width there and then and the work gives up the same; let go, the
+         width is kept as Settings keeps it. A double click puts back the 500px it starts at;
+         with the keyboard, ← and → move it 10px. -->
+    <div class="rb-ai-grip" role="separator" aria-orientation="vertical" tabindex="0"
+      :aria-valuenow="parseFloat(aiWidthNow())" :aria-valuemin="aiWidthU === '%' ? 15 : 240" :aria-valuemax="aiWidthU === '%' ? 60 : 1200" :aria-valuetext="aiWidthNow()"
+      :title="t('Drag to change the width; double-click to reset')" :aria-label="t('Drag to change the width; double-click to reset')"
+      @pointerdown="aiGripDown" @pointermove="aiGripMove" @pointerup="aiGripUp" @pointercancel="aiGripUp" @lostpointercapture="aiGripUp"
+      @dblclick="aiGripReset" @keydown="aiGripKey"></div>
+    <div class="rb-ai-head">
+      <span class="ttl">{{ t('AI assistant') }}</span>
+      <span class="grow"></span>
+      <span class="model" v-if="ai.model" :title="ai.model">{{ ai.model }}</span>
+      <!-- The conversation saved to Files as Markdown, as it stands or summed up by the AI
+           (the owner, 2026-10-06): AI-Hub/RegiBase/ in the person's Files. -->
+      <button type="button" class="rb-ai-ic" @click="aiSave(false)" :disabled="!ai.msgs.length || ai.busy || !!ai.saving" :title="t('Save the conversation')" :aria-label="t('Save the conversation')"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h8l2 2v8.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5z"/><path d="M5.5 2.5v3h5v-3M5 13.5v-4h6v4"/></svg></button>
+      <button type="button" class="rb-ai-ic" @click="aiSave(true)" :disabled="!ai.msgs.length || ai.busy || !!ai.saving || !ai.ready" :title="t('Sum up the conversation and save it')" :aria-label="t('Sum up the conversation and save it')"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5h10M3 6.5h10M3 9.5h6M3 12.5h4"/><path d="M11.5 10v4M9.5 12l2 2 2-2"/></svg></button>
+      <button type="button" class="btn xs rb-ai-new" @click="aiClear" :disabled="ai.busy" :title="t('New conversation')" :aria-label="t('New conversation')">＋<span class="lb"> {{ t('New conversation') }}</span></button>
+      <button type="button" class="hnd" @click="aiToggle" :title="t('Hide') + ' — ' + t('AI assistant')">▶</button>
+    </div>
+    <div class="rb-ai-msgs" ref="aiMsgs">
+      <p class="rb-ai-hint" v-if="!ai.msgs.length">{{ t('Ask how to use RegiBase, or to help find and organise your records. Secret fields such as passwords are never shown to the assistant.') }}</p>
+      <p class="rb-ai-hint" v-if="!ai.msgs.length && ai.imagesOk">{{ t('You can also paste (Ctrl+V) or drop images here.') }}</p>
+      <!-- Each message can be copied as it stands (the owner, 2026-10-06): the button shows while
+           the pointer is on the message; images sent with a question are shown small above its words. -->
+      <div class="rb-ai-msg" :class="m.role === 'user' ? 'is-user' : 'is-bot'" v-for="(m, i) in ai.msgs" :key="i"><div class="rb-ai-bubble"><div class="rb-ai-imgs" v-if="m.images && m.images.length"><img v-for="(im, k) in m.images" :key="k" :src="im.url" :alt="im.name" :title="im.name"></div>{{ m.text }}</div><button type="button" class="rb-ai-copy" v-if="m.text" :class="{ done: m.copied }" :title="t('Copy')" :aria-label="t('Copy')" @click="aiCopy(m)">{{ m.copied ? '✓' : '📋' }}<span class="rb-ai-copied" v-if="m.copied" role="status">{{ t('Copied') }}</span></button></div>
+      <div class="rb-ai-msg is-bot" v-if="ai.busy"><div class="rb-ai-bubble is-busy">{{ t('Thinking…') }}</div></div>
+      <p class="rb-ai-err" v-if="ai.error">{{ ai.error }}</p>
+      <p class="rb-ai-note" v-if="ai.note" role="status">{{ ai.note }}</p>
+      <p class="rb-ai-note" v-if="ai.saving" role="status">{{ ai.saving === 'summary' ? t('Summing up the conversation…') : t('Saving the conversation…') }}</p>
+      <p class="rb-ai-saved" v-if="ai.saved" role="status">{{ t('Saved to {path}.', { path: ai.saved.path }) }}
+        <a :href="ai.saved.url" target="_blank" rel="noopener">{{ t('Open in Files') }}</a></p>
+    </div>
+    <div class="rb-ai-foot">
+      <!-- Images pasted (Ctrl+V) or dropped go with the next question: shown small here, × takes one off. -->
+      <div class="rb-ai-att" v-if="ai.images.length || ai.attNote">
+        <span class="rb-ai-thumb" v-for="(im, k) in ai.images" :key="im.id"><img :src="im.url" :alt="im.name" :title="im.name"><button type="button" :title="t('Remove image')" :aria-label="t('Remove image')" @click="aiUnattach(k)">×</button></span>
+        <p class="rb-ai-attnote" v-if="ai.attNote" role="alert">{{ ai.attNote }}</p>
+      </div>
+      <textarea v-model="ai.input" rows="2" :placeholder="ai.ready ? t('Message to the assistant…') : aiNotReady()" :disabled="!ai.ready"
+        @keydown="aiKey($event)" @paste="aiPaste" @compositionstart="ai.composing = true" @compositionend="ai.composing = false"></textarea>
+      <button type="button" class="btn primary" @click="aiSend" :disabled="ai.busy || !ai.ready || (!ai.input.trim() && !ai.images.length)">{{ t('Send') }}</button>
+    </div>
+  </section>
 
   <!-- Template picker -->
   <div v-if="modal && modal.type==='template'" class="modal-mask">
@@ -634,7 +721,7 @@
     <div class="modal">
       <div class="modal-head"><h3>{{ modal.rec.title }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
-        <div v-for="f in current.fields" :key="f.key" class="detail-row" v-show="modal.rec.data[f.key] != null && modal.rec.data[f.key] !== ''">
+        <div v-for="f in current.fields" :key="f.key" class="detail-row" v-show="(modal.rec.data[f.key] != null && modal.rec.data[f.key] !== '') || (f.secret && secretsMasked)">
           <div class="dk">{{ f.label }}</div>
           <div class="dv" v-if="f.type==='image' || f.type==='image_crop'"><img :src="imgUrl(modal.rec.data[f.key])" class="imgpreview lg" /></div>
           <div class="dv" v-else-if="f.type==='file'">
@@ -1104,7 +1191,7 @@
       </div>
       <div class="modal-foot">
         <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
-        <button class="btn primary" :disabled="secretForm.busy || secretForm.pin.length !== 6" @click="submitSecretReveal">{{ secretForm.busy ? t('Checking…') : t('Show') }}</button>
+        <button class="btn primary" :disabled="secretForm.busy || secretForm.pin.length !== 6" @click="submitSecretReveal">{{ secretForm.busy ? t('Checking…') : t('Reveal') }}</button>
       </div>
     </div>
   </div>
@@ -1311,83 +1398,96 @@
     </div>
   </div>
 
-  <!-- 保存先設定 -->
+  <!-- settings: the dialog looks the same in every Base-series app (the owner, 2026-10-04).
+       NetBase's is the reference -- a head that says whose settings these are, tabs with an icon
+       each, one heading per tab, the theme as three pictured cards, and a quiet line of help under
+       each control. -->
   <div v-if="modal && modal.type==='settings'" class="modal-mask">
     <div class="modal">
-      <div class="modal-head"><h3>{{ t('⚙️ Settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-head set-head">
+        <span class="ic big">⚙</span>
+        <div><strong>{{ t('Settings') }}</strong><div class="dim">{{ t('Applies to RegiBase only, for your account.') }}</div></div>
+        <button type="button" class="set-close" :title="t('Close')" :aria-label="t('Close')" @click="modal=null"><svg viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+      </div>
       <div class="modal-body settings-body">
-        <div class="field">
-          <label>🌗 {{ t('Theme') }}</label>
-          <div class="radios">
-            <label><input type="radio" value="auto" v-model="settingsForm.theme" @change="previewTheme" /> {{ t('Default (match Nextcloud)') }}</label>
-            <label><input type="radio" value="light" v-model="settingsForm.theme" @change="previewTheme" /> {{ t('Light') }}</label>
-            <label><input type="radio" value="dark" v-model="settingsForm.theme" @change="previewTheme" /> {{ t('Dark') }}</label>
+        <div class="set-tabs" role="tablist">
+          <button v-for="s in settingsTabs" :key="s.id" type="button" class="set-tab" :class="{active: settingsTab === s.id}" role="tab" :aria-selected="settingsTab === s.id ? 'true' : 'false'" :title="t(s.label)" @click="settingsTab = s.id"><span class="ic">{{ s.icon }}</span>{{ t(s.label) }}</button>
+        </div>
+
+        <section class="set-group" v-show="settingsTab === 'look'">
+          <h3><span class="ic">🎨</span>{{ t('Appearance and language') }}</h3>
+          <div class="theme-picks">
+            <button v-for="opt in themeOptions" :key="opt.id" type="button" class="theme-pick" :class="{active: settingsForm.theme === opt.id}" @click="settingsForm.theme = opt.id; previewTheme()">
+              <span class="swatch" :class="opt.id"><i class="bar"></i><i class="line"></i><i class="line short"></i></span>
+              <strong>{{ t(opt.label) }}</strong>
+              <span class="dim">{{ t(opt.hint) }}</span>
+              <span class="tick" v-if="settingsForm.theme === opt.id">✓</span>
+            </button>
           </div>
-        </div>
-        <div class="field" style="margin-top:16px">
-          <label>🌐 {{ t('Language') }}</label>
-          <select v-model="settingsForm.language">
-            <option value="auto">{{ t('System default (match Nextcloud)') }}</option>
-            <option v-for="lg in languages" :key="lg.code" :value="lg.code">{{ lg.name }}</option>
-          </select>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The display language switches when you press “Save”.') }}</div>
-        </div>
-        <div class="field" style="margin-top:16px">
-          <label>📁 {{ t('Base folder for attachments') }}</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input v-model="settingsForm.files_folder" :placeholder="t('e.g. RegiBase')" spellcheck="false" autocorrect="off" autocapitalize="off" style="flex:1;min-width:0" />
+          <p class="dim tiny">{{ t('Saved to your account, so it follows you to every browser you sign in from.') }}</p>
+
+          <h4>{{ t('Language') }}</h4>
+          <label class="fl">
+            <select v-model="settingsForm.language">
+              <option value="auto">{{ t('Follow Nextcloud') }}</option>
+              <option v-for="lg in languages" :key="lg.code" :value="lg.code">{{ lg.name }}</option>
+            </select>
+          </label>
+          <p class="dim tiny">{{ t('RegiBase can speak a different language from the rest of Nextcloud.') }}</p>
+          <p class="dim tiny">{{ t('The display language switches when you press “Save”.') }}</p>
+
+          <template v-if="ai.show">
+            <h4>🤖 {{ t('Width of the AI assistant') }}</h4>
+            <div class="fl">
+              <span class="ai-widthbox">
+                <input type="number" step="1" :min="settingsForm.aiWidthU === '%' ? 15 : 240" :max="settingsForm.aiWidthU === '%' ? 60 : 1200" v-model.number="settingsForm.aiWidthW" :aria-label="t('Width of the AI assistant')" />
+                <select v-model="settingsForm.aiWidthU" :aria-label="t('Width of the AI assistant')"><option value="px">px</option><option value="%">%</option></select>
+              </span>
+            </div>
+            <p class="dim tiny">{{ t('In pixels (240 to 1200), or as a percentage of the width of the window (15 to 60).') }}</p>
+          </template>
+        </section>
+
+        <section class="set-group" v-show="settingsTab === 'files'">
+          <h3><span class="ic">📁</span>{{ t('Files and encryption') }}</h3>
+
+          <h4>{{ t('Base folder for attachments') }}</h4>
+          <div class="fl-row">
+            <input v-model="settingsForm.files_folder" class="grow" :placeholder="t('e.g. RegiBase')" spellcheck="false" autocorrect="off" autocapitalize="off" :aria-label="t('Base folder for attachments')" />
             <button type="button" class="btn sm" @click="openFolderPicker('settings')">📁 {{ t('Browse…') }}</button>
           </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.') }}</div>
-        </div>
-        <div v-if="false" class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>🕐 {{ t('Record versions') }}</label>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span style="font-size:13px;color:var(--muted)">{{ t('Keep up to') }}</span>
-            <input type="number" min="0" max="99" step="1" v-model.number="settingsForm.version_keep" style="width:88px" />
-            <span style="font-size:13px;color:var(--muted)">{{ t('versions per record') }}</span>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-            <span style="font-size:13px;color:var(--muted)">{{ t('A version is kept') }}</span>
-            <select v-model="settingsForm.version_when">
-              <option value="manual">{{ t('only when you ask for one') }}</option>
-              <option value="auto">{{ t('every time a record is edited') }}</option>
-            </select>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The version before each edit is kept beside the record, numbered #01 (newest) upward; the oldest falls off past the limit above. Separate from the snapshot/undo history — a version stays even after its undo entry ages out. Nought keeps none.') }}</div>
-        </div>
-        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>{{ t('🔒 Encryption (secret fields) — optional') }}</label>
-          <div v-if="enc.enabled" style="font-size:13px;color:var(--muted)">
-            <b style="color:var(--accent)">{{ t('Enabled') }}</b>{{ t(': Secret fields such as passwords are encrypted with the master key you entered on this device.') }}<span v-if="hasRemembered()">{{ t('(remembered on this device)') }}</span>
-            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm" style="min-width:190px" @click="openEncChange">{{ t('Set master key') }}</button>
-                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Sets or changes the master key and re-encrypts all secret fields.') }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm danger" style="min-width:190px" @click="openEncRemove">{{ t('Remove master key') }}</button>
-                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Decrypts all secret fields back to plain text and turns off encryption.') }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <button type="button" class="btn sm" style="min-width:190px" @click="lockNow">{{ t('Sign out') }}</button>
-                <span style="flex:1;min-width:200px;font-size:12px">{{ t('Forgets the master key on this device (locks secret fields).') }}</span>
-              </div>
+          <p class="dim tiny">{{ t('The default parent folder (under Files) for new collections’ attachments; each new collection saves into “this folder / collection name”. Default: RegiBase.') }}</p>
+
+          <h4>{{ t('🔒 Encryption (secret fields) — optional') }}</h4>
+          <template v-if="enc.enabled">
+            <p class="dim tiny"><b class="on">{{ t('Enabled') }}</b>{{ t(': Secret fields such as passwords are encrypted with the master key you entered on this device.') }}<span v-if="hasRemembered()">{{ t('(remembered on this device)') }}</span></p>
+            <div class="fl-row act">
+              <button type="button" class="btn sm" @click="openEncChange">{{ t('Set master key') }}</button>
+              <span class="dim">{{ t('Sets or changes the master key and re-encrypts all secret fields.') }}</span>
             </div>
-          </div>
-          <div v-else style="font-size:13px;color:var(--muted)">
-            <b>{{ t('Disabled (default)') }}</b>{{ t(': Secret fields are stored in plain text. If you enable it, secret fields are encrypted with your master key and become unreadable even to the server and the administrator.') }}
-            <div style="margin-top:8px"><button type="button" class="btn sm primary" @click="openEncSetup">{{ t('Set master key') }}</button></div>
-          </div>
-        </div>
-        <div class="field" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <label>💾 {{ t('Backup / Restore') }}</label>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Save all collections, records, settings and attachments to a ZIP encrypted with your login password.') }}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div class="fl-row act">
+              <button type="button" class="btn sm danger" @click="openEncRemove">{{ t('Remove master key') }}</button>
+              <span class="dim">{{ t('Decrypts all secret fields back to plain text and turns off encryption.') }}</span>
+            </div>
+            <div class="fl-row act">
+              <button type="button" class="btn sm" @click="lockNow">{{ t('Sign out') }}</button>
+              <span class="dim">{{ t('Forgets the master key on this device (locks secret fields).') }}</span>
+            </div>
+          </template>
+          <template v-else>
+            <p class="dim tiny"><b>{{ t('Disabled (default)') }}</b>{{ t(': Secret fields are stored in plain text. If you enable it, secret fields are encrypted with your master key and become unreadable even to the server and the administrator.') }}</p>
+            <div class="fl-row"><button type="button" class="btn sm primary" @click="openEncSetup">{{ t('Set master key') }}</button></div>
+          </template>
+        </section>
+
+        <section class="set-group" v-show="settingsTab === 'backup'">
+          <h3><span class="ic">💾</span>{{ t('Backup / Restore') }}</h3>
+          <p class="dim tiny">{{ t('Save all collections, records, settings and attachments to a ZIP encrypted with your login password.') }}</p>
+          <div class="fl-row">
             <button type="button" class="btn sm" @click="openBackup">{{ t('🔒 Download all data') }}</button>
             <button type="button" class="btn sm" @click="openRestore">{{ t('♻ Restore from backup') }}</button>
           </div>
-        </div>
+        </section>
       </div>
       <div class="modal-foot">
         <button class="btn" @click="modal=null">{{ t('Cancel') }}</button>
@@ -1807,6 +1907,18 @@
 
   <div v-if="toast" class="toast">{{ toast }}</div>
 </div>
+
+<!-- The right button (the owner, 2026-10-04). The browser's own menu is kept away everywhere in
+     the app (ctxInstall) and this one stands in, with only what the screen already offers; the
+     items call the same methods as the buttons do. A secret field is never on it. mousedown is
+     swallowed so a text box under the pointer keeps its focus and its selection for Cut/Copy. -->
+<div v-if="ctx.open" class="rb-ctxmenu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }" @mousedown.prevent @contextmenu.prevent>
+  <div class="hd" v-if="ctx.title">{{ ctx.title }}</div>
+  <template v-for="(it, i) in ctx.items" :key="i">
+    <div v-if="it.sep" class="sep"></div>
+    <button v-else type="button" class="ci" :class="{ danger: it.danger }" :disabled="it.disabled" @click="ctxRun(it)"><span>{{ it.label }}</span><span v-if="it.key" class="s">{{ it.key }}</span></button>
+  </template>
+</div>
 `;
 
   createApp({
@@ -1825,7 +1937,32 @@
         // and the state of the 6-digit unlock prompt.
         secretShown: false,
         secretForm: { cells: ['', '', '', '', '', ''], pin: '', err: '', busy: false },
-        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100, version_keep: 10, version_when: 'manual' },
+        settingsForm: { files_folder: '', theme: 'auto', language: 'auto', map_provider: 'google', undo_limit: 100, version_keep: 10, version_when: 'manual', aiWidthW: 500, aiWidthU: 'px' },
+        // The AI assistant (through AI-Hub): shown only when AI-Hub is there and the
+        // administrator allows this person; always shut when the app opens. It reads only
+        // what the browser sends (never a secret field). conv is the token the hub keeps
+        // this conversation under; a new one begins every "New conversation".
+        ai: { show: false, ready: false, reason: '', model: '', read: [], search: false, open: false,
+          msgs: [], input: '', busy: false, error: '', composing: false, ask: 0, conv: '',
+          // images waiting to go with the next question; whether this AI connection takes images
+          images: [], attNote: '', drop: false, imagesOk: false,
+          // saving to Files and what was saved; a word when AI-Hub had let the conversation go
+          saving: '', saved: null, note: '' },
+        aiWidthW: 500, aiWidthU: 'px',
+        // Settings: three tabs, as NetBase has (the owner, 2026-10-04)
+        settingsTab: 'look',
+        settingsTabs: [
+          { id: 'look', icon: '🎨', label: 'Appearance and language' },
+          { id: 'files', icon: '📁', label: 'Files and encryption' },
+          { id: 'backup', icon: '💾', label: 'Backup / Restore' },
+        ],
+        themeOptions: [
+          { id: 'auto', label: 'Default (match Nextcloud)', hint: 'Follows whatever theme Nextcloud is using' },
+          { id: 'light', label: 'Light', hint: 'Always light, whatever Nextcloud does' },
+          { id: 'dark', label: 'Dark', hint: 'Always dark, whatever Nextcloud does' },
+        ],
+        // the right button's menu: where it is, what it is about, and its items {label, key, danger, disabled, sep, run}
+        ctx: { open: false, x: 0, y: 0, title: '', items: [] },
         undoTop: null, history: [],
         // versions kept beside a record (floats above the record modal, like folderAsk)
         vers: { open: false, id: null, title: '', list: [] },
@@ -1952,7 +2089,8 @@
       // Warn in the record editor when this collection has image/file fields but no
       // save folder set (the user cleared it). Attachments cannot be saved until set.
       attachWarn() {
-        if (!this.current || String(this.current.files_folder || '').trim() !== '') return false;
+        // somebody the collection is shared with is not sent the owner's folder, and cannot add attachments anyway
+        if (!this.current || !this.isOwner || String(this.current.files_folder || '').trim() !== '') return false;
         return (this.current.fields || []).some((f) => f.type === 'image' || f.type === 'image_crop' || f.type === 'file');
       },
       // recipient viewing a shared collection whose secrets were not shared/unlocked
@@ -2252,9 +2390,12 @@
     watch: {
       // the picker floats above the dialogs, so it must never outlive the one that opened it
       modal() { this.iconPickerOpen = false; this.closePwGen(); },
+      // another collection is another subject: the assistant starts a new conversation
+      'current.id'() { this.aiClear(); },
     },
     async mounted() {
       rootProxy = this;
+      this.ctxInstall();
       const rootEl = document.getElementById('regibase-root');
       this.version = (rootEl && rootEl.getAttribute('data-version')) || '';
       try { history.replaceState({ cid: null }, ''); } catch (e) { /* ignore */ }
@@ -2288,6 +2429,7 @@
       await this.boot();
       this.authenticated = true;
       this.refreshUndo();
+      this.aiLoad();
     },
     methods: {
       // reading this.locale makes every t() call re-evaluate when the language changes
@@ -2331,6 +2473,7 @@
         const collectionsP = api('collections').catch(() => null);
         try {
           const s = await api('settings'); this.settingsForm = s; this.theme = s.theme || 'auto';
+          this.setAiWidth(s.ai_width);
           if (s.apps) this.apps = { contacts: s.apps.contacts !== false, tables: s.apps.tables !== false, calendar: s.apps.calendar !== false };
           this.languages = s.languages || [];
           if (s.language && s.language !== 'auto') await this.applyLanguage(s.language);
@@ -2623,6 +2766,8 @@
         return f ? this.imgUrl(rec.data[f.key]) : '';
       },
       cellPreview(rec, f) {
+        // a secret not shared with the viewer: the server does not send its value at all
+        if (f.secret && this.secretsMasked) return '🔒';
         const v = rec.data[f.key];
         if (v == null || v === '') return '';
         if (f.secret) return '••••••••';
@@ -2970,9 +3115,528 @@
       },
       async openSettings() {
         try { this.settingsForm = await api('settings'); } catch (e) { this.settingsForm = { files_folder: 'RegiBase', theme: this.theme }; }
+        const a = parseAiWidth(this.settingsForm.ai_width);
+        this.settingsForm.aiWidthW = a.w; this.settingsForm.aiWidthU = a.u;
+        this.settingsTab = 'look';
         this.modal = { type: 'settings' };
       },
       previewTheme() { this.theme = this.settingsForm.theme || 'auto'; this.applyTheme(); },
+      // ---- the right button (the owner, 2026-10-04) ----
+      // The browser's own menu is kept away everywhere inside #regibase-root; the app's menu
+      // stands in with only what the screen already offers, calling the same methods the
+      // buttons do and keeping to the same permissions. A secret field is never on it: not
+      // named, not copied -- whatever the screen itself may be showing.
+      ctxInstall() {
+        const root = document.getElementById('regibase-root');
+        if (!root || root.__rbCtx) return;
+        root.__rbCtx = true;
+        root.addEventListener('contextmenu', (e) => this.ctxRoot(e));
+        // outside click, Escape, a scroll, the window losing focus: all shut it
+        document.addEventListener('pointerdown', (e) => { if (this.ctx.open && !(e.target && e.target.closest && e.target.closest('.rb-ctxmenu'))) this.ctxClose(); }, true);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.ctx.open) { e.stopPropagation(); this.ctxClose(); } }, true);
+        document.addEventListener('scroll', () => this.ctxClose(), true);
+        window.addEventListener('resize', () => this.ctxClose());
+        window.addEventListener('blur', () => this.ctxClose());
+      },
+      /** The text box under the pointer, if there is one: the menu is then the clipboard's. */
+      ctxTextTarget(t) {
+        const el = t && t.closest ? t.closest('input, textarea') : null;
+        if (!el) return null;
+        if (el.tagName === 'INPUT' && !/^(text|search|password|email|url|tel|number)$/i.test(el.type || 'text')) return null;
+        return el;
+      },
+      /** Every right click inside the app ends here; rows and collections answer first (ctxSeen). */
+      ctxRoot(e) {
+        e.preventDefault();
+        if (ctxSeen === e) return;
+        if (e.target && e.target.closest && e.target.closest('.rb-ctxmenu')) return;
+        const el = this.ctxTextTarget(e.target);
+        if (el) { this.ctxText(e, el); return; }
+        // open space: only what the screen offers there, and nothing while a dialog is up
+        const inLayout = !!(e.target && e.target.closest && e.target.closest('.layout'));
+        if (!inLayout || this.modal) { this.ctxClose(); return; }
+        const inSidebar = !!e.target.closest('.sidebar');
+        const items = [];
+        if (!inSidebar && this.current && this.canEdit) items.push({ label: T('＋ New record'), run: () => this.openNewRecord() });
+        if (inSidebar || !this.current) items.push({ label: T('＋ New collection'), run: () => this.openTemplatePicker() });
+        if (!items.length) { this.ctxClose(); return; }
+        this.ctxShow(e, '', items);
+      },
+      /** A record: a card, a list row, a table row (col = the cell's column) or a note title. */
+      ctxRecord(e, r, col) {
+        if (ctxSeen === e) return;                   // the cell answered before its row
+        if (this.ctxTextTarget(e.target)) return;    // a text box: the root listener takes it
+        ctxSeen = e; e.preventDefault();
+        const items = [{ label: T('Open'), run: () => this.openRecord(r) }];
+        if (this.canEdit) items.push({ label: T('Duplicate'), run: () => this.ctxDuplicate(r) });
+        // The value of the cell under the pointer: only a plain field that is not secret and is
+        // not an attachment or a picture. A secret field is never offered, shown or not.
+        if (col && col.kind === 'field' && col.field && !col.field.secret && !col.secret && !['image', 'image_crop', 'file'].includes(col.field.type)) {
+          const v = r.data ? r.data[col.field.key] : null;
+          if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) items.push({ label: T('Copy value'), key: col.field.label, run: () => this.copyVal(v) });
+        }
+        if (this.canDelete) items.push({ sep: true }, { label: T('Delete'), danger: true, run: () => this.deleteRecord(r) });
+        this.ctxShow(e, r.title, items);
+      },
+      /** The same as ticking the one record and pressing Duplicate; the ticks go back afterwards. */
+      async ctxDuplicate(r) {
+        const keep = this.selectedIds.slice();
+        this.selectedIds = [r.id];
+        try { await this.duplicateInPlace(); } finally { this.selectedIds = keep; }
+      },
+      /** A collection in the list down the left. Only its owner may share or delete it. */
+      ctxColl(e, c) {
+        if (ctxSeen === e) return;
+        ctxSeen = e; e.preventDefault();
+        const own = c.is_owner !== false;
+        const go = async () => { await this.selectCollection(c.id); return !!(this.current && this.current.id === c.id); };
+        const items = [
+          { label: T('Open'), run: () => this.selectCollection(c.id) },
+          { label: T('Collection settings'), run: async () => { if (await go()) this.openCollSettings(); } },
+        ];
+        if (own) items.push({ label: T('Share settings'), run: async () => { if (await go()) { this.openCollSettings(); this.shareExpanded = true; } } });
+        if (own) items.push({ sep: true }, { label: T('Delete collection'), danger: true, run: async () => { if (await go()) this.deleteCollection(); } });
+        this.ctxShow(e, c.name, items);
+      },
+      /** A text box: the clipboard, as EditBase does it. A masked box gives nothing away. */
+      ctxText(e, el) {
+        ctxSeen = e;
+        const ro = !!(el.readOnly || el.disabled);
+        const masked = el.type === 'password' || el.classList.contains('secret-mask');
+        let hasSel = false;
+        try {
+          const a = el.selectionStart, b = el.selectionEnd;
+          hasSel = (a != null && b != null) ? a !== b : String(window.getSelection ? window.getSelection() : '') !== '';
+        } catch (_) { hasSel = false; }
+        const canRead = !!(navigator.clipboard && navigator.clipboard.readText);
+        this.ctxShow(e, '', [
+          { label: T('Cut'), key: 'Ctrl+X', disabled: ro || masked || !hasSel, run: () => this.ctxClip(el, 'cut') },
+          { label: T('Copy'), key: 'Ctrl+C', disabled: masked || !hasSel, run: () => this.ctxClip(el, 'copy') },
+          { label: T('Paste'), key: 'Ctrl+V', disabled: ro || !canRead, run: () => this.ctxPaste(el) },
+          { sep: true },
+          { label: T('Select all text'), key: 'Ctrl+A', run: () => { el.focus(); el.select(); } },
+        ]);
+      },
+      ctxClip(el, kind) {
+        el.focus();
+        let ok = false;
+        try { ok = document.execCommand(kind); } catch (_) { ok = false; }
+        if (!ok) this.showToast(T('The browser only allows this from the keyboard: {keys}', { keys: kind === 'cut' ? 'Ctrl+X' : 'Ctrl+C' }));
+      },
+      /** Reading the clipboard needs the browser's leave; refused, it says which keys do work. */
+      async ctxPaste(el) {
+        let text = '';
+        try { text = await navigator.clipboard.readText(); } catch (_) {
+          this.showToast(T('The browser would not hand over the clipboard. Use {keys} instead.', { keys: 'Ctrl+V' })); return;
+        }
+        if (!text) return;
+        if (el.tagName === 'INPUT') text = text.replace(/\r?\n/g, ' ');
+        el.focus();
+        try {
+          const a = el.selectionStart, b = el.selectionEnd;
+          if (a == null || b == null) throw new Error('no range');
+          el.setRangeText(text, a, b, 'end');
+        } catch (_) { el.value = String(el.value || '') + text; }
+        el.dispatchEvent(new Event('input', { bubbles: true })); // v-model listens for this
+      },
+      /** Opens at the pointer and is then measured, so the whole of it stays on the screen. */
+      ctxShow(e, title, items) {
+        const px = e.clientX, py = e.clientY;
+        this.ctx.title = title || ''; this.ctx.items = items;
+        this.ctx.x = Math.max(6, px); this.ctx.y = Math.max(6, py);
+        this.ctx.open = true;
+        this.$nextTick(() => {
+          const el = document.querySelector('#regibase-root .rb-ctxmenu');
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          this.ctx.x = Math.max(6, Math.min(px, window.innerWidth - r.width - 6));
+          this.ctx.y = Math.max(6, Math.min(py, window.innerHeight - r.height - 6));
+        });
+      },
+      ctxClose() { if (this.ctx.open) this.ctx.open = false; },
+      ctxRun(it) {
+        if (!it || it.disabled) return;
+        this.ctxClose();
+        const p = it.run && it.run();
+        if (p && p.catch) p.catch(() => {});
+      },
+      setAiWidth(w) { const a = parseAiWidth(w); this.aiWidthW = a.w; this.aiWidthU = a.u; },
+      /** The column's width for CSS: a percentage is of the window's width. */
+      aiWidth() { return clampAiWidth(this.aiWidthW, this.aiWidthU).replace(/%$/, 'vw'); },
+      /** The width as it is kept: "500px" or "30%". */
+      aiWidthNow() { return clampAiWidth(this.aiWidthW, this.aiWidthU); },
+      // ---- the edge between the work and the AI assistant (the owner, 2026-10-06) ----
+      // Dragged, the column takes the width the pointer leaves it, in the unit the setting is
+      // kept in (a percentage stays a percentage of the window's width), within the limits
+      // Settings allows and never past the column's own 70% of the window. Let go, it is kept
+      // where Settings keeps it. A double click puts back 500px; ← → move it 10px.
+      aiGripDown(e) {
+        if (e.button !== 0) return;
+        this._aiGrip = { x: e.clientX, w: e.currentTarget.parentElement.getBoundingClientRect().width, was: this.aiWidthNow() };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* the moves still come while the pointer is over it */ }
+        document.documentElement.classList.add('rb-col-resizing');
+        e.preventDefault();
+      },
+      aiGripMove(e) {
+        if (this._aiGrip) this.aiGripPx(this._aiGrip.w + this._aiGrip.x - e.clientX);
+      },
+      aiGripUp() {
+        const g = this._aiGrip;
+        if (!g) return;
+        this._aiGrip = null;
+        document.documentElement.classList.remove('rb-col-resizing');
+        if (this.aiWidthNow() !== g.was) this.aiGripSave();
+      },
+      aiGripPx(px) {
+        const win = window.innerWidth || document.documentElement.clientWidth || 1000;
+        px = Math.max(1, Math.min(px, win * 0.7)); // a pointer past the right edge is the narrowest, not "no width"
+        this.setAiWidth(this.aiWidthU === '%' ? clampAiWidth(px / win * 100, '%') : clampAiWidth(Math.round(px), 'px'));
+      },
+      aiGripKey(e) {
+        const d = { ArrowLeft: 10, ArrowRight: -10 }[e.key];
+        if (!d) return;
+        e.preventDefault();
+        this.aiGripPx(e.currentTarget.parentElement.getBoundingClientRect().width + d);
+        clearTimeout(this._aiGripT);
+        this._aiGripT = setTimeout(() => this.aiGripSave(), 400);
+      },
+      aiGripReset() { this.setAiWidth('500px'); this.aiGripSave(); },
+      async aiGripSave() {
+        clearTimeout(this._aiGripT);
+        const w = this.aiWidthNow();
+        if (this.settingsForm) { this.settingsForm.ai_width = w; this.settingsForm.aiWidthW = this.aiWidthW; this.settingsForm.aiWidthU = this.aiWidthU; }
+        try { await api('settings', { method: 'PUT', body: JSON.stringify({ ai_width: w }) }); } catch (e) { /* kept on this page at least */ }
+      },
+      // ---- the AI assistant (through AI-Hub; the owner, 2026-10-04) ----
+      // It answers in words only: it reads what the browser sends with each question (the
+      // collection names, the open collection's fields and its NON-SECRET records) and
+      // changes nothing. A secret field's value never leaves the browser for the assistant.
+      async aiLoad() {
+        try {
+          const st = await api('ai/status');
+          Object.assign(this.ai, { show: !!st.show, ready: !!st.ready, reason: st.reason || '', model: st.model || '',
+            read: Array.isArray(st.read) ? st.read : [], search: !!st.search, imagesOk: !!st.images });
+        } catch (e) { this.ai.show = false; }
+        if (this.ai.show) await this.aiRestore();
+      },
+      // ---- the conversation lasts while this tab is open and the person stays logged in
+      // (the owner, 2026-10-06). Its token is kept in this tab's sessionStorage, so a reload
+      // goes on with it and a new tab starts afresh; AI-Hub keeps what was said, for the
+      // login it was said in, so after logging out and in again it starts afresh too.
+      aiConvToken(make) {
+        let id = this.ai.conv;
+        if (!id) { try { id = sessionStorage.getItem(AI_CONV_KEY) || ''; } catch (e) { id = ''; } }
+        if (!id && make) {
+          id = this.aiNewConvId();
+          try { sessionStorage.setItem(AI_CONV_KEY, id); } catch (e) { /* kept for this page only */ }
+        }
+        this.ai.conv = id;
+        return id;
+      },
+      /** What AI-Hub still keeps of this tab's conversation, back on the screen. */
+      async aiRestore() {
+        const id = this.aiConvToken(false);
+        if (!id || this.ai.msgs.length) return;
+        try {
+          const r = await hub('?app=regibase&conversation=' + encodeURIComponent(id));
+          const turns = Array.isArray(r && r.turns) ? r.turns : [];
+          if (!this.ai.msgs.length && this.ai.conv === id) {
+            this.ai.msgs = turns.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string')
+              .map((m) => ({ role: m.role, text: m.text }));
+            this.aiScroll();
+          }
+        } catch (e) { /* nothing to show: a new conversation */ }
+      },
+      /**
+       * Save the conversation to Files as Markdown (AI-Hub/RegiBase/…), or have the AI sum
+       * it up once and save the summary. AI-Hub does both, from what it keeps.
+       */
+      async aiSave(summary) {
+        const id = this.aiConvToken(false);
+        if (!id || !this.ai.msgs.length || this.ai.busy || this.ai.saving) return;
+        this.ai.error = '';
+        this.ai.saved = null;
+        this.ai.saving = summary ? 'summary' : 'plain';
+        this.aiScroll();
+        try {
+          let file = null;
+          if (!summary) {
+            file = await hub('/save', { app: 'regibase', conversation: id });
+          } else {
+            const r = await hub('/summary', { app: 'regibase', conversation: id });
+            if (!r || !r.id) throw new Error((r && r.error) || 'not-ready');
+            const until = Date.now() + 10 * 60 * 1000;
+            while (Date.now() < until && !file) {
+              await new Promise((res) => setTimeout(res, 1500));
+              const x = await hub('/result/' + encodeURIComponent(r.id));
+              if (x.state === 'running') continue;
+              if (x.state === 'done' && x.file) { file = x.file; break; }
+              throw new Error(x.error || x.state);
+            }
+            if (!file) throw new Error('timeout');
+          }
+          if (!file || !file.path) throw new Error('not-saved');
+          this.ai.saved = { path: file.path, url: file.url || '' };
+        } catch (e) {
+          const m = String((e && e.message) || e || '');
+          this.ai.error = m === 'empty' || m === 'HTTP 404' ? this.t('There is nothing kept of this conversation to save.')
+            : (summary && ['busy', 'not-ready', 'timeout'].indexOf(m) >= 0 ? this.aiError(e) : this.t('The conversation could not be saved.'));
+        } finally {
+          this.ai.saving = '';
+          this.aiScroll();
+        }
+      },
+      aiNotReady() {
+        return {
+          'no-key': this.t('AI-Hub has no API key yet.'),
+          'no-cli': this.t('AI-Hub\'s command line tool is not set up.'),
+          'no-model': this.t('AI-Hub has no model chosen yet.'),
+          'no-store': this.t('AI-Hub cannot keep an answer on this server.'),
+        }[this.ai.reason] || this.t('The assistant is not ready.');
+      },
+      aiNewConvId() {
+        try {
+          if (window.crypto && crypto.randomUUID) return 'rb-' + crypto.randomUUID();
+        } catch (e) { /* ignore */ }
+        return 'rb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      },
+      aiToggle() {
+        this.ai.open = !this.ai.open;
+        if (this.ai.open) {
+          this.$nextTick(() => { const ta = document.querySelector('#regibase-root .rb-ai textarea'); if (ta) ta.focus(); this.aiScroll(); }); // not $el: the template's root is a fragment (the menu is its last node)
+        }
+      },
+      /** A new conversation. An answer still on its way to the old one is dropped, and the hub forgets the old one. */
+      aiClear() {
+        this.ai.ask += 1;
+        const old = this.aiConvToken(false);
+        if (old) { api('ai/forget', { method: 'POST', body: JSON.stringify({ conversation: old }) }).catch(() => {}); }
+        try { sessionStorage.removeItem(AI_CONV_KEY); } catch (e) { /* nothing kept */ }
+        Object.assign(this.ai, { msgs: [], busy: false, error: '', conv: '', saved: null, note: '' });
+      },
+      aiKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !this.ai.composing && e.keyCode !== 229) {
+          e.preventDefault();
+          this.aiSend();
+        }
+      },
+      aiScroll() { this.$nextTick(() => { const box = this.$refs.aiMsgs; if (box) box.scrollTop = box.scrollHeight; }); },
+      // ---- copying a message, and images with a question (the owner, 2026-10-06) ----
+      /**
+       * Copy one message as it stands on the screen: the person's own words, or the answer's
+       * plain text (Markdown marks and all). The clipboard API where the browser offers it,
+       * otherwise a hidden text box and the copy command.
+       */
+      async aiCopy(m) {
+        const text = String((m && m.text) || '');
+        let ok = false;
+        try {
+          if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; }
+        } catch (e) { ok = false; }
+        if (!ok) {
+          const prev = document.activeElement;
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0;';
+          document.body.appendChild(ta);
+          ta.select();
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(ta);
+          if (prev && prev.focus) { try { prev.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+        }
+        if (!ok) { return; }
+        m.copied = (m.copied || 0) + 1;
+        const mark = m.copied;
+        setTimeout(() => { if (m.copied === mark) { m.copied = 0; } }, 1500);
+      },
+      /** A pasted image goes with the question; pasted words are pasted as ever (text from Word or Excel brings a picture of itself too). */
+      aiPaste(e) {
+        const cd = e.clipboardData;
+        const files = Array.from((cd && cd.files) || []);
+        if (!files.length) { return; }
+        let text = '';
+        try { text = cd.getData('text/plain') || ''; } catch (err) { text = ''; }
+        if (text.trim()) { return; }
+        e.preventDefault();
+        this.aiAddFiles(files);
+      },
+      aiHasFiles(e) {
+        const types = e.dataTransfer && e.dataTransfer.types;
+        return !!types && Array.from(types).includes('Files');
+      },
+      aiDragOver(e) {
+        if (!this.aiHasFiles(e)) { return; }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        this.ai.drop = true;
+      },
+      aiDragLeave(e) {
+        if (!e.currentTarget || !e.currentTarget.contains(e.relatedTarget)) { this.ai.drop = false; }
+      },
+      aiDrop(e) {
+        this.ai.drop = false;
+        if (!this.aiHasFiles(e)) { return; }
+        e.preventDefault();
+        this.aiAddFiles(Array.from(e.dataTransfer.files || []));
+      },
+      /**
+       * Add images to the question: PNG, JPEG, GIF or WebP, up to 4, at most 5 MB each. A photo
+       * longer than 2000px is made smaller here first; anything refused says why under the
+       * thumbnails. AI-Hub checks all of it again on the server.
+       */
+      async aiAddFiles(files) {
+        const MAX_N = 4;
+        const MAX_BYTES = 5 * 1024 * 1024;
+        const TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        this.ai.attNote = '';
+        if (!this.ai.ready) { return; }
+        if (!this.ai.imagesOk) { this.ai.attNote = this.t('This AI connection cannot send images.'); return; }
+        for (const f of files) {
+          if (!TYPES.includes(f.type)) { this.ai.attNote = this.t('Only PNG, JPEG, GIF and WebP images can be sent.'); continue; }
+          if (this.ai.images.length >= MAX_N) { this.ai.attNote = this.t('Up to 4 images can be sent at once.'); break; }
+          let img = null;
+          try { img = await this.aiPrepImage(f, MAX_BYTES); } catch (e) { this.ai.attNote = this.t('The image could not be read.'); continue; }
+          if (!img) { this.ai.attNote = this.t('An image can be at most 5 MB.'); continue; }
+          if (this.ai.images.length >= MAX_N) { this.ai.attNote = this.t('Up to 4 images can be sent at once.'); break; }
+          this.ai.images.push(img);
+        }
+        this.aiScroll();
+      },
+      /** One image, ready to send: made smaller if its long side is over 2000px; null when it is still over the size limit. */
+      async aiPrepImage(file, maxBytes) {
+        const LONG = 2000;
+        let blob = file;
+        const src = URL.createObjectURL(file);
+        try {
+          const im = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+          const w = im.naturalWidth; const h = im.naturalHeight;
+          if (!w || !h) { throw new Error('unreadable'); }
+          if (Math.max(w, h) > LONG) {
+            const k = LONG / Math.max(w, h);
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+            const g = c.getContext('2d');
+            const encode = (type) => new Promise((resolve) => c.toBlob(resolve, type, 0.9));
+            g.drawImage(im, 0, 0, c.width, c.height);
+            blob = await encode(file.type === 'image/jpeg' || file.type === 'image/webp' ? file.type : 'image/png');
+            if (blob && blob.size > maxBytes && blob.type !== 'image/jpeg') {
+              // A photo kept as PNG can still be too large: as JPEG, on white (JPEG has no transparency).
+              g.globalCompositeOperation = 'destination-over';
+              g.fillStyle = '#fff';
+              g.fillRect(0, 0, c.width, c.height);
+              blob = await encode('image/jpeg');
+            }
+            if (!blob) { throw new Error('unreadable'); }
+          }
+        } finally { URL.revokeObjectURL(src); }
+        if (blob.size > maxBytes) { return null; }
+        const url = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = reject; r.readAsDataURL(blob); });
+        const comma = url.indexOf(',');
+        return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: file.name || '', type: blob.type || file.type, size: blob.size, url, data: url.slice(comma + 1) };
+      },
+      aiUnattach(k) {
+        this.ai.images.splice(k, 1);
+        this.ai.attNote = '';
+      },
+      /**
+       * What the model is shown: the collection names, the open collection's field
+       * definitions, and its NON-SECRET records. Secret fields are stripped here too, as
+       * a defence in depth -- a secret value never leaves the browser for the assistant.
+       */
+      aiContext() {
+        const out = { collections: [], collection: '', fields: [], records: [] };
+        for (const c of this.collections || []) { out.collections.push({ name: c.name, icon: c.icon || '' }); }
+        if (!this.current) return out;
+        out.collection = this.current.name;
+        const fields = (this.current.fields || []);
+        for (const f of fields) {
+          out.fields.push({ key: f.key, label: f.label || '', type: f.type || '', secret: !!f.secret, required: !!f.required });
+        }
+        // Non-secret, non-attachment fields only; their on-screen values, capped.
+        const show = fields.filter((f) => !f.secret && f.type !== 'image' && f.type !== 'image_crop' && f.type !== 'file');
+        let chars = 0;
+        for (const rec of (this.records || []).slice(0, 60)) {
+          const row = {};
+          for (const f of show) {
+            const v = rec.data ? rec.data[f.key] : undefined;
+            if (v == null || v === '') continue;
+            const s = Array.isArray(v) ? v.join(', ') : String(v);
+            row[f.key] = s.slice(0, 500);
+            chars += row[f.key].length;
+          }
+          out.records.push(row);
+          if (chars > 20000) break;
+        }
+        return out;
+      },
+      aiError(e) {
+        const m = String((e && e.message) || e || '');
+        if (m === 'busy') return this.t('Too many questions at once. Wait a moment and ask again.');
+        if (m === 'not-ready') return this.aiNotReady();
+        if (m === 'not-allowed' || m === 'user-not-allowed') return this.t('The administrator has not allowed the assistant for you.');
+        if (m === 'app-not-allowed') return this.t('AI-Hub does not allow RegiBase to ask.');
+        if (m === 'timeout') return this.t('No answer came back in time.');
+        if (m === 'no-images') return this.t('This AI connection cannot send images.');
+        if (m === 'too-many-images') return this.t('Up to 4 images can be sent at once.');
+        if (m === 'image-too-large') return this.t('An image can be at most 5 MB.');
+        if (m === 'image-type') return this.t('Only PNG, JPEG, GIF and WebP images can be sent.');
+        return this.t('The assistant could not answer: {e}', { e: m });
+      },
+      async aiSend() {
+        const text = this.ai.input.trim();
+        const images = this.ai.images.slice();
+        if ((!text && !images.length) || this.ai.busy || !this.ai.ready) return;
+        this.aiConvToken(true);
+        this.ai.input = '';
+        this.ai.error = '';
+        this.ai.saved = null;
+        this.ai.note = '';
+        this.ai.images = [];
+        this.ai.attNote = '';
+        this.ai.msgs.push({ role: 'user', text, images: images.map((im) => ({ url: im.url, name: im.name })) });
+        this.aiScroll();
+        await this.aiRound(text, images);
+      },
+      /** One question and its answer: ask, then poll for the result every 1.5 s, up to 10 minutes. */
+      async aiRound(message, images = []) {
+        const ticket = this.ai.ask;
+        const conv = this.aiConvToken(true);
+        let fresh = false;
+        // A turn that had images says how many; the images themselves go with their own question only.
+        const history = this.ai.msgs.slice(0, -1).map((m) => (m.images && m.images.length ? { role: m.role, text: m.text, images: m.images.length } : { role: m.role, text: m.text }));
+        this.ai.busy = true;
+        this.aiScroll();
+        let answer = null;
+        try {
+          const r = await api('ai/ask', { method: 'POST', body: JSON.stringify({ history, message, context: this.aiContext(), conversation: conv,
+            images: images.map((im) => ({ type: im.type, data: im.data })) }) });
+          if (!r || !r.id) throw new Error((r && r.error) || 'not-ready');
+          const until = Date.now() + 10 * 60 * 1000;
+          while (Date.now() < until) {
+            await new Promise((res) => setTimeout(res, 1500));
+            if (ticket !== this.ai.ask) return;
+            const x = await api('ai/result/' + encodeURIComponent(r.id));
+            if (x.state === 'running') continue;
+            if (x.state === 'done') { answer = String(x.text || ''); fresh = !!x.fresh; break; }
+            throw new Error(x.error || x.state);
+          }
+          if (answer === null) throw new Error('timeout');
+        } catch (e) {
+          if (ticket === this.ai.ask) { this.ai.busy = false; this.ai.error = this.aiError(e); this.aiScroll(); }
+          return;
+        }
+        if (ticket !== this.ai.ask) return;
+        // AI-Hub no longer kept the conversation (a new login, or twelve hours unused): what the
+        // screen still showed before this question is gone from the AI too, so it goes from here.
+        if (fresh && this.ai.msgs.length > 1) {
+          this.ai.msgs = this.ai.msgs.slice(-1);
+          this.ai.note = this.t('The earlier conversation had ended, so this one starts afresh.');
+        }
+        this.ai.msgs.push({ role: 'assistant', text: answer.trim() });
+        this.ai.busy = false;
+        this.aiScroll();
+      },
       // ---- encryption (secret fields, client-side) ----
       // Remember the master key on this device so reloads skip the prompt (review K9): as a key
       // the browser will use but never hand out (non-extractable, in IndexedDB), and only for
@@ -3278,8 +3942,9 @@
       },
       async saveSettings() {
         try {
-          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider, undo_limit: this.settingsForm.undo_limit, version_keep: this.settingsForm.version_keep, version_when: this.settingsForm.version_when }) });
+          const s = await api('settings', { method: 'PUT', body: JSON.stringify({ files_folder: this.settingsForm.files_folder, theme: this.settingsForm.theme, language: this.settingsForm.language, map_provider: this.settingsForm.map_provider, undo_limit: this.settingsForm.undo_limit, version_keep: this.settingsForm.version_keep, version_when: this.settingsForm.version_when, ai_width: clampAiWidth(this.settingsForm.aiWidthW, this.settingsForm.aiWidthU) }) });
           this.settingsForm = s; this.theme = s.theme || 'auto'; this.applyTheme();
+          this.setAiWidth(s.ai_width);
           this.languages = s.languages || this.languages;
           await this.applyLanguage(s.language || 'auto');
           this.modal = null; this.showToast(T('Settings saved'));
@@ -4506,7 +5171,7 @@
           this.modal = null;
           await this.loadCollections();
           this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
-          if (res.collectionId) this.selectCollection(res.collectionId);
+          if (res.collectionId) { await this.selectCollection(res.collectionId); this.warnPlainSecrets(); }
         } catch (e) { this.contactsImport.err = e.message || String(e); }
         finally { this.contactsImport.busy = false; }
       },
@@ -4530,7 +5195,7 @@
           this.modal = null;
           await this.loadCollections();
           this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
-          if (res.collectionId) this.selectCollection(res.collectionId);
+          if (res.collectionId) { await this.selectCollection(res.collectionId); this.warnPlainSecrets(); }
         } catch (e) { this.tablesImport.err = e.message || String(e); }
         finally { this.tablesImport.busy = false; }
       },
@@ -4582,8 +5247,17 @@
           await this.loadCollections();
           await this.selectCollection(res.collectionId);
           this.showToast(TN('Imported {n} items', res.imported, 'Imported {n} item'));
+          this.warnPlainSecrets();
         } catch (e) { alert(T('Import failed') + ': ' + e.message); }
         finally { this.importBusy = false; }
+      },
+      // A server-side import (CSV/JSON, Tables, Contacts) stores what it brings in as it is,
+      // secret fields too: they are encrypted when the owner opens the collection with the
+      // master key unlocked (autoEncryptCurrent). Locked, the owner is told so (review).
+      warnPlainSecrets() {
+        if (!this.current || this.current.is_owner === false || !this.enc.enabled || this.enc.unlocked) return;
+        if (!(this.current.fields || []).some((f) => f.secret)) return;
+        alert(T('The secret fields were imported as plain text. Unlock the master key and open this collection to encrypt them.'));
       },
       // ---- selection ----
       isSelected(id) { return this.selectedIds.includes(id); },
@@ -4976,6 +5650,8 @@
         if (url) window.open(url, '_blank', 'noopener');
       },
       displayVal(rec, f) {
+        // a secret not shared with the viewer: the server does not send its value at all
+        if (f.secret && this.secretsMasked) return '🔒';
         const v = rec.data[f.key];
         if (v == null || v === '') return '—';
         if (f.secret) { if (!this.reveal[f.key]) return '••••••••'; const p = this.openDecrypted[f.key]; return p != null ? p : T('(decrypting…)'); }

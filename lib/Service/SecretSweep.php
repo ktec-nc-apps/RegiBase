@@ -9,9 +9,12 @@ use OCP\IDBConnection;
 
 /**
  * Secret values kept outside the records themselves: in the numbered versions beside each
- * record and in the undo history. A master key change (set, change, remove) has to reach
- * them too, or the history keeps plain text after encryption is switched on, and an undo or
- * a version restore after a key change writes back values nobody can open (review P9, K12).
+ * record, in the versions by session (what a record was before a session first touched it)
+ * and in the undo history. A master key change (set, change, remove) has to reach them too,
+ * or the history keeps plain text after encryption is switched on, and an undo or a version
+ * restore after a key change writes back values nobody can open (review P9, K12). The
+ * versions by session were left out, and putting one back brought the old values back
+ * (review).
  *
  * The page does the cryptography; this lists what it has to transform and writes the result
  * back. A value is included when its field is secret, or when it is encrypted whatever the
@@ -19,6 +22,8 @@ use OCP\IDBConnection;
  */
 class SecretSweep {
 	private const ENC = 'rbenc1:';
+	/** A version-by-session item is listed among `vers` under this prefix ("i<item id>"); a numbered version by its plain id. */
+	private const ITEM = 'i';
 
 	public function __construct(private IDBConnection $db) {
 	}
@@ -58,7 +63,8 @@ class SecretSweep {
 
 	/**
 	 * @return array{vers: list<array>, hist: list<array>, wraps: array<string, string>}
-	 *   vers: {ref: version id, collection, data}; hist: {ref: "row:spot", collection, data};
+	 *   vers: {ref: version id, or "i<item id>" for a version-by-session item, collection, data};
+	 *   hist: {ref: "row:spot", collection, data};
 	 *   wraps: the own key of a deleted collection kept in the history, under "h<row>".
 	 */
 	public function collect(string $uid): array {
@@ -70,6 +76,13 @@ class SecretSweep {
 			$picked = self::pick($data, $map[(int)$row['collection_id']] ?? []);
 			if ($picked) {
 				$vers[] = ['ref' => (int)$row['id'], 'collection' => (int)$row['collection_id'], 'data' => $picked];
+			}
+		}
+		// the versions by session: the record as it was before the session touched it
+		foreach ($this->itemRows(array_keys($map)) as $row) {
+			$picked = self::pick(self::itemData((string)$row['data']), $map[(int)$row['collection_id']] ?? []);
+			if ($picked) {
+				$vers[] = ['ref' => self::ITEM . $row['id'], 'collection' => (int)$row['collection_id'], 'data' => $picked];
 			}
 		}
 		$hist = [];
@@ -105,8 +118,25 @@ class SecretSweep {
 		foreach ($this->versionRows(array_keys($map)) as $row) {
 			$byId[(int)$row['id']] = $row;
 		}
+		$itemById = [];
+		foreach ($this->itemRows(array_keys($map)) as $row) {
+			$itemById[(int)$row['id']] = $row;
+		}
 		foreach ($vers as $it) {
-			$id = (int)($it['ref'] ?? 0);
+			$ref = $it['ref'] ?? 0;
+			if (is_string($ref) && str_starts_with($ref, self::ITEM)) {
+				// a version-by-session item: the record data is a JSON string inside its JSON
+				$id = (int)substr($ref, strlen(self::ITEM));
+				if (!isset($itemById[$id]) || !is_array($it['data'] ?? null)) {
+					throw new \InvalidArgumentException('Bad version: ' . $ref);
+				}
+				$pre = json_decode((string)$itemById[$id]['data'], true) ?: [];
+				$data = self::itemData((string)$itemById[$id]['data']);
+				$pre['data'] = json_encode($this->merge($data, $it['data'], $map[(int)$itemById[$id]['collection_id']] ?? []), JSON_UNESCAPED_UNICODE);
+				$out[] = ['regibase_version_items', 'data', $id, json_encode($pre, JSON_UNESCAPED_UNICODE)];
+				continue;
+			}
+			$id = (int)$ref;
 			if (!isset($byId[$id]) || !is_array($it['data'] ?? null)) {
 				throw new \InvalidArgumentException('Bad version: ' . $id);
 			}
@@ -259,6 +289,27 @@ class SecretSweep {
 			array_push($rows, ...$q->executeQuery()->fetchAll());
 		}
 		return $rows;
+	}
+
+	/** The items of the versions by session that keep a record as it was ("pre"), for these collections. */
+	private function itemRows(array $cids): array {
+		$rows = [];
+		foreach (array_chunk($cids, 500) as $chunk) {
+			$q = $this->db->getQueryBuilder();
+			$q->select('i.id', 'i.data', 'v.collection_id')->from('regibase_version_items', 'i')
+				->innerJoin('i', 'regibase_versions', 'v', $q->expr()->eq('v.id', 'i.version_id'))
+				->where($q->expr()->in('v.collection_id', $q->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($q->expr()->eq('i.kind', $q->createNamedParameter('pre')));
+			array_push($rows, ...$q->executeQuery()->fetchAll());
+		}
+		return $rows;
+	}
+
+	/** The record data a version-by-session item keeps: VersionJournal writes it as a JSON string inside the item's JSON. */
+	public static function itemData(string $json): array {
+		$pre = json_decode($json, true);
+		$data = is_array($pre) ? json_decode((string)($pre['data'] ?? '{}'), true) : null;
+		return is_array($data) ? $data : [];
 	}
 
 	/** The user's own history, and anybody's history about the user's collections. */

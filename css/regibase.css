@@ -610,8 +610,10 @@
   /* Full-screen modals: no mask padding + stretch so the header ✕ and footer
      buttons stay on-screen (otherwise a 100dvh modal in a padded mask overflows
      and its close/cancel controls get pushed out of view). */
-  #regibase-root .modal-mask { padding: 0; align-items: stretch; }
-  #regibase-root .modal { width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  /* Nextcloud's header stays on top of everything in the content area, so the dialog
+     starts below it rather than under it. */
+  #regibase-root .modal-mask { padding: var(--header-height, 50px) 0 0; align-items: stretch; }
+  #regibase-root .modal { width: 100%; max-height: calc(100dvh - var(--header-height, 50px)); height: calc(100dvh - var(--header-height, 50px)); border-radius: 0; }
   #regibase-root .modal.wide { width: 100%; }
   #regibase-root .content { padding: 14px 14px 40px; }
   /* Header wraps to its own full row. Row 1: view switcher (left) + New record
@@ -904,3 +906,260 @@
 #regibase-root .concat-sep-label { display: block; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 #regibase-root .concat-sep-opts { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 #regibase-root .concat-sep-opts label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
+
+/* The AI assistant (through AI-Hub) at the far right of the layout (the owner, 2026-10-04).
+   Shut: a narrow strip with the name written downwards and a triangle pointing the way it
+   opens. Open: a column whose width is the user setting (Settings -> "Width of the AI
+   assistant"), carried in --rb-ai-width. On a narrow screen the column stacks under the
+   content. It reads only what the browser sends -- never a secret field -- and changes nothing. */
+#regibase-root .rb-aibar {
+  flex: 0 0 28px; width: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 10px;
+  background: var(--surface); border-left: 1px solid var(--border); -webkit-user-select: none; user-select: none;
+}
+#regibase-root .rb-aibar .lb { writing-mode: vertical-rl; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .5px; white-space: nowrap; }
+#regibase-root .rb-aibar .hnd, #regibase-root .rb-ai-head .hnd {
+  flex: 0 0 auto; border: 0; border-radius: 6px; padding: 8px 5px; background: var(--surface-2); color: var(--muted);
+  cursor: pointer; font-size: 11px; line-height: 1;
+}
+#regibase-root .rb-aibar .hnd:hover, #regibase-root .rb-ai-head .hnd:hover { background: var(--primary); color: var(--primary-ink); }
+#regibase-root .rb-ai {
+  width: var(--rb-ai-width, 500px); flex: 0 0 var(--rb-ai-width, 500px); max-width: 70vw; min-width: 0;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface); border-left: 1px solid var(--border); font-size: 13px;
+}
+/* The edge between the work and the assistant (the owner, 2026-10-06): a thin strip over
+   the column's left border. Pointed at, it shows the resize cursor and a line in the accent
+   colour; dragged, it sets the column's width. Not on a narrow screen, where the column
+   stacks under the work. */
+#regibase-root .rb-ai { position: relative; }
+#regibase-root .rb-ai-grip {
+  position: absolute; top: 0; bottom: 0; left: -2px; width: 8px; z-index: 6;
+  cursor: col-resize; touch-action: none; outline: none;
+}
+#regibase-root .rb-ai-grip::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 1px; width: 2px; background: transparent; transition: background .15s;
+}
+#regibase-root .rb-ai-grip:hover::after, #regibase-root .rb-ai-grip:focus-visible::after,
+html.rb-col-resizing #regibase-root .rb-ai-grip::after { background: var(--primary); }
+html.rb-col-resizing, html.rb-col-resizing * { cursor: col-resize !important; -webkit-user-select: none !important; user-select: none !important; }
+#regibase-root .rb-ai-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 8px 10px 14px; min-height: 56px; box-sizing: border-box;
+  font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+#regibase-root .rb-ai-head .ttl { color: var(--text); white-space: nowrap; }
+#regibase-root .rb-ai-head .sub { font-weight: 400; font-size: 11.5px; white-space: nowrap; }
+#regibase-root .rb-ai-head .grow { flex: 1 1 auto; }
+#regibase-root .rb-ai-head .model { font-weight: 400; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30%; }
+#regibase-root .rb-ai-msgs { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+#regibase-root .rb-ai-msgs .rb-ai-hint { color: var(--muted); margin: 4px 0; }
+#regibase-root .rb-ai-msgs .rb-ai-msg { display: flex; flex-direction: column; max-width: 92%; }
+#regibase-root .rb-ai-msgs .rb-ai-msg.is-user { align-self: flex-end; align-items: flex-end; }
+#regibase-root .rb-ai-msgs .rb-ai-msg.is-bot { align-self: flex-start; }
+/* The answer is shown as the plain text it is: line breaks kept, nothing read as HTML. */
+#regibase-root .rb-ai-msgs .rb-ai-bubble { display: block; position: static; padding: 7px 11px; border-radius: 10px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+#regibase-root .rb-ai-msgs .rb-ai-msg.is-user .rb-ai-bubble { background: color-mix(in srgb, var(--primary) 14%, var(--surface)); }
+#regibase-root .rb-ai-msgs .rb-ai-msg.is-bot .rb-ai-bubble { background: var(--surface-2); }
+#regibase-root .rb-ai-msgs .rb-ai-bubble.is-busy { color: var(--muted); }
+#regibase-root .rb-ai-msgs .rb-ai-err { color: var(--danger); margin: 2px 0; }
+/* Saving the conversation to Files (the owner, 2026-10-06): two small icon buttons in the
+   head, and a line under the messages that says where it went. */
+#regibase-root .rb-ai-head .rb-ai-ic {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer;
+}
+#regibase-root .rb-ai-head .rb-ai-ic:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border); }
+#regibase-root .rb-ai-head .rb-ai-ic:disabled { opacity: .4; cursor: default; }
+#regibase-root .rb-ai-head .rb-ai-ic svg { display: block; }
+/* A narrow column (down to 240px): the head stays one row -- "New conversation" keeps only its
+   "＋" (the words stay in its tooltip), and the gaps close up. */
+#regibase-root .rb-ai { container-type: inline-size; }
+@container (max-width: 420px) {
+  #regibase-root .rb-ai-head { gap: 4px; padding-left: 10px; }
+  #regibase-root .rb-ai-head .rb-ai-new .lb { display: none; }
+  #regibase-root .rb-ai-head .rb-ai-new { padding-left: 8px; padding-right: 8px; }
+}
+#regibase-root .rb-ai-msgs .rb-ai-note { color: var(--muted); margin: 2px 0; font-size: 12.5px; }
+#regibase-root .rb-ai-msgs .rb-ai-saved { color: var(--muted); margin: 2px 0; font-size: 12.5px; overflow-wrap: anywhere; }
+#regibase-root .rb-ai-msgs .rb-ai-saved a { color: var(--primary); text-decoration: underline; white-space: nowrap; }
+#regibase-root .rb-ai-foot { display: flex; gap: 6px; align-items: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); }
+#regibase-root .rb-ai-foot textarea {
+  flex: 1 1 auto; min-height: 40px; max-height: 160px; resize: vertical; font: inherit; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; background: var(--surface); color: var(--text);
+}
+#regibase-root .rb-ai-foot textarea:focus { outline: none; border-color: var(--primary); }
+/* Copying a message, and images with a question (the owner, 2026-10-06). The copy button sits
+   beside the message -- left of the person's, right of the answer's -- and shows while the
+   pointer is on the message (always, faintly, where there is no pointer to hover with). */
+#regibase-root .rb-ai-msgs .rb-ai-msg { position: relative; max-width: calc(100% - 34px); }
+#regibase-root .rb-ai-copy {
+  position: absolute; bottom: 0; box-sizing: border-box; width: 28px; height: 28px; min-width: 0; min-height: 0; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
+  font: inherit; font-size: 13px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .12s;
+}
+#regibase-root .rb-ai-msg.is-bot .rb-ai-copy { left: calc(100% + 4px); }
+#regibase-root .rb-ai-msg.is-user .rb-ai-copy { right: calc(100% + 4px); }
+#regibase-root .rb-ai-msgs .rb-ai-msg:hover .rb-ai-copy, #regibase-root .rb-ai-copy:focus-visible, #regibase-root .rb-ai-copy.done { opacity: 1; }
+#regibase-root .rb-ai-copy:hover { color: var(--text); border-color: var(--primary); }
+#regibase-root .rb-ai-copy.done { color: var(--primary); border-color: var(--primary); }
+@media (hover: none) { #regibase-root .rb-ai-copy { opacity: .75; } }
+#regibase-root .rb-ai-copied {
+  position: absolute; bottom: 3px; white-space: nowrap; pointer-events: none;
+  padding: 2px 7px; border-radius: 4px; font-size: 11.5px; line-height: 1.5; background: var(--text); color: var(--surface);
+}
+/* the label sits beside the button, over the message's corner: never past the panel's edge, nor above the first message */
+#regibase-root .rb-ai-msg.is-bot .rb-ai-copied { right: calc(100% + 4px); }
+#regibase-root .rb-ai-msg.is-user .rb-ai-copied { left: calc(100% + 4px); }
+#regibase-root .rb-ai-imgs { display: flex; flex-wrap: wrap; gap: 4px; margin: 1px 0 4px; white-space: normal; }
+#regibase-root .rb-ai-imgs img { display: block; max-width: 140px; max-height: 140px; border-radius: 6px; object-fit: contain; background: var(--surface); }
+#regibase-root .rb-ai-foot { flex-wrap: wrap; }
+/* the box and Send stay on one line, the thumbnails above them */
+#regibase-root .rb-ai-foot textarea { flex-basis: 0; min-width: 0; }
+#regibase-root .rb-ai-att { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+#regibase-root .rb-ai-thumb {
+  position: relative; width: 56px; height: 56px; flex: 0 0 56px; box-sizing: border-box; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+}
+#regibase-root .rb-ai-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+#regibase-root .rb-ai-thumb button {
+  position: absolute; top: 2px; right: 2px; box-sizing: border-box; width: 20px; height: 20px; min-width: 0; min-height: 0; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%;
+  background: rgba(0, 0, 0, .62); color: #fff; font: inherit; font-size: 14px; line-height: 1; cursor: pointer;
+}
+#regibase-root .rb-ai-thumb button:hover, #regibase-root .rb-ai-thumb button:focus-visible { background: var(--danger, #c00); }
+#regibase-root .rb-ai-attnote { flex: 1 0 100%; margin: 0; color: var(--danger); font-size: 12.5px; }
+#regibase-root .rb-ai.is-drop { outline: 2px dashed var(--primary); outline-offset: -4px; }
+@media (max-width: 780px) {
+  #regibase-root .layout.has-ai { flex-direction: column; }
+  #regibase-root .layout.has-ai .main { flex: 1 1 auto; min-height: 0; }
+  #regibase-root .rb-ai { width: 100%; flex: 0 0 45%; max-width: none; border-left: 0; border-top: 1px solid var(--border); }
+  #regibase-root .rb-ai-grip { display: none; }
+  #regibase-root .rb-aibar { width: 100%; flex: 0 0 30px; flex-direction: row; justify-content: center; padding: 0 10px; border-left: 0; border-top: 1px solid var(--border); }
+  #regibase-root .rb-aibar .lb { writing-mode: horizontal-tb; }
+}
+
+/* ---------- the settings tabs (the owner, 2026-10-04; the look of NetBase's) ----------
+   A strip of tabs on a line, the open one joined to the panel below: it takes the panel's own
+   background and carries the accent along its bottom edge. A closed tab is darker than the
+   panel so it reads as closed. One group is on screen at a time. */
+#regibase-root .set-tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 2px solid var(--primary); margin: 0 0 18px; }
+#regibase-root .set-tab {
+  flex: 1 1 auto; min-width: 0; position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: color-mix(in srgb, var(--border) 85%, var(--surface-2));
+  color: var(--text); border: 1px solid var(--border); border-bottom: 0;
+  border-radius: 8px 8px 0 0; margin: 0 -1px -1px 0;
+  padding: 10px 14px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#regibase-root .set-tab:hover { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); }
+#regibase-root .set-tab.active { background: var(--surface); color: var(--primary); border-color: var(--border); z-index: 1; }
+#regibase-root .set-tab.active::after { content: ""; position: absolute; left: -1px; right: -1px; bottom: -2px; height: 2px; background: var(--primary); }
+#regibase-root .set-tab .ic { flex: 0 0 auto; font-size: 15px; line-height: 1; }
+@media (max-width: 520px) { #regibase-root .set-tab { flex: 1 1 100%; border-radius: 0; margin-right: 0; } }
+
+/* ---------- the right button (the owner, 2026-10-04; the look of EditBase's menu) ----------
+   Drawn in this app's own colours, so dark mode follows. It floats above the dialogs, where the
+   browser's own menu also sat. */
+#regibase-root .rb-ctxmenu {
+  position: fixed; z-index: 12001; min-width: 238px; max-width: min(380px, calc(100vw - 12px)); padding: 5px; font-size: 13.5px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 11px; box-shadow: var(--shadow); -webkit-user-select: none; user-select: none;
+}
+#regibase-root .rb-ctxmenu .ci {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  width: 100%; position: relative; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box;
+  background: none; border: 0; color: inherit; padding: 6px 10px; border-radius: 7px;
+}
+#regibase-root .rb-ctxmenu .ci:hover, #regibase-root .rb-ctxmenu .ci:focus-visible { background: var(--surface-2); }
+#regibase-root .rb-ctxmenu .ci[disabled] { opacity: .38; cursor: default; }
+#regibase-root .rb-ctxmenu .ci[disabled]:hover { background: none; }
+#regibase-root .rb-ctxmenu .ci .s { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+#regibase-root .rb-ctxmenu .sep { height: 1px; background: var(--border); margin: 5px 6px; }
+/* the name of what the menu is about: the record's title or the collection's name */
+#regibase-root .rb-ctxmenu .hd { padding: 5px 10px 6px; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#regibase-root .rb-ctxmenu .ci.danger { color: var(--danger); }
+#regibase-root .rb-ctxmenu .ci.danger:hover { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+
+/* ---------- settings dialog: the look shared by the Base-series apps ----------
+   NetBase's settings dialog is the reference (the owner, 2026-10-04): a head that
+   says whose settings these are, tabs with an icon each, one heading per tab, the
+   theme as three pictured cards, and a quiet line of help under each control. The
+   rules below are the same in every app, so the dialogs read as one family. */
+#regibase-root .set-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+#regibase-root .set-head .ic.big { font-size: 28px; line-height: 1; flex: 0 0 auto; font-family: inherit; }
+/* One width for the dialog in every app: NetBase's. */
+#regibase-root .modal:has(> .set-head), #regibase-root .eb-modal:has(> .set-head) { width: min(660px, 94vw); max-width: 100%; }
+#regibase-root .set-head > div { flex: 1 1 auto; min-width: 0; }
+#regibase-root .set-head strong { display: block; font-size: 17px; font-weight: 700; color: var(--text); }
+#regibase-root .set-head .dim { font-size: 12.5px; color: var(--muted); }
+#regibase-root .set-close { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; line-height: 1; }
+#regibase-root .set-close:hover { color: var(--primary); border-color: var(--primary); }
+#regibase-root .set-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; display: block; }
+#regibase-root .set-group > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; font-size: 15.5px; font-weight: 700; color: var(--text); }
+#regibase-root .set-group > h3 .ic { font-size: 16px; line-height: 1; }
+/* A sub-heading needs air above it or it reads as a caption of the paragraph it
+   sits under; only the one right after the tab's own title sits close to it. */
+#regibase-root .set-group h4 { margin: 0 0 8px; padding: 22px 0 0; font-size: 12.5px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+#regibase-root .set-group > h3 + h4 { padding-top: 4px; }
+#regibase-root .set-group .fl { display: flex; flex-direction: column; gap: 5px; margin: 0 0 4px; min-width: 0; }
+#regibase-root .set-group .fl-label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+#regibase-root .set-group .fl > input, #regibase-root .set-group .fl > select, #regibase-root .set-group .fl > textarea,
+#regibase-root .set-group .fl-row > input, #regibase-root .set-group .fl-row > select,
+#regibase-root .set-group .ai-widthbox > input, #regibase-root .set-group .ai-widthbox > select {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 14px; outline: none; margin: 0; box-sizing: border-box;
+}
+#regibase-root .set-group input:focus, #regibase-root .set-group select:focus, #regibase-root .set-group textarea:focus { border-color: var(--primary); }
+/* An explanation is meant to be read, not squinted at: quiet, under the thing it explains. */
+#regibase-root .set-group p.dim { margin: 6px 0 0; font-size: 12.5px; line-height: 1.65; color: var(--muted); }
+#regibase-root .set-group p.dim + p.dim { margin-top: 4px; }
+#regibase-root .set-group p.dim b { color: var(--text); }
+#regibase-root .set-group p.dim b.on { color: var(--accent, var(--primary)); }
+#regibase-root .set-group .fl-row { display: flex; gap: 12px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+#regibase-root .set-group .fl-row > .fl { flex: 1 1 auto; margin: 0; }
+#regibase-root .set-group .fl-row > .fl.short { flex: 0 0 110px; }
+#regibase-root .set-group .fl-row.inline { margin-top: 8px; font-size: 13px; }
+#regibase-root .set-group .fl-row.inline > input, #regibase-root .set-group .fl-row.inline > select { width: auto; }
+#regibase-root .set-group .fl-row.inline > input.short { width: 88px; }
+#regibase-root .set-group .fl-row > .grow { flex: 1 1 auto; min-width: 0; width: auto; }
+#regibase-root .set-group .fl-row.range > input[type=range] { flex: 1 1 auto; width: auto; padding: 0; border: 0; background: transparent; accent-color: var(--primary); }
+#regibase-root .set-group .fl-row.range > .pct { min-width: 40px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+#regibase-root .set-group .fl-row.act { align-items: center; }
+#regibase-root .set-group .fl-row.act > .btn { min-width: 190px; }
+#regibase-root .set-group .fl-row.act > .dim { flex: 1 1 200px; font-size: 12.5px; line-height: 1.5; }
+#regibase-root .set-group .opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+#regibase-root .set-group .opt input { margin: 0; accent-color: var(--primary); }
+#regibase-root .set-group .ai-widthbox { display: inline-flex; gap: 6px; align-items: center; }
+#regibase-root .set-group .ai-widthbox > input { width: 110px; }
+#regibase-root .set-group .ai-widthbox > select { width: 80px; }
+/* The theme as three pictured cards: a miniature of the app (title bar, two lines of
+   text), with 'auto' split down the middle. The picked one carries a tick. */
+#regibase-root .theme-picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+#regibase-root .theme-pick {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 12px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface);
+  color: var(--text); text-align: left; font: inherit; font-size: 13.5px; cursor: pointer; margin: 0; width: 100%;
+}
+#regibase-root .theme-pick:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+#regibase-root .theme-pick.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+#regibase-root .theme-pick strong { font-weight: 700; }
+#regibase-root .theme-pick .dim { font-size: 12px; line-height: 1.35; color: var(--muted); }
+#regibase-root .theme-pick .tick { position: absolute; top: 8px; right: 10px; color: var(--primary); font-weight: 800; }
+#regibase-root .theme-pick .swatch {
+  width: 100%; height: 46px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 4px;
+  padding: 6px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; position: relative; box-sizing: border-box;
+}
+#regibase-root .theme-pick .swatch i { display: block; border-radius: 2px; }
+#regibase-root .theme-pick .swatch i.bar { height: 8px; width: 60%; }
+#regibase-root .theme-pick .swatch i.line { height: 5px; width: 100%; }
+#regibase-root .theme-pick .swatch i.line.short { width: 70%; }
+#regibase-root .theme-pick .swatch.light { background: #f4f6fb; }
+#regibase-root .theme-pick .swatch.light i.bar { background: #2563eb; }
+#regibase-root .theme-pick .swatch.light i.line { background: #cbd5e1; }
+#regibase-root .theme-pick .swatch.dark { background: #0b1220; }
+#regibase-root .theme-pick .swatch.dark i.bar { background: #4f8cff; }
+#regibase-root .theme-pick .swatch.dark i.line { background: #334565; }
+#regibase-root .theme-pick .swatch.auto { background: linear-gradient(105deg, #f4f6fb 0 50%, #0b1220 50% 100%); }
+#regibase-root .theme-pick .swatch.auto i.bar { background: linear-gradient(105deg, #2563eb 0 50%, #4f8cff 50% 100%); }
+#regibase-root .theme-pick .swatch.auto i.line { background: linear-gradient(105deg, #cbd5e1 0 50%, #334565 50% 100%); }
