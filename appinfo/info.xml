@@ -3,7 +3,7 @@
 	<id>regibase</id>
 	<name>RegiBase</name>
 	<summary>Personal database — templates, sharing, encryption, Tables integration and multiple views</summary>
-	<summary lang="ja">個人用データベース ― テンプレート・共有・暗号化・Tables連携・複数の表示形式に対応</summary>
+	<summary lang="ja">テンプレート、共有、暗号化、Tables 連携、多彩な表示形式に対応したパーソナルデータベース</summary>
 	<description><![CDATA[RegiBase is a lightweight personal database for the information you want to keep — credit cards, bank accounts, online accounts, memberships, licenses, contacts and anything else.
 
 Design your own fields (or start from a template), then browse records as a list, a spreadsheet-style table (with a frozen first column), or cards, and choose per field which of those views it appears in.
@@ -25,28 +25,28 @@ Features:
 - Command-line access via occ — list / get / export / find (with regex), plus master-key management (set / change / remove) — with opt-in secret decryption
 - An AI assistant, through the AI-Hub app: a chat beside the open collection that answers in words and writes out what to type. It never sees the value of a secret field. Without AI-Hub it is simply not shown
 - Available in 21 languages (Portuguese in both Brazilian and European forms)]]></description>
-	<description lang="ja"><![CDATA[RegiBaseは、クレジットカード・銀行口座・オンラインアカウント・会員情報・ライセンス・連絡先など、残しておきたい情報を管理する軽量なパーソナルデータベースです。
+	<description lang="ja"><![CDATA[RegiBase は、クレジットカード、銀行口座、オンラインアカウント、会員情報、ライセンス、連絡先など、手元に残しておきたい情報を管理するための軽量なパーソナルデータベースです。
 
-項目は自由に設計でき（テンプレートから始めることも可能）、レコードはリスト・表計算風テーブル（先頭列固定）・カードの表示形式で閲覧でき、項目ごとにどの表示に出すかを選べます。
+項目は自由に設計でき、テンプレートから始めることもできます。レコードはリスト、表計算ソフトのようなテーブル（先頭列を固定）、カードで表示でき、各項目をどの表示に出すかも項目ごとに選べます。
 
-RegiBaseは、お使いの他のNextcloudアプリ（Contacts・Tables・Files・Notes・Calendar）と連携し、導入されているものを活用します。
+RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の Nextcloud アプリがインストールされていれば、それらと連携して動作します。
 
 主な機能:
-- 項目ごとに入力規則を設定できるカスタムフォーム項目。再利用可能なテンプレートから作成
-- 自分のテンプレートを保存でき、初期テンプレートも編集可能（ユーザーごとの上書き、既定への復元も可能）
-- コレクションの複製（レコードを含めるかどうか選択可）
-- Nextcloudユーザーまたはグループとのコレクション共有（閲覧／編集／削除の3段階、任意のアクセスパスワード、秘密項目の共有にも対応）
-- 秘密項目のクライアント側暗号化（AES-GCM、任意）― サーバーは鍵も平文も一切関知しません
-- Nextcloud Tables連携 ― テーブルを新規コレクションとして取込、またはコレクションをTablesへ書出
-- CSV / JSON（Googleパスワードマネージャーのエクスポート等）や、Nextcloud連絡先（写真含む）からのインポート
-- Nextcloud FilesやNotesからの画像・ファイル添付
-- 日付項目から Nextcloud Calendar にリマインダー追加、住所を地図（Google マップ／Yahoo!地図／OpenStreetMap／Apple マップ／Bing マップ、コレクション毎に選択可）で開く
-- レコードのコレクション間での移動・コピー・マージ
-- パスワード保護された全体バックアップ／復元（AES-256 ZIP）
-- occによるコマンドライン操作 ― 一覧／取得／エクスポート／検索（正規表現対応）とマスターキー管理（設定／変更／削除）、秘密項目の復号はオプトイン
-- AI-Hub アプリを通した AI アシスタント。開いているコレクションの横のチャットが、答えを言葉で返し、入力すべきことを書き出します。秘密項目の値は見ません。AI-Hub が無ければ表示されません
-- 21言語対応（ポルトガル語はブラジルとポルトガルの両方）]]></description>
-	<version>0.21.0</version>
+- 項目ごとに入力規則を設定できるフォーム。再利用できるテンプレートから作成できます
+- 自分で作ったテンプレートの保存と、標準テンプレートの編集（変更はユーザーごとに適用され、初期状態に戻せます）
+- コレクションの複製（レコードも含めるかを選べます）
+- Nextcloud のユーザーやグループとのコレクション共有（閲覧／編集／削除の 3 段階。アクセスパスワードの設定や秘密項目の共有も可能）
+- 秘密項目のクライアント側での暗号化（AES-GCM、任意）。キーや平文がサーバーに渡ることはありません
+- Nextcloud Tables 連携：テーブルを新しいコレクションとしてインポート、またはコレクションを新しい Tables のテーブルとしてエクスポート
+- CSV / JSON（Google パスワードマネージャーのエクスポートなど）や、Nextcloud Contacts（写真を含む）からのインポート
+- Nextcloud Files や Notes からの画像・ファイルの添付
+- 日付の項目から Nextcloud Calendar へのリマインダー追加と、住所の地図表示（Google マップ／Yahoo!地図／OpenStreetMap／Apple マップ／Bing マップ。コレクションごとに選択可能）
+- コレクション間でのレコードの移動・コピー・マージ
+- パスワードで保護された全データのバックアップと復元（AES-256 暗号化 ZIP）
+- occ によるコマンドライン操作：一覧表示、取得、エクスポート、検索（正規表現対応）、マスターキーの管理（設定／変更／削除）。秘密項目の復号は、オプションを指定したときだけ行います
+- AI-Hub アプリを通じた AI アシスタント：開いているコレクションの横にチャットを表示し、質問に文章で答え、入力すべき内容を示します。秘密項目の値を見ることはありません。AI-Hub がない場合は表示されません
+- 21 言語に対応（ポルトガル語はブラジル版とポルトガル版の両方）]]></description>
+	<version>0.21.1</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

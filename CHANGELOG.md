@@ -2,26 +2,31 @@
 
 All notable changes to RegiBase.
 
+## 0.21.1 — 2026-10-11
+
+Only the Japanese text was rewritten — the README, the App Store description and the changelog — to read naturally. No feature was added or changed.
+（README・App Store の説明・変更履歴の日本語の文章を、自然な日本語に差し替えただけです。機能の追加や変更はありません。）
+
 ## 0.21.0 — 2026-10-08
 
 An AI assistant, through the new AI-Hub app, and the fixes from a review of the whole app.
-（新しいアプリ AI-Hub を通した AI アシスタントと、アプリ全体の点検で見つかったものの修正。）
+（新しいアプリ AI-Hub を利用した AI アシスタントを追加し、アプリ全体の見直しで見つかった問題を修正しました。）
 
 ### Added
 
 - **An AI assistant, through the AI-Hub app.** A chat beside the open collection that knows RegiBase. It answers in words and writes out what to type; it changes nothing. **It never sees the value of a secret field**: the browser strips them before anything is sent, and the server drops them again as a second line of defence. Administration settings → RegiBase → AI assistant: on or off, who may use it, what it may read. Shown only when AI-Hub is installed.
-  （**AI-Hub アプリを通した AI アシスタント。** RegiBase を知っているチャットが開いているコレクションの横に出る。答えを言葉で返し、入力すべきことを書き出す。何も変更しない。**秘密項目の値は決して見ない**（ブラウザが送る前に外し、サーバーでも二重に外す）。管理者設定 → RegiBase → AI アシスタントで、使うかどうか・使える人・読める範囲を決める。AI-Hub が入っているときだけ表示される。）
+  （**AI-Hub アプリを利用した AI アシスタントを追加しました。** 開いているコレクションの横に、RegiBase の使い方を理解したチャットが表示されます。質問には文章で答え、入力すべき内容を示しますが、データを変更することはありません。**秘密項目の値を見ることはありません**（ブラウザーが送信前に取り除き、念のためサーバー側でも再度取り除きます）。管理者設定 → RegiBase → AI アシスタントで、有効・無効、利用できるユーザー、読み取れる範囲を設定できます。AI-Hub がインストールされている場合にのみ表示されます。）
 
 ### Fixed
 
 - **Someone a collection is shared with, view-only, no longer receives its secret fields** in records, exports or searches. They were returned as they stood, in plain text when the owner had not set a master key.
-  （**閲覧のみで共有された相手に、秘密項目が渡らない。** 記録・書き出し・検索で、そのまま返っていた（所有者がマスターキー未設定なら平文）。）
+  （**閲覧のみの権限で共有された相手には、秘密項目が渡らないようにしました。** これまでは、レコード、エクスポート、検索の結果で秘密項目がそのまま返され、所有者がマスターキーを設定していない場合は平文のままでした。）
 - **Putting a session version back no longer brings back plain secrets.** Encrypting, or changing the master key, now covers the versions kept by session as well; they were left as they were, and restoring one wrote the old text back.
-  （**セッションごとのバージョンを戻しても、平文の秘密が戻らない。** 暗号化・マスターキー変更の対象に、セッションごとのバージョンも含めた。）
+  （**セッションごとのバージョンを戻したときに、暗号化前の秘密項目が戻らないようにしました。** 暗号化やマスターキーの変更を、セッションごとに保存されたバージョンにも適用するようにしました。これまではバージョンが元のまま残っていたため、戻すと古い内容が書き戻されていました。）
 - **A hidden collection's PIN is asked on every path to it**, including the owner's own: changing, duplicating or sharing it, and listing its secrets. Only some of them asked before.
-  （**隠しコレクションの PIN を、持ち主の操作を含むすべての経路で求める。** 変更・複製・共有・秘密の一覧など、これまで求めない経路があった。）
+  （**隠しコレクションでは、所有者自身の操作も含め、すべての操作で PIN を求めるようにしました。** 変更、複製、共有、秘密項目の一覧表示などで、これまでは PIN を求めない場合がありました。）
 - **Deleting an account clears the versions kept for it**; they were left behind.
-  （アカウントを消すと、そのバージョンも消える。これまでは残っていた。）
+  （**アカウントを削除すると、そのアカウントのバージョンも削除されるようにしました。** これまでは削除されずに残っていました。）
 
 ## 0.20.3 — 2026-09-29
 
