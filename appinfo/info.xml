@@ -46,7 +46,7 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 - occ によるコマンドライン操作：一覧表示、取得、エクスポート、検索（正規表現対応）、マスターキーの管理（設定／変更／削除）。秘密項目の復号は、オプションを指定したときだけ行います
 - AI-Hub アプリを通じた AI アシスタント：開いているコレクションの横にチャットを表示し、質問に文章で答え、入力すべき内容を示します。秘密項目の値を見ることはありません。AI-Hub がない場合は表示されません
 - 21 言語に対応（ポルトガル語はブラジル版とポルトガル版の両方）]]></description>
-	<version>0.21.1</version>
+	<version>0.21.2</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

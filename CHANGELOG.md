@@ -2,6 +2,11 @@
 
 All notable changes to RegiBase.
 
+## 0.21.2 — 2026-10-18
+
+Two Brazilian Portuguese texts that were written the European way — "Definições" for Settings, and the line under the theme setting — now read as they do in Brazil. No feature was added or changed.
+（ブラジル向けポルトガル語で、ポルトガルの言い方になっていた 2 か所（設定を表す「Definições」と、テーマ設定の説明）を、ブラジルの言い方に直しました。機能の追加や変更はありません。）
+
 ## 0.21.1 — 2026-10-11
 
 Only the Japanese text was rewritten — the README, the App Store description and the changelog — to read naturally. No feature was added or changed.
