@@ -2,10 +2,10 @@
 
 All notable changes to RegiBase.
 
-## 0.21.2 — 2026-10-18
+## 0.21.2 — 2026-10-19
 
-Two Brazilian Portuguese texts that were written the European way — "Definições" for Settings, and the line under the theme setting — now read as they do in Brazil. No feature was added or changed.
-（ブラジル向けポルトガル語で、ポルトガルの言い方になっていた 2 か所（設定を表す「Definições」と、テーマ設定の説明）を、ブラジルの言い方に直しました。機能の追加や変更はありません。）
+Translations corrected after a review. In sixteen languages, sentences that used another word than the rest of RegiBase — for a snapshot, the master key, a secret field, a record, or the form of address — now use the same one; in Japanese this includes "Undo / change history" and the wording around secret fields and keys. Two Brazilian Portuguese texts that were written the European way — "Definições" for Settings, and the line under the theme setting — now read as they do in Brazil. No feature was added or changed.
+（翻訳の見直しを受けて訳を直しました。16 の言語で、スナップショット、マスターキー、秘匿項目、レコード、呼びかけ方について、RegiBase のほかの画面と違う語を使っていた文を、同じ語にそろえました。日本語では「元に戻す / 変更履歴」や、秘匿項目とキーまわりの言い方も直しました。ブラジル向けポルトガル語で、ポルトガルの言い方になっていた 2 か所（設定を表す「Definições」と、テーマ設定の説明）も、ブラジルの言い方に直しました。機能の追加や変更はありません。）
 
 ## 0.21.1 — 2026-10-11
 
