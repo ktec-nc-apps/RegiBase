@@ -462,9 +462,6 @@
    stand out at the flush-left edge. */
 #regibase-root .settings-body .field { padding-left: 16px; }
 #regibase-root .settings-body .field > label { margin-left: -16px; }
-/* Share section: it is a normal .field, so its checkbox toggle lines up with
-   the Edit-lock toggle above. The body keeps the field's own 16px indent. */
-#regibase-root .settings-body .share-section .share-body { padding-left: 0; }
 /* Two fields side by side, each 50% (e.g. Color + Icon). */
 #regibase-root .field-row { display: flex; gap: 12px; align-items: flex-start; }
 #regibase-root .field-row > .field { flex: 1 1 0; min-width: 0; margin-bottom: 14px; }
@@ -626,7 +623,12 @@
   #regibase-root .topbar-actions .ta-break { display: block; order: 3; flex-basis: 100%; height: 0; }
   #regibase-root .topbar-actions .btn.sm:not(.accent) { order: 4; }
   #regibase-root .schema-row { grid-template-columns: 1fr; }
-  #regibase-root .schema-row.sortable { grid-template-columns: auto 1fr; }
+  /* Phone: the handle and the name on one line, the type and the delete button on the next.
+     (With "auto 1fr" the full-width rows below widened the handle's column and left the name
+     box one letter wide.) */
+  #regibase-root .schema-row.sortable { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  #regibase-root .schema-row.sortable > input:first-of-type { grid-column: 2 / -1; }
+  #regibase-root .schema-row.sortable > select:first-of-type { grid-column: 1 / 3; }
   /* Table view: cap the frozen first column at half the screen width. */
   #regibase-root .rec-table .rt-frozen { max-width: 50vw; }
   #regibase-root .rec-table .rt-fval { max-width: 42vw; }
@@ -812,14 +814,14 @@
 #regibase-root .hc-badge { position: absolute; top: -6px; right: -6px; font-size: 13px; background: var(--surface); border-radius: 50%; padding: 1px 2px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 #regibase-root .hc-icon { position: relative; }
 #regibase-root .share-note { font-size: 13px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
-#regibase-root .share-section { border-top: 1px dashed var(--border); padding-top: 12px; }
-/* Share panel: a checkbox turns it on and expands the body (like the edit lock). */
-#regibase-root .share-section .share-count { flex: 0 0 auto; margin-left: auto; min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 10px; background: var(--primary); color: #fff; font-size: 12px; }
-#regibase-root .share-body { padding-top: 10px; }
+#regibase-root .share-body { padding-top: 0; }
 #regibase-root .share-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 #regibase-root .share-row { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
 #regibase-root .share-row .share-user { flex: 1 1 auto; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #regibase-root .share-perm { flex: 0 0 auto; }
+#regibase-root .share-row .share-exp { flex: 0 0 auto; width: auto; min-width: 10.5em; }
+/* Phone width: the name gets a line of its own, so the date can show in full beside the other controls. */
+@media (max-width: 600px) { #regibase-root .share-row { flex-wrap: wrap; gap: 4px; } #regibase-root .share-row .share-user { flex-basis: 100%; } #regibase-root .share-row > * { margin-right: 0; } }
 #regibase-root .share-flag { flex: 0 0 auto; font-size: 13px; }
 #regibase-root .share-add { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
 #regibase-root .share-search { position: relative; }
@@ -888,6 +890,29 @@
 #regibase-root .hist-tag { flex: 0 0 auto; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
 #regibase-root .hist-icon { flex: 0 0 auto; font-size: 14px; width: 1.4em; text-align: center; }
 #regibase-root .hist-row .btn.xs { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; }
+/* a snapshot that says what it did: kind, what, when; below it the changes */
+#regibase-root .hist-row.hist-snap { align-items: flex-start; }
+#regibase-root .hist-snap .hist-icon { padding-top: 1px; }
+#regibase-root .hist-snap .btn.xs, #regibase-root .hist-snap .hist-tag { margin-top: 1px; }
+#regibase-root .hist-main { flex: 1 1 auto; min-width: 0; }
+#regibase-root .hist-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+#regibase-root .hist-op { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--primary); }
+#regibase-root .hist-snap .hist-sum { flex: 1 1 8em; min-width: 0; white-space: nowrap; }
+#regibase-root .hist-snap .hist-when { min-width: 0; }
+#regibase-root .hist-lines { list-style: none; margin: 3px 0 0; padding: 0; font-size: 12.5px; color: var(--muted); }
+#regibase-root .hist-lines li { padding: 1px 0; overflow-wrap: anywhere; }
+#regibase-root .hist-lines li.sub { padding-left: 1.2em; }
+#regibase-root .hist-lines li.rec { color: var(--text); }
+#regibase-root .hist-lines li.sec::before { content: '🔒 '; }
+#regibase-root .hist-lines li.att::before { content: '📎 '; }
+#regibase-root .hist-lines li.old { font-style: italic; }
+#regibase-root .hist-lines li.more { opacity: .85; }
+#regibase-root .hist-row.done .hist-lines { text-decoration: line-through; }
+@media (max-width: 600px) {
+  #regibase-root .hist-row.hist-snap { flex-wrap: wrap; }
+  #regibase-root .hist-snap .hist-main { flex-basis: calc(100% - 2.4em); }
+  #regibase-root .hist-snap .btn.xs, #regibase-root .hist-snap .hist-tag { margin-left: 2.4em; }
+}
 #regibase-root .btn.xs { font-size: 11px; padding: 2px 8px; line-height: 1.4; }
 
 /* radio / checkbox choice fields */
@@ -1163,3 +1188,47 @@ html.rb-col-resizing, html.rb-col-resizing * { cursor: col-resize !important; -w
 #regibase-root .theme-pick .swatch.auto { background: linear-gradient(105deg, #f4f6fb 0 50%, #0b1220 50% 100%); }
 #regibase-root .theme-pick .swatch.auto i.bar { background: linear-gradient(105deg, #2563eb 0 50%, #4f8cff 50% 100%); }
 #regibase-root .theme-pick .swatch.auto i.line { background: linear-gradient(105deg, #cbd5e1 0 50%, #334565 50% 100%); }
+
+/* Collection settings: wider, in tabs (owner, 2026-11-07). The body keeps one height while the
+   tabs change, so the buttons below do not jump. */
+#regibase-root .modal.coll-settings { width: min(860px, 100%); }
+/* The collection editor, wider too (owner, 2026-11-07): it still fits a 1366×768 screen. */
+#regibase-root .modal.schema-editor { width: min(1100px, 100%); }
+/* a label beside its control stays on one line ("Character type", "Concatenate with") on a wide screen; on a phone it would
+   widen the row's first column and squeeze the name box */
+@media (min-width: 781px) { #regibase-root .schema-editor .imgcfg .cfg, #regibase-root .schema-editor .flags label { white-space: nowrap; } }
+#regibase-root .modal.coll-settings .modal-body { height: min(640px, calc(92dvh - 150px)); }
+#regibase-root .modal.coll-settings .set-tab { flex: 1 1 0; }
+@media (max-width: 520px) {
+  #regibase-root .modal.coll-settings .modal-body { height: auto; }
+  #regibase-root .modal.coll-settings .set-tab { flex: 1 1 50%; padding: 9px 6px; }
+}
+
+/* ---------- categories of the collection list (owner, 2026-11-07) ----------
+   A heading per category over its collections; "Uncategorized" is always first and does not move.
+   A heading is dragged to reorder the categories, and a collection dropped on it joins it. */
+#regibase-root .cat-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; padding: 6px 8px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; user-select: none; border: 1px dashed transparent; }
+#regibase-root .cat-head:first-child { margin-top: 0; }
+#regibase-root .cat-head:not(.fixed) { cursor: grab; }
+#regibase-root .cat-head:hover { background: var(--surface-2); color: var(--text); }
+#regibase-root .cat-head.has-active { color: var(--primary); }
+#regibase-root .cat-head.dragging { opacity: .45; }
+#regibase-root .cat-head.dragover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
+/* The open/close mark, large and in the accent colour, so a heading is not taken for a collection (owner, 2026-11-07) */
+#regibase-root .cat-head .cat-caret { flex: 0 0 auto; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 15px; line-height: 1; color: #fff; background: var(--primary); }
+#regibase-root .cat-head.collapsed .cat-caret { background: color-mix(in srgb, var(--primary) 70%, var(--muted)); }
+#regibase-root .cat-head { font-size: 13.5px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+#regibase-root .cat-head .cat-ic { font-size: 16px; }
+#regibase-root .coll-home .ch-count { font-weight: 600; }
+#regibase-root .coll-home .ch-sep { color: var(--muted); margin: 0 2px; }
+#regibase-root .cat-head .cat-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#regibase-root .cat-head .ct { flex: 0 0 auto; font-weight: 600; }
+#regibase-root .home-cat { display: flex; align-items: center; gap: 6px; margin: 18px 0 10px; font-size: 14px; color: var(--muted); }
+#regibase-root .home-cat:first-of-type { margin-top: 0; }
+#regibase-root .home-cat .ct { font-weight: 600; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+#regibase-root .cat-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+#regibase-root .cat-head .cat-sec { flex: 0 0 auto; font-size: 12px; }
+#regibase-root .home-cat-note { margin: -6px 0 10px; font-size: 12.5px; color: var(--muted); white-space: pre-wrap; }
+#regibase-root .cat-head:hover { border-color: var(--primary); }
+/* the collections of an open category sit one step in from its heading */
+#regibase-root .coll-list .coll-item { margin-left: 14px; width: calc(100% - 14px); }

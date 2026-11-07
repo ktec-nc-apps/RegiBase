@@ -18,12 +18,10 @@ use OCP\IUserManager;
  * assistant is not offered at all, and its admin settings are shown greyed out.
  *
  * What the assistant may do is set by the administrator: whether it is on, who may
- * use it, what it may read (read only -- it never changes anything), and whether it
- * may search the web. For now it only reads what the browser sends with a question:
- * the names of the collections, the open collection's field definitions and its
- * records -- never a secret field's value. Secret fields are encrypted in the
- * browser; the server never sees the key or the plaintext, and the assistant is
- * never handed a secret value, decrypted or encrypted.
+ * use it, what it may read and whether it may change things (with the asker's rights,
+ * through AiTools; the owner, 2026-11-07), and whether it may search the web. It never
+ * reads or writes a secret field's value, and a secret collection or category exists for
+ * it only after the person opened it with its 6-digit key in this session.
  */
 class AiService {
 	public const KEY_ENABLED = 'ai_enabled';
@@ -32,11 +30,10 @@ class AiService {
 	public const KEY_READ = 'ai_read';
 	public const KEY_SEARCH = 'ai_search';
 	/**
-	 * What the assistant may be allowed to read, all sent by the browser with the
-	 * question and all free of secret values: the collection names with the open
-	 * collection's field definitions, and the open collection's non-secret records.
+	 * What the assistant may be allowed: the collections and their field definitions, the
+	 * records (non-secret values only), and changing records, fields and collections.
 	 */
-	public const SOURCES = ['collections', 'records'];
+	public const SOURCES = ['collections', 'records', 'write'];
 	/** The name RegiBase's assistant is registered under at AI-Hub. */
 	public const SCENARIO = 'assistant';
 	private const HUB = 'ai_hub';
@@ -79,6 +76,9 @@ class AiService {
 			// Who may ask is the administrator's RegiBase setting, and the hub holds
 			// to it on every way in -- not only through RegiBase's own controller.
 			'allow' => fn (string $uid): bool => $this->allowed($uid),
+			// What it can do in RegiBase by itself (the owner, 2026-11-07); each tool looks up
+			// what the administrator allows when it runs.
+			'tools' => \OCP\Server::get(AiTools::class)->tools(fn (): array => $this->settings()['read']),
 		]);
 	}
 
@@ -202,6 +202,9 @@ class AiService {
 			&& in_array($t['role'] ?? '', ['user', 'assistant'], true) && is_string($t['text'] ?? null))), -30));
 		$messages[] = ['role' => 'user', 'text' => $message];
 		$this->registerScenario();
+		// the secret collections and categories open in this session, for the tools (they run
+		// in AI-Hub's own request, without this session)
+		\OCP\Server::get(AiTools::class)->noteOpen($uid);
 		$options = [
 			'context' => AiScenario::perQuestion($st['read'], $st['search'], $context, $lang),
 			'search' => $st['search'],

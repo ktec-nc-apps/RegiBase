@@ -46,12 +46,13 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 - occ によるコマンドライン操作：一覧表示、取得、エクスポート、検索（正規表現対応）、マスターキーの管理（設定／変更／削除）。秘密項目の復号は、オプションを指定したときだけ行います
 - AI-Hub アプリを通じた AI アシスタント：開いているコレクションの横にチャットを表示し、質問に文章で答え、入力すべき内容を示します。秘密項目の値を見ることはありません。AI-Hub がない場合は表示されません
 - 21 言語に対応（ポルトガル語はブラジル版とポルトガル版の両方）]]></description>
-	<version>0.21.2</version>
+	<version>0.22.1</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>
 	<category>organization</category>
 	<category>tools</category>
+	<category>ai</category>
 	<website>https://github.com/ktec-nc-apps/RegiBase</website>
 	<bugs>https://github.com/ktec-nc-apps/RegiBase/issues</bugs>
 	<repository>https://github.com/ktec-nc-apps/RegiBase</repository>
@@ -66,6 +67,17 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 	<dependencies>
 		<nextcloud min-version="30" max-version="35"/>
 	</dependencies>
+	<background-jobs>
+		<job>OCA\RegiBase\BackgroundJob\ShareExpiry</job>
+	</background-jobs>
+	<commands>
+		<command>OCA\RegiBase\Command\Collections</command>
+		<command>OCA\RegiBase\Command\Records</command>
+		<command>OCA\RegiBase\Command\GetRecord</command>
+		<command>OCA\RegiBase\Command\ExportCollection</command>
+		<command>OCA\RegiBase\Command\FindRecords</command>
+		<command>OCA\RegiBase\Command\MasterKey</command>
+	</commands>
 	<settings>
 		<admin>OCA\RegiBase\Settings\AiAdmin</admin>
 		<admin-section>OCA\RegiBase\Settings\AiSection</admin-section>
@@ -78,15 +90,4 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 			<order>80</order>
 		</navigation>
 	</navigations>
-	<background-jobs>
-		<job>OCA\RegiBase\BackgroundJob\ShareExpiry</job>
-	</background-jobs>
-	<commands>
-		<command>OCA\RegiBase\Command\Collections</command>
-		<command>OCA\RegiBase\Command\Records</command>
-		<command>OCA\RegiBase\Command\GetRecord</command>
-		<command>OCA\RegiBase\Command\ExportCollection</command>
-		<command>OCA\RegiBase\Command\FindRecords</command>
-		<command>OCA\RegiBase\Command\MasterKey</command>
-	</commands>
 </info>

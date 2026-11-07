@@ -13,6 +13,8 @@
   const HUB = ((window.OC && OC.generateUrl) ? OC.generateUrl('/apps/ai_hub') : '/apps/ai_hub') + '/conversation';
   /** Where this tab keeps the token of its conversation with the AI (sessionStorage). */
   const AI_CONV_KEY = 'regibase.ai.conversation';
+  // the assistant's tools that change something: after one of them the page reloads what it shows
+  const AI_WRITE_TOOLS = ['create_records', 'update_records', 'delete_records', 'create_collection', 'update_collection', 'set_fields', 'delete_collection'];
   /** A request to AI-Hub's conversation pages: GET without a body, POST with one. */
   async function hub(path, body) {
     const res = await fetch(HUB + path, {
@@ -304,11 +306,19 @@
   <div class="backdrop" :class="{show: sidebarOpen}" @click="sidebarOpen=false"></div>
   <aside class="sidebar" :class="{open: sidebarOpen}">
     <div class="brand"><span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="337 403 1329 1010"><path fill="#400099" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="none" stroke="#fff" stroke-width="100" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#2e3192" d="M1040.39,1355.06c-3.65-4.48-4.91-9.8-3.78-15.97l115.97-542.87c1.12-6.16,4.33-11.48,9.66-15.97,5.32-4.48,11.06-6.72,17.23-6.72h262.19c37.53,0,69.33,7.14,95.38,21.43,26.05,14.29,45.51,33.06,58.4,56.3,12.88,23.25,19.33,47.77,19.33,73.53,0,12.33-1.13,22.98-3.36,31.93-5.61,28.02-15.27,50.57-28.99,67.65-13.73,17.1-27.31,30.12-40.76,39.08,25.21,20.73,37.82,47.62,37.82,80.67,0,12.89-1.68,27.46-5.04,43.7-7.85,35.29-19.05,65.42-33.61,90.34-14.57,24.93-37.12,45.1-67.65,60.51-30.54,15.42-71.01,23.11-121.43,23.11h-296.64c-6.17,0-11.07-2.23-14.71-6.72ZM1353.42,1231.52c19.04,0,35.15-6.16,48.32-18.49,13.16-12.32,19.75-27.17,19.75-44.54,0-11.76-4.2-21.28-12.6-28.57-8.4-7.27-19.62-10.92-33.61-10.92h-138.66l-21.85,102.52h138.66ZM1284.51,903.79l-20.17,95.8h130.25c16.81,0,30.53-4.2,41.18-12.6,10.64-8.4,17.36-20.17,20.17-35.29,1.12-6.72,1.68-11.2,1.68-13.45,0-11.2-3.65-19.75-10.92-25.63-7.29-5.88-17.94-8.82-31.93-8.82h-130.25Z"/><path fill="#e56b00" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="none" stroke="#fff" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/><path fill="#f15a24" d="M1151.98,517.88c58.5,42.78,87.77,103.05,87.77,180.8,0,25.06-2.09,46.66-6.27,64.8-12.55,62.22-35.53,112.97-68.97,152.28s-77.72,70.64-132.88,93.95l92.77,308.45c.84,1.73,1.27,3.89,1.27,6.48,0,9.5-3.56,17.92-10.66,25.27-7.11,7.34-14.84,11.02-23.2,11.02h-157.95c-15.05,0-25.7-3.23-31.97-9.72-6.28-6.47-11.08-14.89-14.42-25.27l-81.48-277.36h-127.86l-57.67,277.36c-1.69,9.5-6.48,17.72-14.42,24.62s-16.52,10.36-25.7,10.36h-164.22c-9.2,0-16.52-3.45-21.95-10.36s-7.31-15.12-5.62-24.62l173-837.22c1.66-9.5,6.47-17.72,14.41-24.62s16.52-10.38,25.7-10.38h327.2c90.25,0,164.64,21.39,223.14,64.16ZM861.14,846.42c81.06,0,128.3-31.97,141.67-95.91,1.66-12.09,2.5-19.86,2.5-23.33,0-48.38-35.11-72.56-105.3-72.56h-141.67l-38.86,191.8h141.66Z"/></svg></span><span>RegiBase</span><span class="tag" v-if="version">v{{ version }}</span></div>
-    <button class="coll-home" :class="{active: !current}" @click="goHome">{{ t('🗂️ All collections') }}</button>
+    <button class="coll-home" :class="{active: !current}" @click="goHome" :title="t('Show every collection on the home screen')">🗂️ <span class="ch-count">{{ t('Categories: {c}', { c: categoryNames.length }) }}</span><span class="ch-sep">·</span><span class="ch-count">{{ t('Collections: {n}', { n: collections.length }) }}</span></button>
+    <datalist id="rb-cat-names"><option v-for="n in categoryNames" :key="n" :value="n"></option></datalist>
     <nav class="coll-list">
-      <button v-for="(c,ci) in collections" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" @contextmenu="ctxColl($event, c)" :draggable="c.is_owner !== false" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
+      <template v-for="g in collGroups" :key="'g:' + g.key">
+      <div class="cat-head" :class="{fixed: g.fixed, collapsed: catOpen !== g.key, dragging: catDrag.from === g.key, dragover: catDrag.over === g.key || (collDrag.from !== null && collDrag.overCat === g.key), 'has-active': !!(current && g.items.some((it) => it.c.id === current.id))}" :draggable="!g.fixed" :title="g.fixed ? t('Collections in no category. Always at the top.') : (g.note ? g.note + '\n\n' : '') + t('Drag to reorder the categories')" @click="toggleCat(g.key)" @contextmenu="ctxCat($event, g)" @dragstart="catDragStart(g, $event)" @dragover.prevent="catDragOver(g)" @dragleave="catDragLeave(g)" @drop.prevent="catDrop(g)" @dragend="catDragEnd">
+        <span class="cat-caret">{{ catOpen !== g.key ? '▸' : '▾' }}</span><span class="cat-ic">{{ g.fixed ? '📥' : (g.icon || '📂') }}</span><span class="cat-name">{{ g.name }}</span><span v-if="g.secret" class="cat-sec" :title="t('Secret category')">🕶️</span><span class="ct">{{ g.items.length }}</span>
+      </div>
+      <template v-if="catOpen === g.key">
+      <button v-for="{ c, ci } in g.items" :key="c.id" class="coll-item" :class="{active: current && current.id===c.id, dragging: collDrag.from===ci, dragover: collDrag.over===ci}" @contextmenu="ctxColl($event, c)" draggable="true" @click="selectCollection(c.id)" @dragstart="cDragStart(ci, $event)" @dragover.prevent="cDragOver(ci)" @dragleave="cDragLeave(ci)" @drop.prevent="cDrop(ci)" @dragend="cDragEnd" @mouseenter="showCollTip(c, $event)" @mouseleave="hideCollTip" @focus="showCollTip(c, $event)" @blur="hideCollTip">
         <span class="ci-bar" :style="{background: c.color}"></span><span v-if="shareBadge(c)" class="share-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span><span class="ic">{{ c.icon }}</span><span class="nm">{{ c.name }}</span><span v-if="c.secret" class="ci-lock" :title="t('Secret collection')">🕶️</span><span v-if="c.locked" class="ci-lock" :title="t('Edit lock (view only)')">🔒</span><span class="ct">{{ c.record_count }}</span>
       </button>
+      </template>
+      </template>
       <div v-if="!collections.length" class="empty" style="padding:24px 8px">
         <div>{{ t('No collections yet') }}</div>
       </div>
@@ -319,6 +329,7 @@
     </div>
     <div class="sidebar-foot">
       <button class="btn primary block" @click="openTemplatePicker">{{ t('＋ New collection') }}</button>
+      <button type="button" class="btn sm block" @click="openCategoryEdit(null)" :title="t('Make a category, then drag collections onto its heading')">📂 {{ t('＋ New category') }}</button>
       <button class="btn sm block secret-toggle" :class="{on: secretShown}" @click="openSecretToggle" :title="t('Show or hide secret collections')">{{ secretShown ? t('🕶️ Hide secret collections') : t('🕶️ Secret toggle') }}</button>
       <button class="btn sm block" @click="openSettings" :title="t('Theme, storage location, etc.')">{{ t('⚙️ Settings') }}</button>
     </div>
@@ -346,8 +357,12 @@
 
     <div class="content" :class="{'content-table': current && curView==='table' && records.length, 'content-note': current && curView==='note' && records.length}" @scroll="onScrollNearBottom">
       <div v-if="!current" class="home">
-        <div v-if="collections.length" class="home-grid">
-          <button v-for="c in collections" :key="c.id" class="home-card" @click="selectCollection(c.id)">
+        <template v-if="collections.length">
+        <template v-for="g in collGroups" :key="'h:' + g.key">
+        <h4 v-if="g.items.length" class="home-cat"><span>{{ g.fixed ? '📥' : (g.icon || '📂') }}</span> {{ g.name }} <span v-if="g.secret" :title="t('Secret category')">🕶️</span> <span class="ct">{{ g.items.length }}</span></h4>
+        <p v-if="g.items.length && g.note" class="home-cat-note">{{ g.note }}</p>
+        <div v-if="g.items.length" class="home-grid">
+          <button v-for="{ c } in g.items" :key="c.id" class="home-card" @click="selectCollection(c.id)">
             <span class="hc-bar" :style="{background: c.color}"></span>
             <div class="hc-icon" :style="{background: c.color + '22', color: c.color}">{{ c.icon }}<span v-if="shareBadge(c)" class="hc-badge" :title="shareBadgeTitle(c)">{{ shareBadge(c) }}</span></div>
             <div class="hc-body">
@@ -357,6 +372,8 @@
             </div>
           </button>
         </div>
+        </template>
+        </template>
         <div v-else class="empty">
           <div class="big">🗂️</div>
           <p>{{ t('No collections yet.') }}<br>{{ t('Create one from “＋ New collection” on the left.') }}</p>
@@ -527,7 +544,7 @@
                       <a v-if="linkFor(f, noteCur.data[f.key])" class="val link" :href="linkFor(f, noteCur.data[f.key])" target="_blank" rel="noopener noreferrer">{{ displayVal(noteCur, f) }}</a>
                       <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(noteCur, f) }}</span>
                       <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
-                      <button v-if="f.type==='date' || f.type==='month'" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(noteCur, f)">📅</button>
+                      <button v-if="f.type==='date' || f.type==='month' || isDateTime(f)" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(noteCur, f)">📅</button>
                       <button v-if="fieldHasMap(f) && noteCur.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(noteCur.data[f.key])">🌐</button>
                       <button v-if="!(f.secret && secretsMasked)" type="button" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : noteCur.data[f.key])" :title="t('Copy')">⧉</button>
                     </div>
@@ -699,6 +716,9 @@
               </div>
             </template>
           </div>
+          <div v-else-if="isDateTime(f) && !f.secret" class="control">
+            <input type="datetime-local" :step="f.type==='datetime_sec' ? 1 : 60" :value="dtIn(f, form[f.key])" @input="form[f.key] = dtOut(f, $event.target.value)" />
+          </div>
           <div v-else class="control">
             <input :type="inputType(f)" :step="inputType(f)==='number' ? 'any' : null" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click.stop="openPwGen('record', f)" :title="t('Generate a password')">🎲</button>
@@ -734,7 +754,7 @@
             <a v-if="linkFor(f, modal.rec.data[f.key])" class="val link" :href="linkFor(f, modal.rec.data[f.key])" target="_blank" rel="noopener noreferrer">{{ displayVal(modal.rec, f) }}</a>
             <span v-else class="val" :class="{mono: f.secret}">{{ displayVal(modal.rec, f) }}</span>
             <button v-if="f.secret && !secretsMasked" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
-            <button v-if="f.type==='date' || f.type==='month'" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(modal.rec, f)">📅</button>
+            <button v-if="f.type==='date' || f.type==='month' || isDateTime(f)" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(modal.rec, f)">📅</button>
             <button v-if="fieldHasMap(f) && modal.rec.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(modal.rec.data[f.key])">🌐</button>
             <button v-if="!(f.secret && secretsMasked)" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
           </div>
@@ -774,7 +794,7 @@
 
   <!-- Schema editor -->
   <div v-if="modal && modal.type==='schema'" class="modal-mask">
-    <div class="modal wide">
+    <div class="modal wide schema-editor">
       <div class="modal-head"><h3>{{ schemaMode==='template' ? (tplEdit.row_id || tplEdit.builtin_key ? t('✏️ Edit template') : t('⭐ New template')) : t('🧩 Edit collection') }}</h3><button class="icon-btn" @click="closeSchemaEditor">✕</button></div>
       <div class="modal-body" ref="schemaBody" @dragover="onSchemaAutoScroll($event)">
         <div v-if="schemaMode==='template'" class="tpl-meta">
@@ -807,6 +827,8 @@
             <option value="number">{{ t('Numeric') }}</option>
             <option value="date">{{ t('Date') }}</option>
             <option value="month">{{ t('Year/Month') }}</option>
+            <option value="datetime">{{ t('Date and time') }}</option>
+            <option value="datetime_sec">{{ t('Date and time (with seconds)') }}</option>
             <option value="email">{{ t('Email') }}</option>
             <option value="url">URL</option>
             <option value="tel">{{ t('Phone number') }}</option>
@@ -969,15 +991,86 @@
     </div>
   </div>
 
+  <!-- A category: name, icon, note, secret (owner, 2026-11-07) -->
+  <div v-if="modal && modal.type==='catEdit'" class="modal-mask">
+    <div class="modal">
+      <div class="modal-head"><h3>📂 {{ catForm.from ? t('Edit category') : t('New category') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body settings-body">
+        <div class="field-row">
+          <div class="field"><label>🏷️ {{ t('Category name') }}</label><input v-model="catForm.name" maxlength="60" @keyup.enter="saveCategoryEdit" /></div>
+          <div class="field" style="max-width:190px"><label>😀 {{ t('Icon') }}</label>
+            <div class="iconpick-head">
+              <button type="button" class="iconpick-cur" :class="{open: iconPickerOpen && iconTarget==='catForm'}" @click.stop="openIconPicker('catForm')" :title="t('Click to choose an icon')">{{ catForm.icon || '📂' }}</button>
+              <input v-model="catForm.icon" maxlength="16" :placeholder="t('Emoji')" />
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>📝 {{ t('Remarks') }}</label><textarea v-model="catForm.note" maxlength="1000" :placeholder="t('What this category is for (shown on the home screen and when pointing at its heading)')"></textarea></div>
+        <div class="field">
+          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" v-model="catForm.secret" style="width:18px;height:18px" />
+            <span>🕶️ {{ t('Make this category secret') }}</span>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('When on, this category and its collections are hidden from the list. Use the “Secret toggle” button and enter its 6-digit key to show them for that session. The same key as a secret collection shows both.') }}</div>
+          <div v-if="catForm.secret" class="field" style="margin-top:8px">
+            <label>🔢 {{ t('6-digit secret key') }}</label>
+            <input v-model="catForm.pin" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" maxlength="6"
+              @input="catForm.pin = (catForm.pin || '').replace(/\\D/g, '').slice(0, 6)"
+              :placeholder="catForm.hadSecret ? t('Enter a new 6-digit key (leave blank to keep the current one)') : t('Set a 6-digit key (numbers only)')" />
+          </div>
+        </div>
+        <div v-if="catForm.err" class="share-err">{{ catForm.err }}</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button type="button" class="btn primary" :disabled="catForm.busy" @click="saveCategoryEdit">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The category of a collection in the list (owner, 2026-11-07) -->
+  <div v-if="modal && modal.type==='category'" class="modal-mask" @click.self="modal=null">
+    <div class="modal sm">
+      <div class="modal-head"><h3>📂 {{ t('Category') }} — {{ modal.name }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
+      <div class="modal-body">
+        <div class="field">
+          <label>{{ t('Category name') }}</label>
+          <input v-model="modal.cat" list="rb-cat-names" maxlength="60" :placeholder="t('Uncategorized')" @keyup.enter="saveCategoryModal" autofocus />
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Choose a category below or type a new name. Leave it blank for Uncategorized.') }}</div>
+        </div>
+        <div class="cat-picks">
+          <button type="button" class="btn sm" :class="{primary: !modal.cat}" @click="modal.cat = ''">📥 {{ t('Uncategorized') }}</button>
+          <button v-for="n in categoryNames" :key="n" type="button" class="btn sm" :class="{primary: modal.cat === n}" @click="modal.cat = n">📂 {{ n }}</button>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" @click="modal=null">{{ t('Cancel') }}</button>
+        <button type="button" class="btn primary" @click="saveCategoryModal">{{ t('Save') }}</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Collection settings -->
   <div v-if="modal && modal.type==='collSettings'" class="modal-mask">
-    <div class="modal">
+    <div class="modal coll-settings">
       <div class="modal-head"><h3>{{ t('⚙️ Collection settings') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body settings-body">
         <div v-if="!isOwner" class="share-note">{{ shareAccessNote }}</div>
+        <div v-if="collTabs.length > 1" class="set-tabs" role="tablist">
+          <button v-for="s in collTabs" :key="s.id" type="button" class="set-tab" :class="{active: collTab === s.id}" role="tab" :aria-selected="collTab === s.id ? 'true' : 'false'" :title="t(s.label)" @click="collTab = s.id"><span class="ic">{{ s.icon }}</span>{{ t(s.label) }}</button>
+        </div>
 
-        <template v-if="canSettings">
+        <section v-if="canSettings" v-show="collTab === 'basic'">
         <div class="field"><label>🏷️ {{ t('Name') }}</label><input v-model="collForm.name" /></div>
+        <div class="field">
+          <label>📂 {{ t('Category') }}</label>
+          <input v-model="collCat" list="rb-cat-names" maxlength="60" :placeholder="t('Uncategorized')" />
+          <div class="cat-picks" style="margin-top:6px">
+            <button type="button" class="btn sm" :class="{primary: !collCat}" @click="collCat = ''">📥 {{ t('Uncategorized') }}</button>
+            <button v-for="n in categoryNames" :key="n" type="button" class="btn sm" :class="{primary: collCat === n}" @click="collCat = n">📂 {{ n }}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Choose a category above or type a new name. Leave it blank for Uncategorized. The list on the left shows the collections by category.') }}</div>
+        </div>
         <div class="field"><label>📝 {{ t('Description') }}</label><textarea v-model="collForm.description" :placeholder="t('Description of this collection (shown on the home screen card)')"></textarea></div>
         <div class="field-row">
         <div class="field"><label>🎨 {{ t('Color') }}</label><input type="color" v-model="collForm.color" style="height:44px;padding:4px;width:100%" /></div>
@@ -1010,8 +1103,9 @@
           </select>
         </div>
 
-        </template>
+        </section>
 
+        <section v-if="isOwner" v-show="collTab === 'protect'">
         <div v-if="isOwner" class="field">
           <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" v-model="collForm.locked" style="width:18px;height:18px" />
@@ -1034,14 +1128,11 @@
           </div>
         </div>
 
-        <div v-if="isOwner" class="field share-section" :class="{open: shareExpanded}">
-          <label class="lock-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" v-model="shareExpanded" style="width:18px;height:18px" />
-            <span>👥 {{ t('Share settings') }}</span>
-            <span v-if="sharePanel.shares.length" class="share-count">{{ sharePanel.shares.length }}</span>
-          </label>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Turn on to share this collection with other users, or to review and change existing shares.') }}</div>
-          <div v-show="shareExpanded" class="share-body">
+        </section>
+
+        <section v-if="isOwner" v-show="collTab === 'share'" class="share-tab">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">{{ t('Share this collection with other users, or review and change existing shares.') }}</div>
+        <div class="share-body">
           <div v-if="sharePanel.shares.length" class="share-list">
             <div v-for="s in sharePanel.shares" :key="(s.recipient_type||'user') + ':' + s.recipient_uid" class="share-row">
               <span class="share-user">{{ s.recipient_type === 'group' ? '👥' : '👤' }} {{ s.recipient_name || s.recipient_uid }}</span>
@@ -1101,8 +1192,10 @@
             <div v-if="sharePanel.err" class="share-err">{{ sharePanel.err }}</div>
             <button type="button" class="btn sm primary" :disabled="!sharePanel.recipient || sharePanel.busy" @click="addShare">{{ t('Share') }}</button>
           </div>
-          </div>
         </div>
+        </section>
+
+        <section v-show="collTab === 'data'">
 
         <div v-if="isOwner" class="field">
           <label>📄 {{ t('Duplicate / template') }}</label>
@@ -1144,6 +1237,7 @@
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The length, character types and options used when you open the 🎲 generator. Applies to every collection.') }}</div>
         </div>
+        </section>
       </div>
       <div class="modal-foot">
         <button v-if="isOwner" class="btn danger foot-left" @click="deleteCollection">{{ t('Delete collection') }}</button>
@@ -1563,12 +1657,20 @@
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Newest first. “Restore to here” undoes that change and every change above it.') }}</div>
         <div v-if="!history.length" class="empty"><p>{{ t('No snapshots recorded yet.') }}</p></div>
         <div v-else class="hist-list">
-          <div v-for="h in history" :key="h.id" class="hist-row" :class="{done: h.undone}" :title="snapDetail(h)">
-            <span class="hist-icon">{{ snapIcon(h.op) }}</span>
-            <span class="hist-when">{{ fmtHistTime(h.created_at) }}</span>
-            <span class="hist-sum">{{ h.summary }}</span>
-            <span v-if="h.undone" class="hist-tag">{{ t('undone') }}</span>
-            <button v-else class="btn xs" :disabled="busy" @click="restoreTo(h)" :title="t('Undo this change and everything newer')">↶ {{ t('Restore to here') }}</button>
+          <div v-for="g in historyGroups" :key="g.key" class="hist-row hist-snap" :class="{done: g.undone}" :title="snapDetail(g.head)">
+            <span class="hist-icon">{{ snapIcon(g.head.op) }}</span>
+            <div class="hist-main">
+              <div class="hist-head">
+                <span class="hist-op">{{ snapOpLabel(g.head.op) }}</span>
+                <span class="hist-sum">{{ snapTarget(g) }}</span>
+                <span class="hist-when">{{ fmtHistTime(g.head.created_at) }}</span>
+              </div>
+              <ul v-if="snapLines(g).length" class="hist-lines">
+                <li v-for="(ln, i) in snapLines(g)" :key="i" :class="ln.cls">{{ ln.text }}</li>
+              </ul>
+            </div>
+            <span v-if="g.undone" class="hist-tag">{{ t('undone') }}</span>
+            <button v-else class="btn xs" :disabled="busy" @click="restoreTo(g.last)" :title="t('Undo this change and everything newer')">↶ {{ t('Restore to here') }}</button>
           </div>
         </div>
       </div>
@@ -2006,7 +2108,7 @@
           max: { upper: null, lower: null, digits: null, symbols: null },
           symbolSet: PWGEN_SETS.symbols, noLookalike: true, firstAlpha: true, loaded: false,
         },
-        shareExpanded: false,
+        collTab: 'basic',
         unlockKey: '', unlockErr: '', unlockRemember: true, remembered: false, deviceTag: '',
         encForm: { cur: '', next: '', next2: '', busy: false, progress: '', err: '', remember: true },
         cropper: { open: false, key: '', src: '', imgW: 0, imgH: 0, dispW: 0, dispH: 0, ratio: null, ratioLabel: 'free', out: 600, box: { x: 0, y: 0, w: 0, h: 0 }, drag: null, busy: false },
@@ -2030,7 +2132,14 @@
         schemaPlan: null, schemaAck: false,
         reorder: { list: [], keys: [{ field: '', dir: 'asc' }], from: null, over: null, busy: false },
         collTip: { show: false, name: '', desc: '', x: 0, y: 0 },
-        collDrag: { from: null, over: null },
+        collDrag: { from: null, over: null, overCat: null },
+        catMap: {},
+        catOrder: [],
+        collCat: '',      // the category box in Collection settings
+        catMeta: {},      // name -> {icon, note, secret}
+        catForm: { from: '', name: '', icon: '', note: '', secret: false, pin: '', hadSecret: false, err: '', busy: false },
+        catOpen: '',      // the one category shown open; Uncategorized ('') at first (owner, 2026-11-07)
+        catDrag: { from: null, over: null },
         uidCounter: 1, dragIndex: null, dragOverIndex: null, dropKey: null,
         autoScroll: { timer: null, dir: 0, el: null },
         version: '', renderLimit: 200, ruleTypes: RULE_TYPES,
@@ -2061,6 +2170,20 @@
     },
     computed: {
       patternExamples() { return PATTERN_EXAMPLES; },
+      // Snapshots side by side that one action made (find & replace: one entry per record, one
+      // undo group) are shown as one row. "Restore to here" on it goes back to before its oldest.
+      historyGroups() {
+        const out = [];
+        for (const h of (this.history || [])) {
+          const prev = out[out.length - 1];
+          if (prev && h.grp && prev.head.grp === h.grp && prev.head.op === h.op && h.op === 'record.update') {
+            prev.items.push(h); prev.last = h; prev.undone = prev.undone && !!h.undone;
+          } else {
+            out.push({ key: h.id, head: h, last: h, items: [h], undone: !!h.undone });
+          }
+        }
+        return out;
+      },
       // Localised label for the compact permission picker (shown via an overlaid
       // span so centering never depends on native <select> value alignment).
       permOptions() {
@@ -2076,6 +2199,31 @@
       // (detailed list, thumbnail cards) falls back to the plain list.
       curView() { const v = this.current ? this.current.view : 'list'; return (v === 'card' || v === 'table' || v === 'note') ? v : 'list'; },
       isOwner() { return this.current ? this.current.is_owner !== false : true; },
+      // ---- categories of the collection list (owner, 2026-11-07) ----
+      // Each person's own. "Uncategorized" holds the collections in no category and is always
+      // first; the others are in the order they were dragged into, new ones at the end.
+      categoryNames() {
+        const used = new Set();
+        for (const c of this.collections) { const n = this.catMap[c.id]; if (n) used.add(n); }
+        const out = this.catOrder.slice();   // a category made with "New category" stays while empty
+        const rest = [...used].filter((n) => !out.includes(n)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        return out.concat(rest);
+      },
+      collGroups() {
+        const groups = [{ key: '', name: T('Uncategorized'), fixed: true, items: [] }];
+        const byName = {};
+        for (const n of this.categoryNames) { const m = this.catMeta[n] || {}; const g = { key: n, name: n, fixed: false, items: [], icon: m.icon || '', note: m.note || '', secret: !!m.secret }; byName[n] = g; groups.push(g); }
+        this.collections.forEach((c, ci) => { const n = this.catMap[c.id]; (n && byName[n] ? byName[n] : groups[0]).items.push({ c, ci }); });
+        return groups;
+      },
+      // Collection settings in tabs (owner, 2026-11-07): only the tabs with something the viewer may use.
+      collTabs() {
+        const tabs = [];
+        if (this.canSettings) tabs.push({ id: 'basic', icon: '🏷️', label: 'General' });
+        if (this.isOwner) tabs.push({ id: 'protect', icon: '🔒', label: 'Lock and secret' }, { id: 'share', icon: '👥', label: 'Sharing' });
+        tabs.push({ id: 'data', icon: '📦', label: 'Data' });
+        return tabs;
+      },
       // Edit lock: when a collection is locked it is view-only for everyone
       // (owner included). Only collection settings can still be changed — that's
       // how the lock is turned back off.
@@ -2494,7 +2642,7 @@
         // templates power only the "New collection" picker; fetch them lazily
         // when that picker opens so the home screen appears as soon as collections load.
         const cols = await collectionsP;
-        if (cols) { this.collections = cols; this.refreshUndo(); } else { await this.loadCollections(); }
+        if (cols) { this.collections = cols; this.refreshUndo(); this.loadCategories(); } else { await this.loadCollections(); }
         // Return to the collection that was open before a **reload within the same
         // browsing session**. A new session — the browser was reopened, or the login
         // session was lost and re-established — starts at the home collection list.
@@ -2551,7 +2699,127 @@
         }
         this.collections = base;
         this.refreshUndo();
+        this.loadCategories();
       },
+      async loadCategories() {
+        try {
+          const r = await api('collection-categories');
+          this.applyCategories(r);
+        } catch (e) { /* the list still shows, all under Uncategorized */ }
+      },
+      applyCategories(r) {
+        this.catMap = (r && r.map) || {};
+        this.catOrder = (r && Array.isArray(r.order)) ? r.order : [];
+        this.catMeta = (r && r.meta && !Array.isArray(r.meta)) ? r.meta : {};
+        if (Object.values(this.catMeta).some((m) => m && m.secret)) this.secretShown = true;
+        if (this.catOpen && this.catOpen !== '' && !this.categoryNames.includes(this.catOpen)) this.catOpen = '';
+      },
+      async saveCategories(withOrder) {
+        const body = { map: this.catMap };
+        if (withOrder) body.order = this.catOrder;
+        try {
+          const r = await api('collection-categories', { method: 'PUT', body: JSON.stringify(body) });
+          this.applyCategories(r);
+        } catch (e) { this.showToast(T('Failed to save') + ': ' + (e.message || e)); }
+      },
+      /** Put a collection into a category ('' = Uncategorized). A new name goes to the end of the order. */
+      async setCategory(cid, name) {
+        name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        const m = { ...this.catMap };
+        if (name) m[cid] = name; else delete m[cid];
+        this.catMap = m;
+        const newName = name && !this.catOrder.includes(name);
+        if (newName) this.catOrder = this.categoryNames.filter((n) => n !== name).concat([name]);
+        await this.saveCategories(newName);
+      },
+      // The category dialog (owner, 2026-11-07): name, icon, note, and secret with a 6-digit key.
+      openCategoryEdit(g) {
+        const m = g ? (this.catMeta[g.key] || {}) : {};
+        this.catForm = { from: g ? g.key : '', name: g ? g.key : '', icon: m.icon || '', note: m.note || '', secret: !!m.secret, pin: '', hadSecret: !!m.secret, err: '', busy: false };
+        this.iconPickerOpen = false;
+        this.modal = { type: 'catEdit' };
+      },
+      async saveCategoryEdit() {
+        const f = this.catForm;
+        const name = String(f.name || '').replace(/\s+/g, ' ').trim();
+        const pin = String(f.pin || '').trim();
+        if (!name) { f.err = T('Enter a name for the category.'); return; }
+        if (f.secret && pin !== '' && !/^\d{6}$/.test(pin)) { f.err = T('The secret key must be exactly 6 digits.'); return; }
+        if (f.secret && !f.hadSecret && pin === '') { f.err = T('Set a 6-digit secret key to make this category secret.'); return; }
+        f.busy = true; f.err = '';
+        try {
+          const r = await api('collection-category', { method: 'PUT', body: JSON.stringify({ from: f.from, name, icon: f.icon, note: f.note, secret: !!f.secret, pin }) });
+          if (f.from && this.catOpen === f.from) this.catOpen = name;
+          this.applyCategories(r);
+          if (f.secret && pin) { secretPins.add(pin); this.secretShown = true; }
+          this.modal = null;
+          this.showToast(f.from ? T('Saved') : T('Category “{name}” added. Drag collections onto its heading, or choose it in Collection settings.', { name }), f.from ? undefined : 6000);
+        } catch (e) { f.err = e.message || String(e); }
+        finally { f.busy = false; }
+      },
+      // One category open at a time: opening one closes the other; a second click closes it.
+      toggleCat(key) { this.catOpen = this.catOpen === key ? null : key; },
+      openCategoryModal(c) {
+        this.modal = { type: 'category', cid: c.id, name: c.name, cat: this.catMap[c.id] || '' };
+      },
+      async saveCategoryModal() {
+        const m = this.modal; if (!m || m.type !== 'category') return;
+        this.modal = null;
+        await this.setCategory(m.cid, m.cat);
+      },
+      async dissolveCategory(g) {
+        if (g.items.length && !confirm(T('Move the {n} collections of “{name}” to Uncategorized? The collections themselves are not changed.', { n: g.items.length, name: g.name }))) return;
+        const m = {};
+        for (const [id, n] of Object.entries(this.catMap)) if (n !== g.key) m[id] = n;
+        this.catMap = m;
+        this.catOrder = this.catOrder.filter((n) => n !== g.key);
+        if (this.catOpen === g.key) this.catOpen = '';
+        await this.saveCategories(true);
+      },
+      ctxCat(e, g) {
+        if (ctxSeen === e) return;
+        ctxSeen = e; e.preventDefault();
+        if (g.fixed) { this.ctxShow(e, g.name, [{ label: T('Collections in no category. Always at the top.'), disabled: true }]); return; }
+        this.ctxShow(e, g.name, [
+          { label: T('Edit category…'), run: () => this.openCategoryEdit(g) },
+          { sep: true },
+          { label: T('Remove category (move its collections to Uncategorized)'), danger: true, run: () => this.dissolveCategory(g) },
+        ]);
+      },
+      // a category heading: dragged to reorder the categories, or a collection dropped on it
+      catDragStart(g, e) {
+        if (g.fixed) { if (e) e.preventDefault(); return; }
+        this.hideCollTip();
+        this.catDrag.from = g.key;
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'cat:' + g.key); } catch (_) { /* ignore */ }
+      },
+      catDragOver(g) {
+        if (this.collDrag.from !== null) { this.collDrag.overCat = g.key; this.collDrag.over = null; return; }
+        if (this.catDrag.from === null) return;
+        this.catDrag.over = (!g.fixed && g.key !== this.catDrag.from) ? g.key : null;
+      },
+      catDragLeave(g) {
+        if (this.catDrag.over === g.key) this.catDrag.over = null;
+        if (this.collDrag.overCat === g.key) this.collDrag.overCat = null;
+      },
+      async catDrop(g) {
+        if (this.collDrag.from !== null) {
+          const c = this.collections[this.collDrag.from];
+          this.cDragEnd();
+          if (c && (this.catMap[c.id] || '') !== g.key) await this.setCategory(c.id, g.key);
+          return;
+        }
+        const from = this.catDrag.from;
+        this.catDragEnd();
+        if (from === null || g.fixed || from === g.key) return;
+        const names = this.categoryNames.slice();
+        const a = names.indexOf(from), b = names.indexOf(g.key);
+        if (a < 0 || b < 0) return;
+        names.splice(a, 1); names.splice(b, 0, from);
+        this.catOrder = names;
+        await this.saveCategories(true);
+      },
+      catDragEnd() { this.catDrag.from = null; this.catDrag.over = null; },
       // "Secret toggle" button: if secret collections are shown, hide them again;
       // otherwise open the 6-digit prompt to reveal them for this session.
       openSecretToggle() {
@@ -2608,7 +2876,11 @@
         try { matches = await api('collections-reveal', { method: 'POST', body: JSON.stringify({ pin }) }); }
         catch (e) { this.secretForm.busy = false; this.secretForm.err = T('Failed') + ': ' + (e.message || e); return; }
         this.secretForm.busy = false;
-        if (!matches || !matches.length) { this.secretForm.err = T('No secret collection matches that key.'); return; }
+        const before = Object.values(this.catMeta).filter((m) => m && m.secret).length;
+        if (!matches || !matches.length) {
+          await this.loadCategories();   // the key may open a secret category that holds no collection yet
+          if (Object.values(this.catMeta).filter((m) => m && m.secret).length <= before) { this.secretForm.err = T('No secret collection matches that key.'); return; }
+        }
         secretPins.add(pin); this.secretShown = true;
         await this.loadCollections();
         this.modal = null;
@@ -2617,9 +2889,10 @@
       // Hide every revealed secret collection again (forget the entered keys).
       async hideSecretCollections() {
         secretPins.clear(); this.secretShown = false;
-        // if the collection currently open is now hidden, return to the home view
-        if (this.current && this.current.secret) { this.current = null; this.records = []; }
+        try { await api('collections-hide', { method: 'POST', body: '{}' }); } catch (e) { /* the categories stay open until the session ends */ }
         await this.loadCollections();
+        // if the collection currently open is now hidden (a secret one, or one in a secret category), return to the home view
+        if (this.current && (this.current.secret || !this.collections.some((c) => c.id === this.current.id))) { this.current = null; this.records = []; }
         this.showToast(T('Secret collections hidden'));
       },
       async selectCollection(id, push = true) {
@@ -3193,8 +3466,9 @@
         const items = [
           { label: T('Open'), run: () => this.selectCollection(c.id) },
           { label: T('Collection settings'), run: async () => { if (await go()) this.openCollSettings(); } },
+          { label: T('Category…'), run: () => this.openCategoryModal(c) },
         ];
-        if (own) items.push({ label: T('Share settings'), run: async () => { if (await go()) { this.openCollSettings(); this.shareExpanded = true; } } });
+        if (own) items.push({ label: T('Share settings'), run: async () => { if (await go()) this.openCollSettings('share'); } });
         if (own) items.push({ sep: true }, { label: T('Delete collection'), danger: true, run: async () => { if (await go()) this.deleteCollection(); } });
         this.ctxShow(e, c.name, items);
       },
@@ -3608,6 +3882,7 @@
         this.ai.busy = true;
         this.aiScroll();
         let answer = null;
+        let changed = false;
         try {
           const r = await api('ai/ask', { method: 'POST', body: JSON.stringify({ history, message, context: this.aiContext(), conversation: conv,
             images: images.map((im) => ({ type: im.type, data: im.data })) }) });
@@ -3618,7 +3893,7 @@
             if (ticket !== this.ai.ask) return;
             const x = await api('ai/result/' + encodeURIComponent(r.id));
             if (x.state === 'running') continue;
-            if (x.state === 'done') { answer = String(x.text || ''); fresh = !!x.fresh; break; }
+            if (x.state === 'done') { answer = String(x.text || ''); fresh = !!x.fresh; changed = (x.tools || []).some((n) => AI_WRITE_TOOLS.includes(n)); break; }
             throw new Error(x.error || x.state);
           }
           if (answer === null) throw new Error('timeout');
@@ -3636,6 +3911,13 @@
         this.ai.msgs.push({ role: 'assistant', text: answer.trim() });
         this.ai.busy = false;
         this.aiScroll();
+        // the assistant changed something: show it (2026-11-07)
+        if (changed) {
+          try {
+            if (this.current && this.current.id) await this.afterUndo(this.current.id);
+            else await this.loadCollections();
+          } catch (e) { /* the page shows it on the next load */ }
+        }
       },
       // ---- encryption (secret fields, client-side) ----
       // Remember the master key on this device so reloads skip the prompt (review K9): as a key
@@ -3986,11 +4268,26 @@
         try {
           const cid = this.current && this.current.id;
           if (!cid) { this.history = []; this.undoTop = null; return; }
-          const h = await api('history?collection=' + cid);
+          // what each change did is asked for only while the snapshot list is open: this is
+          // read after every save for the undo button, and stays as light as it was
+          const withDetail = !!(this.modal && this.modal.type === 'history');
+          const h = await api('history?collection=' + cid + (withDetail ? '&detail=1' : ''));
           this.history = h.entries || [];
           const a = this.history.find((e) => !e.undone);
           this.undoTop = a ? a.summary : null;
         } catch (e) { /* snapshots are best-effort */ }
+      },
+      /** Why a change could not be undone (the server says which). */
+      undoRefusedText(r) {
+        if (r.refused_reason === 'target_gone') return T('Could not undo: the collection the records belonged to no longer exists.');
+        if (r.refused_reason === 'forbidden') return T('Could not undo: you can no longer change this collection (the share was changed, or editing is locked).');
+        return T('Could not undo this change.');
+      },
+      /** The collections an undo brought back, or made, to put the records into. */
+      undoRecoveredText(r) {
+        return (r.recovered || []).map((x) => x.how === 'created'
+          ? T('A new collection “{name}” was created for the records.', { name: x.name })
+          : T('The collection “{name}” was brought back.', { name: x.name })).join(' ');
       },
       async doUndo() {
         if (this.busy) return;
@@ -3998,10 +4295,23 @@
         if (!cid) return;
         this.busy = true;
         try {
-          const r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid }) });
+          let r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid }) });
+          if (r && r.refused && r.can_create) {
+            // the collection the records belonged to is gone and cannot be brought back
+            if (!confirm(T('The original collection cannot be brought back. Create a new collection and restore into it?'))) { this.busy = false; return; }
+            r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid, createNew: true }) });
+          }
+          if (r && r.refused) {
+            // say why, instead of "Nothing to undo" for a change that is there but could not be undone
+            this.showToast(this.undoRefusedText(r), 6000);
+            await this.afterUndo(cid);
+            return;
+          }
           if (!r || !r.undone) { this.undoTop = null; this.showToast(T('Nothing to undo')); return; }
-          this.showToast(T('Undone: {what}', { what: r.summary || '' }));
+          const back = this.undoRecoveredText(r);
+          this.showToast(T('Undone: {what}', { what: r.summary || '' }) + (back ? ' ' + back : ''), back ? 6000 : 0);
           await this.afterUndo(cid);
+          if (back) await this.loadCollections();
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
         finally { this.busy = false; }
       },
@@ -4013,8 +4323,11 @@
         this.busy = true;
         try {
           const r = await api('history/undo', { method: 'POST', body: JSON.stringify({ collection: cid, downTo: h.id }) });
-          this.showToast(TN('Reverted {n} change(s)', (r && r.undone) || 0, 'Reverted {n} change', 'Reverted {n} changes'));
+          const back = r ? this.undoRecoveredText(r) : '';
+          this.showToast(TN('Reverted {n} change(s)', (r && r.undone) || 0, 'Reverted {n} change', 'Reverted {n} changes')
+            + (back ? ' ' + back : '') + (r && r.refused ? ' ' + this.undoRefusedText(r) : ''), (r && r.refused) || back ? 6000 : 0);
           await this.afterUndo(cid);
+          if (back) await this.loadCollections();
         } catch (e) { alert(T('Failed') + ': ' + (e.message || e)); }
         finally { this.busy = false; }
       },
@@ -4028,7 +4341,7 @@
         }
         await this.refreshUndo();
       },
-      async openHistory() { await this.refreshUndo(); this.modal = { type: 'history' }; },
+      async openHistory() { this.modal = { type: 'history' }; await this.refreshUndo(); },
       // ---- per-record version history (independent of the snapshot/undo log above) ----
       async openVersions(id) {
         if (!id) return;
@@ -4055,10 +4368,92 @@
         } catch (e) { alert(T('Failed to restore') + ': ' + (e.message || e)); }
       },
       snapIcon(op) {
-        return { 'record.create': '➕', 'record.update': '✏️', 'record.delete': '🗑', 'record.delete_many': '🗑', 'record.reorder': '⇅', 'records.bulk_add': '📥', 'record.transfer': '↔', 'fields.replace': '🧩', 'fields.append': '🧩', 'collection.create': '🗂️', 'collection.update': '⚙️', 'collection.delete': '🗑', 'collection.duplicate': '📄' }[op] || '•';
+        return { 'record.create': '➕', 'record.update': '✏️', 'record.delete': '🗑', 'record.delete_many': '🗑', 'record.reorder': '⇅', 'record.bulk_add': '📥', 'record.transfer': '↔', 'record.transfer': '↔', 'fields.replace': '🧩', 'fields.append': '🧩', 'collection.create': '🗂️', 'collection.update': '⚙️', 'collection.delete': '🗑', 'collection.duplicate': '📄' }[op] || '•';
       },
       snapOpLabel(op) {
-        return { 'record.create': T('Add record'), 'record.update': T('Edit record'), 'record.delete': T('Delete record'), 'record.delete_many': T('Delete records'), 'record.reorder': T('Reorder records'), 'records.bulk_add': T('Import records'), 'record.transfer': T('Move / copy records'), 'fields.replace': T('Edit fields'), 'fields.append': T('Add fields'), 'collection.create': T('Create collection'), 'collection.update': T('Collection settings'), 'collection.delete': T('Delete collection'), 'collection.duplicate': T('Duplicate collection') }[op] || op;
+        return { 'record.create': T('Add record'), 'record.update': T('Edit record'), 'record.delete': T('Delete record'), 'record.delete_many': T('Delete records'), 'record.reorder': T('Reorder records'), 'record.bulk_add': T('Import records'), 'record.transfer': T('Move / copy records'), 'fields.replace': T('Edit fields'), 'fields.append': T('Add fields'), 'collection.create': T('Create collection'), 'collection.update': T('Collection settings'), 'collection.delete': T('Delete collection'), 'collection.duplicate': T('Duplicate collection') }[op] || op;
+      },
+      // ---- what a snapshot did (owner, 2026-11-04: 「何を行ったかがわかるように」) ----
+      // The server sends each entry's `detail` (HistoryView.php): secret values and values a
+      // recipient may not see never come; here they are only put into words.
+      snapEmpty(v) { return (v === undefined || v === null || v === '') ? T('(empty)') : v; },
+      snapTarget(g) {
+        const d = g.head.detail;
+        if (g.items.length > 1) return T('Records: {n}', { n: g.items.length });
+        if (d) {
+          if (d.title) return d.title;
+          if (d.titles && d.titles.length === 1 && (d.count || 1) === 1) return d.titles[0];
+          if (d.count && d.kind !== 'collection') return T('Records: {n}', { n: d.count });
+        }
+        // The saved one-line summary often repeats the label shown just before it
+        // ("Edit fields  Edit fields", "Edit record  Edited: A"): keep only what it adds.
+        const sum = g.head.summary || '';
+        if (sum === this.snapOpLabel(g.head.op)) return '';
+        const pre = T('Edited: %s').split('%s')[0];
+        if (g.head.op === 'record.update' && pre && sum.startsWith(pre)) return sum.slice(pre.length);
+        return sum;
+      },
+      snapChangeLines(d) {
+        const out = [];
+        for (const c of (d.changes || [])) {
+          if (c.secret) out.push({ text: c.label + ': ' + T('secret field changed'), cls: 'sec' });
+          else if (c.attach) out.push({ text: c.label + ': ' + (c.attach === 'file' ? T('file changed') : T('image changed')), cls: 'att' });
+          else if (c.before) out.push({ text: c.label + ': ' + this.snapEmpty(c.old) + '  (' + T('before the change') + ')', cls: 'old' });
+          else out.push({ text: c.label + ': ' + this.snapEmpty(c.old) + ' → ' + this.snapEmpty(c.new), cls: '' });
+        }
+        if (d.more) out.push({ text: T('More fields: {n}', { n: d.more }), cls: 'more' });
+        return out;
+      },
+      snapSettingName(k) {
+        return { name: T('Name'), icon: T('Icon'), color: T('Color'), description: T('Description'), locked: T('Edit lock (view only)'),
+          key_head: T('Title display'), key_sep: T('Title display'), key_sep_char: T('Title display'), files_folder: T('Attachment folder (this collection)'),
+          map_provider: T('Map service (this collection)'), secret: T('6-digit secret key') }[k] || k;
+      },
+      snapLines(g) {
+        // several records changed by one action (find & replace): the first few, each with its changes
+        if (g.items.length > 1) {
+          const out = [];
+          for (const h of g.items.slice(0, 3)) {
+            out.push({ text: h.summary || '', cls: 'rec' });
+            if (h.detail && h.detail.kind === 'edit') out.push(...this.snapChangeLines(Object.assign({}, h.detail, { more: 0 })).slice(0, 2).map((l) => Object.assign(l, { cls: (l.cls + ' sub').trim() })));
+          }
+          if (g.items.length > 3) out.push({ text: '…', cls: 'more' });
+          return out;
+        }
+        const d = g.head.detail;
+        if (!d) return [];
+        const list = (a) => (a || []).join(', ');
+        switch (d.kind) {
+          case 'edit': return this.snapChangeLines(d);
+          case 'add': return (d.fields || []).map((f) => ({ text: f.label + ': ' + f.value, cls: '' }));
+          case 'delete':
+          case 'import': {
+            if ((d.count || 0) <= 1 && d.kind === 'delete') return [];
+            const out = (d.titles || []).map((t) => ({ text: t, cls: 'rec' }));
+            if ((d.count || 0) > (d.titles || []).length && out.length) out.push({ text: '…', cls: 'more' });
+            return out;
+          }
+          case 'transfer':
+            if (!d.from) return d.to ? [{ text: T('Moved to “{to}”', { to: d.to }), cls: '' }] : [];
+            return [{ text: T(d.mode === 'move' ? 'Moved: {from} → {to}' : 'Copied: {from} → {to}', { from: d.from, to: d.to || '' }), cls: '' }];
+          case 'fields': {
+            const out = [];
+            if (d.added) out.push({ text: T('Fields added: {list}', { list: list(d.added) }), cls: '' });
+            if (d.removed) out.push({ text: T('Fields removed: {list}', { list: list(d.removed) }), cls: '' });
+            if (d.renamed) out.push({ text: T('Fields renamed: {list}', { list: d.renamed.map((r) => r[0] + ' → ' + r[1]).join(', ') }), cls: '' });
+            if (d.changed) out.push({ text: T('Field type or secrecy changed: {list}', { list: list(d.changed) }), cls: '' });
+            return out;
+          }
+          case 'settings': {
+            const out = [];
+            if (d.name && d.name.length === 2) out.push({ text: T('Name') + ': ' + this.snapEmpty(d.name[0]) + ' → ' + this.snapEmpty(d.name[1]), cls: '' });
+            const rest = [...new Set((d.settings || []).filter((k) => k !== 'name').map((k) => this.snapSettingName(k)))];
+            if (rest.length) out.push({ text: T('Settings changed: {list}', { list: rest.join(', ') }), cls: '' });
+            return out;
+          }
+          case 'collection': return [{ text: T('Records: {n}', { n: d.count || 0 }) + ' · ' + T('Fields: {n}', { n: d.nfields || 0 }), cls: '' }];
+        }
+        return [];
       },
       snapDetail(h) {
         let dt = h.created_at;
@@ -4282,14 +4677,16 @@
         if (this.modal) this.modal = null;
         if (push) this.pushNav({ cid: null });
       },
-      openCollSettings() {
+      /** tab: which tab to open on ("share" from the list menu's Share settings, Issue #1). */
+      openCollSettings(tab) {
         this.collForm = { name: this.current.name, icon: this.current.icon, color: this.current.color, description: this.current.description || '', locked: !!this.current.locked, key_head: !!this.current.key_head, key_sep: this.current.key_sep || 'space', key_sep_char: this.current.key_sep_char || '', files_folder: this.current.files_folder || '', map_provider: this.current.map_provider || '', secret: !!this.current.secret, secret_pin: '' };
         // A temporary share password is put in the box; the owner may change it (owner, 2026-09-24).
         this.sharePanel = { shares: [], q: '', results: [], searching: false, recipient: null, recipientName: '', recipientType: 'user', perm: 'view', password: rbcrypto.tempPassword(), expires: '', shareSecrets: true, notice: '', err: '', busy: false };
         this.modal = { type: 'collSettings' };
         this.permOpen = false;
         this.iconPickerOpen = false;
-        this.shareExpanded = false;
+        this.collCat = this.catMap[this.current.id] || '';
+        this.collTab = this.collTabs.some((x) => x.id === tab) ? tab : (this.collTabs[0] || { id: 'data' }).id;
         if (this.isOwner) this.loadShares();
         this.refreshUndo(); // load this collection's snapshot count
         this.loadSessVersions();
@@ -4330,8 +4727,6 @@
         try {
           const r = await api('collections/' + this.current.id + '/shares');
           this.sharePanel.shares = r.shares || [];
-          // Already-shared collection: start expanded (checkbox on), like the edit-lock state
-          if (this.sharePanel.shares.length) this.shareExpanded = true;
         } catch (e) { /* not owner or none */ }
       },
       async searchShareUsers() {
@@ -4537,6 +4932,8 @@
         // vanish from the list the moment you save it), using the key you just set.
         if (this.collForm.secret && pin) { secretPins.add(pin); this.secretShown = true; }
         this.folderAsk = { open: false };
+        const cat = String(this.collCat || '').replace(/\s+/g, ' ').trim();
+        if (cat !== (this.catMap[this.current.id] || '')) await this.setCategory(this.current.id, cat);
         await this.loadCollections(); this.modal = null; this.showToast(T('Saved'));
       },
       deleteCollection() {
@@ -4764,7 +5161,7 @@
       // ---- sidebar collection drag & drop reordering (own collections only) ----
       cDragStart(i, e) {
         const c = this.collections[i];
-        if (!c || c.is_owner === false) { if (e) e.preventDefault(); return; }
+        if (!c) { if (e) e.preventDefault(); return; }
         this.hideCollTip();
         this.collDrag.from = i;
         try {
@@ -4774,22 +5171,26 @@
       },
       cDragOver(i) {
         if (this.collDrag.from === null) return;
-        const c = this.collections[i];
-        this.collDrag.over = (c && c.is_owner !== false) ? i : null;
+        this.collDrag.overCat = null;
+        this.collDrag.over = this.collections[i] ? i : null;
       },
       cDragLeave(i) { if (this.collDrag.over === i) this.collDrag.over = null; },
       cDrop(i) {
         const from = this.collDrag.from;
-        this.collDrag.from = null; this.collDrag.over = null;
+        this.collDrag.from = null; this.collDrag.over = null; this.collDrag.overCat = null;
         if (from === null || i === null || from === i) return;
-        const target = this.collections[i];
-        if (!target || target.is_owner === false) return;
+        const target = this.collections[i], moved = this.collections[from];
+        if (!target || !moved) return;
+        // dropped among another category's collections: it joins that category
+        const cat = this.catMap[target.id] || '';
+        if ((this.catMap[moved.id] || '') !== cat) this.setCategory(moved.id, cat);
+        if (target.is_owner === false || moved.is_owner === false) return; // the order is the owner's: only their own move
         const a = this.collections;
         const [it] = a.splice(from, 1);
         a.splice(i, 0, it);
         this.saveCollOrder();
       },
-      cDragEnd() { this.collDrag.from = null; this.collDrag.over = null; },
+      cDragEnd() { this.collDrag.from = null; this.collDrag.over = null; this.collDrag.overCat = null; },
       async saveCollOrder() {
         const ids = this.collections.filter((c) => c.is_owner !== false).map((c) => c.id);
         try {
@@ -4944,6 +5345,7 @@
         const selOpt = {}; newFields.forEach((f) => { if (CHOICE_TYPES.includes(f.type)) selOpt[f.key] = (f.options || []).slice(); });
         const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
         const isMonth = (v) => /^\d{4}-\d{2}$/.test(String(v));
+        const isDT = (v) => /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(String(v));
         const isNum = (v) => { const t = String(v).replace(/,/g, ''); return /^-?\d+(\.\d+)?$/.test(t) && isFinite(parseFloat(t)); };
         let records;
         try { records = await api('collections/' + this.current.id + '/records'); }
@@ -4977,8 +5379,17 @@
               const from = of.type, to = nf.type;
               if (ATT.includes(from) && !ATT.includes(to)) { delete data[nf.key]; dirty = true; counts.attCleared++; }
               else if (!ATT.includes(from) && ATT.includes(to)) { delete data[nf.key]; dirty = true; counts.toAtt++; }
-              else if (to === 'date') { if (!isDate(v)) { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
-              else if (to === 'month') { if (isMonth(v)) { /* ok */ } else if (isDate(v)) { data[nf.key] = v.slice(0, 7); dirty = true; } else { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
+              else if (to === 'date') { if (isDate(v)) { /* ok */ } else if (isDT(v)) { data[nf.key] = String(v).slice(0, 10); dirty = true; } else { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
+              else if (to === 'month') { if (isMonth(v)) { /* ok */ } else if (isDate(v) || isDT(v)) { data[nf.key] = String(v).slice(0, 7); dirty = true; } else { delete data[nf.key]; dirty = true; counts.dateCleared++; } }
+              else if (to === 'datetime' || to === 'datetime_sec') {
+                // a date gets 00:00, a year/month its first day; with seconds or without, as the new type says
+                let d = null; const t = String(v);
+                if (isDT(t)) d = t.slice(0, 10) + ' ' + t.slice(11, 16) + (t.length >= 19 ? t.slice(16, 19) : ':00');
+                else if (isDate(t)) d = t + ' 00:00:00';
+                else if (isMonth(t)) d = t + '-01 00:00:00';
+                if (d === null) { delete data[nf.key]; dirty = true; counts.dateCleared++; }
+                else { d = to === 'datetime' ? d.slice(0, 16) : d; if (d !== t) { data[nf.key] = d; dirty = true; } }
+              }
               else if (to === 'number') { if (!isNum(v)) { delete data[nf.key]; dirty = true; counts.numCleared++; } }
               else if (CHOICE_TYPES.includes(to)) { const opts = selOpt[nf.key] || []; const parts = (to === 'checkbox') ? String(v).split(', ').map((s) => s.trim()).filter(Boolean) : [v]; for (const p of parts) { if (!opts.includes(p)) (selectExtra[nf.key] = selectExtra[nf.key] || new Set()).add(p); } }
             }
@@ -5392,6 +5803,23 @@
         } catch (e) { alert(T('Operation failed') + ': ' + e.message); }
         finally { this.xfer.busy = false; }
       },
+      // Date and time (owner, 2026-11-07): stored as "YYYY-MM-DD HH:MM" (or ":SS" with seconds),
+      // so lists, titles and exports read it as it is; only the input box uses the browser's
+      // "YYYY-MM-DDTHH:MM" form.
+      isDateTime(f) { return !!f && (f.type === 'datetime' || f.type === 'datetime_sec'); },
+      dtIn(f, v) {
+        if (v == null || v === '') return '';
+        const m = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2})(:\d{2})?)?$/.exec(String(v).trim());
+        if (!m) return '';
+        return m[1] + 'T' + (m[2] || '00:00') + (f.type === 'datetime_sec' ? (m[3] || ':00') : '');
+      },
+      dtOut(f, v) {
+        if (!v) return '';
+        let s = String(v).replace('T', ' ');
+        if (f.type === 'datetime_sec') { if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) s += ':00'; s = s.slice(0, 19); } // the browser leaves ":00" out
+        else s = s.slice(0, 16);
+        return s;
+      },
       inputType(f) {
         // Secret fields are plain text masked with CSS (.secret-mask) rather than
         // type="password", so the browser never treats the record form as a login
@@ -5614,18 +6042,26 @@
       reminderRange(f, raw) {
         if (raw == null || raw === '') return null;
         let s = String(raw).trim();
+        if (this.isDateTime(f)) {                                                   // a set time: a one-hour event
+          const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?$/.exec(s);
+          if (!m) return null;
+          const d = new Date(m[1] + 'T' + m[2] + (m[3] || ':00'));
+          if (isNaN(d.getTime())) return null;
+          const start = Math.floor(d.getTime() / 1000);
+          return { start, end: start + 3600, allDay: false };
+        }
         if (f.type === 'month') s = /^\d{4}-\d{2}$/.test(s) ? s + '-01' : s;      // YYYY-MM -> first day
         if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return null;                            // not a date value
         const d = new Date(s.slice(0, 10) + 'T00:00:00');                         // local midnight
         if (isNaN(d.getTime())) return null;
         const start = Math.floor(d.getTime() / 1000);
-        return { start, end: start + 86400 };                                     // all-day, next-day exclusive end
+        return { start, end: start + 86400, allDay: true };                                     // all-day, next-day exclusive end
       },
       addReminder(rec, f) {
         if (!this.apps.calendar) return;
         const r = this.reminderRange(f, rec.data[f.key]);
         if (!r) { this.showToast(T('Not a valid date')); return; }
-        const url = OC.generateUrl('/apps/calendar/new/1/' + r.start + '/' + r.end);
+        const url = OC.generateUrl('/apps/calendar/new/' + (r.allDay ? 1 : 0) + '/' + r.start + '/' + r.end);
         window.open(url, 'rbcal', 'popup,width=520,height=760,noopener');
       },
       // Address fields carry a map link. (options.map is honoured for backward
@@ -5711,7 +6147,7 @@
         }
         return cols;
       },
-      showToast(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ''), 1900); },
+      showToast(m, ms) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ''), ms || 1900); },
       onSearchInput() { this.selectedIds = []; clearTimeout(this._s); this._s = setTimeout(() => this.loadRecords(), 250); },
       // Find & replace across the currently-matched records. Normal mode does a
       // case-insensitive literal replace; regex mode uses the pattern (global).

@@ -1,0 +1,2 @@
+# the tests stay in the repository but are not shipped in the app archive
+/tests export-ignore

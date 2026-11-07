@@ -2,6 +2,52 @@
 
 All notable changes to RegiBase.
 
+## 0.22.1 — 2026-11-07
+
+The AI assistant can now work in RegiBase itself; categories for the collection list; date-and-time fields; collection settings wider and in tabs, with Share settings opening on their own tab; snapshots that show what each change did; undo that brings back a deleted collection, and the fixes from a review of the whole app.
+（AI アシスタントが、RegiBase の中を自分で操作できるようになりました。コレクション一覧にカテゴリを追加しました。日時の項目を追加しました。コレクション設定を広くしてタブに分け、「共有設定」から開くと共有のタブが開くようにしました。スナップショットで変更の中身が見えるようにしました。元に戻すときに、削除したコレクションも復活させるようにしました。アプリ全体の見直しで見つかった問題も修正しました。）
+
+### Added
+
+- **The AI assistant can work in RegiBase itself** (with AI-Hub). It looks through every collection the person can see — not only the open one — finds records, finds duplicates within and across collections or in one category, and, when the administrator allows it, adds, changes and deletes records, makes collections, renames them, files them in a category, changes their fields and deletes them. It acts with the rights of the person asking, so a shared collection only at its shared level, and every change can be taken back with "↶ Undo"; the page shows the change as soon as the answer comes. Secret collections and secret categories are open to it only after the person has entered their 6-digit key in this session, and "Hide secret collections" closes them to it again. The value of a secret field is never read or written by it: it knows only whether one is filled in, so when removing duplicates it keeps the record that holds a password. In the administration settings, "What it may do" now has a third choice, "Make, change and delete records, fields and collections"; reading covers every collection the person can see.
+
+- **Categories for the collection list**, for when there are too many collections to find your way. Make one with "＋ New category" under "＋ New collection", then put collections in it: in Collection settings (General tab, just under the name), with right-click → "Category…", or by dragging a collection onto the category's heading. A category made this way stays while it is empty. Collections in no category are under "Uncategorized", which is always at the top; the other categories are put in order by dragging their headings. One category is open at a time: Uncategorized at first, and opening another closes the one that was open. Right-click a heading also to remove the category (its collections go to Uncategorized; the collections themselves are not changed). A heading has a large open/close mark and its collections sit one step in, so it is not taken for a collection; the button at the top of the list now shows how many categories and collections there are instead of "All collections". The home screen shows the collections under the same headings. A category can have an icon and remarks (shown on the home screen and when pointing at its heading), and can be made secret with a 6-digit key: it and its collections stay out of the list until the key is entered with "Secret toggle" — the same key as a secret collection shows both. Right-click a heading → "Edit category…" to change its name, icon, remarks or secrecy. Categories are each person's own, so someone a collection is shared with can file it where they like.
+  （**コレクション一覧にカテゴリを追加しました。** コレクションが増えて探しにくいときに使います。「＋ 新規コレクション」の下の「＋ 新しいカテゴリ」でカテゴリを作り、コレクションを入れます。入れ方は3つあります。コレクション設定の「基本」タブ（名前のすぐ下）で選ぶ、コレクションを右クリックして「カテゴリ…」を選ぶ、コレクションをカテゴリの見出しにドラッグする、のどれでもできます。作ったカテゴリは、コレクションが0件でも残ります。どのカテゴリにも入っていないコレクションは「未分類」に入り、「未分類」は常に一番上に表示します。ほかのカテゴリは、見出しをドラッグして並べ替えられます。開くカテゴリは1つだけで、最初は「未分類」が開いており、別のカテゴリを開くと、開いていたカテゴリは閉じます。見出しを右クリックすると、カテゴリの解除もできます。解除すると、そのコレクションは「未分類」に移り、コレクションそのものは変わりません。見出しには大きな開閉の印を付け、中のコレクションを一段下げて表示するので、コレクションと見分けられます。一覧の一番上のボタンには、「コレクション一覧」の文字の代わりに、カテゴリ数とコレクション数を表示します。ホーム画面でも、同じ見出しでコレクションを分けて表示します。カテゴリにはアイコンと備考を付けられます（備考はホーム画面と、見出しにマウスを置いたときに表示します）。カテゴリは6桁のキーでシークレットにでき、「シークレット切り替え」でキーを入力するまで、カテゴリとその中のコレクションを一覧に表示しません。シークレットのコレクションと同じキーにすると、両方まとめて表示されます。名前・アイコン・備考・シークレットは、見出しを右クリックして「カテゴリを編集…」で変えられます。カテゴリは人ごとの設定なので、共有された人も自分でカテゴリに分けられます。）
+- **Two new field types: "Date and time" (year, month, day, hours and minutes) and "Date and time (with seconds)".** A value is kept as `2026-11-07 14:30` (or `14:30:05`), so lists, titles and exports show it as it is, and it sorts in time order. The 📅 button adds it to the Calendar as a one-hour event at that time. Changing a field between Date, Year/Month and the two new types keeps the values that fit: a date becomes 00:00 of that day, a date and time keeps its date. Exporting to Tables makes a date-and-time column, and importing one from Tables gives this type.
+  （**項目の種類に「日時」（年月日時分）と「日時（秒まで）」を追加しました。** 値は `2026-11-07 14:30`（秒までなら `14:30:05`）の形で保存するので、一覧・見出し・書き出しにそのまま表示され、時刻の順に並べ替えられます。📅 ボタンで、その時刻から1時間の予定としてカレンダーに追加できます。「日付」「年月」と新しい2つの種類の間で項目の種類を変えたときは、変換できる値を残します。日付はその日の 00:00 に、日時は日付の部分だけにします。Tables への書き出しでは日時の列になり、Tables から取り込むと日時の項目になります。）
+
+### Changed
+
+- **Collection settings are wider and in tabs**: General, Lock and secret, Sharing and Data. "Share settings" in the list's menu opens them on the Sharing tab ([#1](https://github.com/ktec-nc-apps/RegiBase/issues/1)): the shares used to sit at the bottom of one long dialog, where they could not be seen without scrolling down. The switch that had to be turned on before the shares were shown is gone: the shares and the form to add one are there at once. The last day of a share is no longer cut short in the list. Someone a collection is shared with sees only what they may use, without tabs.
+  （**コレクション設定を広くし、「基本」「ロックとシークレット」「共有」「データ」のタブに分けました。** 一覧の右クリックで「共有設定」を選ぶと、共有のタブが開きます（[#1](https://github.com/ktec-nc-apps/RegiBase/issues/1)）。これまでは共有設定が長いダイアログの一番下にあり、下までスクロールしないと見えませんでした。共有を表示する前にオンにする必要があったチェックもなくし、共有の一覧と追加の欄を最初から表示します。共有の一覧で、共有の最終日が途中で切れないようにしました。共有された人には、タブを使わず、使える項目だけを表示します。）
+- **The collection editor (Edit collection) is wider too**, and its labels stay on one line. Both dialogs fit a 1366 × 768 screen. On a phone, the name box of a field is no longer squeezed to one letter.
+  （**コレクション編集も横幅を広げ、見出しが途中で折り返さないようにしました。** どちらのダイアログも 1366 × 768 の画面に収まります。スマホで、項目名の欄が1文字分まで細くなる問題も直しました。）
+- **Snapshots show what each change did.** Each line names the kind of change and the record, and below it what changed: "Name: old → new" for an edit, the records added or deleted, the fields added. A secret field is shown only as "secret field changed", never with its value, and someone a collection is shared with is shown only what they may see.
+  （**スナップショットで、それぞれの変更の中身が見えるようにしました。** 各行に変更の種類と対象のレコードを出し、その下に中身を出します。編集なら「欄名：変更前 → 変更後」、追加・削除したレコード、追加した項目などです。秘匿項目は「秘匿項目を変更」とだけ出し、値は出しません。共有された人には、見てよい内容だけを出します。）
+- **Undo brings back a deleted collection when it needs to.** When the records of a change belonged to a collection that has since been deleted, and that deletion can still be undone, the collection comes back first, with its settings, fields and records, and the change is undone into it. When it can no longer be brought back, you are asked whether to make a new collection for the records. Changes made before the deletion can still be undone in the collection brought back.
+  （**元に戻すときに、必要なら削除したコレクションも復活させるようにしました。** 変更したレコードのコレクションがその後で削除されていても、その削除が元に戻せるなら、まずコレクションを設定・項目・レコードごと復活させ、そこへ変更を戻します。復活できない場合は、新しいコレクションを作ってレコードを戻すかどうかを確認します。削除より前の変更も、復活したコレクションで元に戻せます。）
+- **When an undo cannot be done, the reason is shown**, instead of "Nothing to undo".
+  （**元に戻せなかったときは、その理由を表示します。** これまでは理由にかかわらず「元に戻す変更はありません」と表示していました。）
+
+### Fixed
+
+- **A secret collection could be opened without its 6-digit key** when its owner had shared it with a group the owner belongs to.
+  （**シークレットコレクションが、6桁のシークレットキーなしで開ける場合がありました。** 所有者が、自分も入っているグループにそのコレクションを共有していた場合です。）
+- **Someone could send another user's held attachments to the trash** by clearing the snapshots of a collection that was not theirs. Only the owner can do this now.
+  （**ほかの人のコレクションのスナップショットを消去すると、その所有者が保管していた添付ファイルがゴミ箱へ移る問題を修正しました。** 消去できるのは所有者だけです。）
+- **A secret value could reach someone it was shared with without the key**, through the text shown for reading a field.
+  （**秘匿項目の値が、鍵を渡していない共有相手に届く場合がありました。** 欄の読み仮名の表示を通じてです。）
+- **Someone a collection is shared with could put back secret fields they cannot change** by undoing their own change. Undo now writes only what their own save could write.
+  （**共有された人が元に戻すと、変更できないはずの秘匿項目まで古い値に戻る問題を修正しました。** 元に戻す操作では、その人が保存で書き換えられる範囲だけを戻します。）
+- **Undoing a move could put the records into a deleted collection**, where they could not be seen.
+  （**移動を元に戻すと、レコードが削除済みのコレクションに戻され、見えなくなる問題を修正しました。**）
+- **The secret fields of a duplicated collection could not be opened.** The copy now takes the collection's own key with it.
+  （**複製したコレクションの秘匿項目が開けない問題を修正しました。** 複製先にも、そのコレクションの鍵を引き継ぎます。）
+- **Restoring a backup over secret collections that are not open** stopped part way with no reason given. It now says so before anything is written: open them with their 6-digit key first.
+  （**開いていないシークレットコレクションがあると、バックアップからの復元が理由も出さずに途中で止まる問題を修正しました。** 書き込む前に、先に6桁のシークレットキーで開くよう案内します。）
+- The order of the entries in `appinfo/info.xml` now follows the Nextcloud app schema.
+  （`appinfo/info.xml` の項目の並び順を、Nextcloud の決まりに合わせました。）
+
 ## 0.21.2 — 2026-10-19
 
 Translations corrected after a review. In sixteen languages, sentences that used another word than the rest of RegiBase — for a snapshot, the master key, a secret field, a record, or the form of address — now use the same one; in Japanese this includes "Undo / change history" and the wording around secret fields and keys. Two Brazilian Portuguese texts that were written the European way — "Definições" for Settings, and the line under the theme setting — now read as they do in Brazil. No feature was added or changed.

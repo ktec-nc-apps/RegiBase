@@ -68,6 +68,11 @@ class HistoryService {
 		return array_map(fn (HistoryEntity $h) => $h->jsonSerialize(), $this->mapper->listForUser($userId, 100000, $collectionId));
 	}
 
+	/** The same rows as listForUser(), as entities (their undo data with them). @return HistoryEntity[] */
+	public function listEntitiesForUser(string $userId, ?int $collectionId = null): array {
+		return $this->mapper->listForUser($userId, 100000, $collectionId);
+	}
+
 	public function clearCollection(int $collectionId): void {
 		$this->mapper->deleteForCollection($collectionId);
 	}
@@ -96,6 +101,72 @@ class HistoryService {
 			return $this->mapper->activeGroup($userId, $grp);
 		}
 		return [$latest];
+	}
+
+	/**
+	 * A deleted collection brought back by undo has a new id, and so have its records:
+	 * point the changes still waiting to be undone at the new ids.
+	 * @param array<int,int> $recMap old record id => new record id
+	 */
+	public function remapPending(string $userId, int $oldCid, int $newCid, array $recMap): void {
+		$rid = static fn ($id) => $recMap[(int)$id] ?? $id;
+		$walk = static function ($v) use (&$walk, $oldCid, $newCid) {
+			if (!is_array($v)) {
+				return $v;
+			}
+			foreach ($v as $k => $x) {
+				if ($k === 'collectionId' && (int)$x === $oldCid) {
+					$v[$k] = $newCid;
+				} elseif (is_array($x)) {
+					$v[$k] = $walk($x);
+				}
+			}
+			return $v;
+		};
+		foreach ($this->mapper->listForUser($userId, 100000, null) as $e) {
+			if ($e->getUndone()) {
+				continue;
+			}
+			$p = $walk($this->decode($e));
+			switch ($p['kind'] ?? '') {
+				case 'del_collection':
+				case 'restore_collection':
+					if ((int)($p['id'] ?? 0) === $oldCid) {
+						$p['id'] = $newCid;
+					}
+					break;
+				case 'del_record':
+				case 'set_data':
+					if (isset($p['id'])) {
+						$p['id'] = $rid($p['id']);
+					}
+					break;
+				case 'del_many':
+					$p['ids'] = array_map($rid, is_array($p['ids'] ?? null) ? $p['ids'] : []);
+					break;
+				case 'reorder':
+					$p['orders'] = array_map(static fn ($o) => is_array($o) && isset($o[0]) ? [$rid($o[0])] + $o : $o, is_array($p['orders'] ?? null) ? $p['orders'] : []);
+					break;
+				case 'undo_transfer':
+					$p['createdIds'] = array_map($rid, is_array($p['createdIds'] ?? null) ? $p['createdIds'] : []);
+					break;
+			}
+			$e->setUndoData($this->encode($p));
+			if ((int)$e->getCollectionId() === $oldCid) {
+				$e->setCollectionId($newCid);
+			}
+			$this->mapper->update($e);
+		}
+	}
+
+	/** The entry as it is stored now (after remapPending() changed it). */
+	public function reload(string $userId, HistoryEntity $e): HistoryEntity {
+		foreach ($this->mapper->listForUser($userId, 100000, null) as $h) {
+			if ((int)$h->getId() === (int)$e->getId()) {
+				return $h;
+			}
+		}
+		return $e;
 	}
 
 	public function markUndone(HistoryEntity $e): void {

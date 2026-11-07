@@ -75,6 +75,11 @@ class RegiBaseService {
 		$best = null;
 		$bestRank = -1;
 		foreach ($candidates as $s) {
+			// The owner's own collection reached through a group the owner is in is not a share
+			// to them: it let a hidden collection open without its 6-digit key (review).
+			if ((string)$s->getOwnerUid() === $userId) {
+				continue;
+			}
 			// A share past its end date gives nothing, and its key is erased.
 			if ($this->purgeIfExpired($s) || !$this->shareAllowedNow($s)) {
 				continue;
@@ -130,6 +135,21 @@ class RegiBaseService {
 			throw new \RuntimeException('Invalid date');
 		}
 		return $v;
+	}
+
+	/**
+	 * $undo with a small view of the change beside it (HistoryView), for the snapshot list.
+	 * A view that cannot be made is left out: it never costs the change itself.
+	 */
+	private static function withView(array $undo, callable $view): array {
+		try {
+			$v = $view();
+			if (is_array($v) && $v !== []) {
+				$undo['view'] = $v;
+			}
+		} catch (\Throwable $e) {
+		}
+		return $undo;
 	}
 
 	/** Best-effort append to the undo/change-history journal (never blocks the op). */
@@ -586,6 +606,11 @@ class RegiBaseService {
 		// highest permission level.
 		$bestByColl = [];
 		foreach ($this->shares->findAllForUserAccess($userId, $this->userGroupIds($userId)) as $share) {
+			// the owner's own collection shared to a group the owner is in is listed once, as
+			// the owner's, and a hidden one not at all (review)
+			if ((string)$share->getOwnerUid() === $userId) {
+				continue;
+			}
 			// a share past its last day is not listed (and its key is erased)
 			if ($this->purgeIfExpired($share) || !$this->shareAllowedNow($share)) {
 				continue;
@@ -610,6 +635,36 @@ class RegiBaseService {
 			$out[] = $this->decorateShare($j, false, $share);
 		}
 		return $out;
+	}
+
+	/** Ids of the user's own secret (hidden) collections, open or not. @return list<int> */
+	public function ownSecretCollectionIds(string $userId): array {
+		$ids = [];
+		foreach ($this->collections->findAllForUser($userId) as $c) {
+			if ($c->getSecret()) {
+				$ids[] = (int)$c->getId();
+			}
+		}
+		return $ids;
+	}
+
+	/** "Hide secret collections": the ones opened in this session close again on the server too. */
+	public function closeSecretCollections(string $userId): void {
+		foreach ($this->ownSecretCollectionIds($userId) as $id) {
+			$this->session->remove(self::secretOpenKey($id));
+		}
+	}
+
+	/** Ids of every collection in the user's list: their own (hidden ones included) and those shared with them. @return array<int,true> */
+	public function listedCollectionIds(string $userId): array {
+		$ids = [];
+		foreach ($this->collections->findAllForUser($userId) as $c) {
+			$ids[(int)$c->getId()] = true;
+		}
+		foreach ($this->listCollections($userId) as $j) {
+			$ids[(int)$j['id']] = true;
+		}
+		return $ids;
 	}
 
 	/** A secret collection key is exactly six digits. */
@@ -872,6 +927,10 @@ class RegiBaseService {
 		$c->setKeyHead($src->getKeyHead());
 		$c->setKeySep($src->getKeySep());
 		$c->setKeySepChar($src->getKeySepChar());
+		// The collection's own key goes with the copy: the secret values copied below are under
+		// it, and without it the copy's secrets could not be opened (review). The shares are not
+		// copied, so nobody else is given anything by this.
+		$c->setKeyWrap(($src->getKeyWrap() ?? '') !== '' ? (string)$src->getKeyWrap() : null);
 		$c->setSort($this->collections->maxSort($userId) + 1);
 		$c->setCreatedAt($this->now());
 		$c->setUpdatedAt($this->now());
@@ -929,7 +988,7 @@ class RegiBaseService {
 		// Don't clutter the undo history with pure display-preference switches
 		// (view / sort). Only real settings changes are worth an undo entry.
 		if (array_diff(array_keys($patch), ['view', 'record_sort'])) {
-			$this->rec($userId, 'collection.update', $id, $this->l->t('Change settings of “%s”', [$c->getName()]), ['kind' => 'restore_collection', 'id' => $id, 'settings' => $c->jsonSerialize()]);
+			$this->rec($userId, 'collection.update', $id, $this->l->t('Change settings of “%s”', [$c->getName()]), self::withView(['kind' => 'restore_collection', 'id' => $id, 'settings' => $c->jsonSerialize()], fn () => HistoryView::settingsView($c->jsonSerialize(), $patch)));
 		}
 		if (isset($patch['name'])) {
 			$c->setName(self::cut($patch['name'], self::NAME_MAX));
@@ -1043,7 +1102,7 @@ class RegiBaseService {
 		$dump = [
 			'settings' => $c->jsonSerialize() + ['secret_hash' => $c->getSecretHash()],
 			'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id)),
-			'records' => array_map(fn (RecordEntity $r) => ['data' => json_decode($r->getData() ?: '{}', true) ?: [], 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()], $this->records->findForCollection($id)),
+			'records' => array_map(fn (RecordEntity $r) => ['id' => (int)$r->getId(), 'data' => json_decode($r->getData() ?: '{}', true) ?: [], 'sort' => (int)$r->getSort(), 'createdAt' => (string)$r->getCreatedAt()], $this->records->findForCollection($id)),
 		];
 		$this->rec($userId, 'collection.delete', null, $this->l->t('Delete the collection “%s”', [$c->getName()]), ['kind' => 'recreate_collection', 'dump' => $dump]);
 		$attach = $trashAttachments ? $this->attachmentFields($id) : [];
@@ -1079,8 +1138,66 @@ class RegiBaseService {
 	// ---- undo / change history ----
 
 	/** List the user's snapshot history (newest first), optionally scoped to one collection. */
-	public function history(string $userId, ?int $collectionId = null): array {
-		return $this->history->listForUser($userId, $collectionId);
+	public function history(string $userId, ?int $collectionId = null, bool $withDetail = false): array {
+		if (!$withDetail) {
+			return $this->history->listForUser($userId, $collectionId);
+		}
+		$out = [];
+		$access = [];   // collection id => [fields, isOwner] or null (no access now)
+		$n = 0;
+		foreach ($this->history->listEntitiesForUser($userId, $collectionId) as $h) {
+			$j = $h->jsonSerialize();
+			// what the change did, for the newest entries only: the list stays light
+			if ($n++ < self::HISTORY_DETAIL_MAX) {
+				try {
+					$j['detail'] = $this->historyDetail($userId, (string)$h->getOp(), $h->getCollectionId() !== null ? (int)$h->getCollectionId() : null, $this->history->decode($h), $access);
+				} catch (\Throwable $e) {
+					$j['detail'] = null;
+				}
+			}
+			$out[] = $j;
+		}
+		return $out;
+	}
+
+	/** How many of the newest snapshots carry what they changed. */
+	private const HISTORY_DETAIL_MAX = 300;
+
+	/**
+	 * One snapshot's detail as HistoryView makes it, against the collection's fields as they are
+	 * now and the viewer's access to it now: an entry of a collection the viewer can no longer
+	 * open (a share taken away, a password not given) shows its summary only.
+	 */
+	private function historyDetail(string $userId, string $op, ?int $cid, array $p, array &$access): ?array {
+		if (($p['kind'] ?? '') === 'recreate_collection') {
+			return HistoryView::detail($op, $p, [], true);   // the owner's own deletion: counts only
+		}
+		if ($cid === null) {
+			return null;
+		}
+		if (!array_key_exists($cid, $access)) {
+			try {
+				[$c, , $isOwner] = $this->resolve($userId, $cid);
+				$access[$cid] = [array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId())), $isOwner];
+			} catch (\Throwable $e) {
+				$access[$cid] = null;
+			}
+		}
+		if ($access[$cid] === null) {
+			return null;
+		}
+		[$fields, $isOwner] = $access[$cid];
+		$current = null;
+		if (!isset($p['view']) && in_array($p['kind'] ?? '', ['set_data', 'del_record'], true)) {
+			try {
+				$r = $this->records->find((int)($p['id'] ?? 0));
+				if ((int)$r->getCollectionId() === $cid) {
+					$current = json_decode($r->getData() ?: '{}', true) ?: [];
+				}
+			} catch (DoesNotExistException $e) {
+			}
+		}
+		return HistoryView::detail($op, $p, $fields, (bool)$isOwner, $current);
 	}
 
 	public function undoLimit(string $userId): int {
@@ -1093,7 +1210,15 @@ class RegiBaseService {
 
 	public function clearHistory(string $userId, ?int $collectionId = null): void {
 		$this->history->clearForUser($userId, $collectionId);
+		// The held attachments are the owner's, kept for the owner's undo history: only the
+		// owner clearing their own history of the collection lets them go. Anybody naming
+		// any collection id used to send its owner's held files to the trash (review).
 		if ($collectionId !== null) {
+			try {
+				$this->findOwned($userId, $collectionId);
+			} catch (DoesNotExistException $e) {
+				return;
+			}
 			$this->purgeHeld($collectionId);
 		}
 	}
@@ -1192,7 +1317,7 @@ class RegiBaseService {
 		return ['records' => $put, 'versions' => count($vers)];
 	}
 
-	public function undo(string $userId, ?int $collectionId = null): array {
+	public function undo(string $userId, ?int $collectionId = null, bool $createNew = false): array {
 		$batch = $this->history->nextUndoBatch($userId, $collectionId); // newest-first
 		if (!$batch) {
 			return ['undone' => 0];
@@ -1201,21 +1326,112 @@ class RegiBaseService {
 		$collectionId = null;
 		$done = 0;
 		$refused = 0;
+		$reason = null;
+		$recovered = [];
 		foreach ($batch as $entry) {
+			$p = $this->history->decode($entry);
+			if (($p['kind'] ?? '') === 'none') {
+				// the other half of a move, kept in the collection it left: it changes nothing,
+				// so it is not counted (a refused move was reported as one change undone)
+				$this->history->markUndone($entry);
+				continue;
+			}
 			try {
-				$cid = $this->applyInverse($userId, $this->history->decode($entry));
+				try {
+					$cid = $this->applyInverse($userId, $p);
+				} catch (UndoTargetGoneException $e) {
+					// Where the records go back to is gone. Its deletion still waiting to be undone
+					// brings it back first; without it, a new collection is made only when the
+					// person said yes (owner, 2026-11-06). Then the change is undone into it.
+					$rec = $this->recoverUndoTarget($userId, $e->collectionId, $createNew, $p);
+					if ($rec === null) {
+						// nothing changed and the change stays in the history, so it can be asked again
+						return ['undone' => $done, 'refused' => 1, 'refused_reason' => 'target_gone', 'can_create' => true,
+							'summary' => $summary, 'collection_id' => $collectionId];
+					}
+					$recovered[] = $rec;
+					$entry = $this->history->reload($userId, $entry);
+					$cid = $this->applyInverse($userId, $this->history->decode($entry));
+				}
 				if ($cid !== null) {
 					$collectionId = $cid;
 				}
+			} catch (UndoTargetGoneException $e) {
+				$refused++;   // nothing was changed: where it would go back to is gone
+				$reason = 'target_gone';
 			} catch (ForbiddenException|LockedException $e) {
 				$refused++;   // no longer allowed there (share taken away, lowered, or locked)
+				$reason = $reason ?? 'forbidden';
 			} catch (\Throwable $e) {
 				// keep going; still mark undone so we never loop on a bad entry
 			}
 			$this->history->markUndone($entry);
 			$done++;
 		}
-		return ['undone' => $done - $refused, 'refused' => $refused, 'summary' => $summary, 'collection_id' => $collectionId];
+		$out = ['undone' => $done - $refused, 'refused' => $refused, 'summary' => $summary, 'collection_id' => $collectionId];
+		if ($reason !== null) {
+			$out['refused_reason'] = $reason;
+		}
+		if ($recovered) {
+			$out['recovered'] = $recovered;
+		}
+		return $out;
+	}
+
+	/**
+	 * Bring back the collection an undo puts records into. Its deletion, still waiting to be
+	 * undone, is undone first (the whole collection comes back as it was); without it and
+	 * when $createNew, a new collection is made with a text field for every key the records
+	 * have. The older changes waiting to be undone are pointed at it either way.
+	 * @return array{how: string, id: int, name: string}|null null: nothing done
+	 */
+	private function recoverUndoTarget(string $userId, int $goneId, bool $createNew, array $payload): ?array {
+		if ($goneId <= 0) {
+			return null;
+		}
+		foreach ($this->history->listEntitiesForUser($userId, null) as $h) {
+			if ($h->getUndone()) {
+				continue;
+			}
+			$q = $this->history->decode($h);
+			if (($q['kind'] ?? '') === 'recreate_collection' && (int)($q['dump']['settings']['id'] ?? 0) === $goneId) {
+				$nid = (int)$this->recreateCollection($userId, is_array($q['dump'] ?? null) ? $q['dump'] : []);
+				$this->history->markUndone($h);
+				return ['how' => 'restored', 'id' => $nid, 'name' => (string)($q['dump']['settings']['name'] ?? '')];
+			}
+		}
+		if (!$createNew) {
+			return null;
+		}
+		$recs = [];
+		if (is_array($payload['record'] ?? null)) {
+			$recs[] = $payload['record'];
+		}
+		foreach (['records', 'restore'] as $k) {
+			foreach ((is_array($payload[$k] ?? null) ? $payload[$k] : []) as $r) {
+				if (is_array($r)) {
+					$recs[] = $r;
+				}
+			}
+		}
+		$keys = [];
+		foreach ($recs as $r) {
+			if ((int)($r['collectionId'] ?? 0) !== $goneId) {
+				continue;
+			}
+			foreach (array_keys(is_array($r['data'] ?? null) ? $r['data'] : []) as $k) {
+				$keys[(string)$k] = true;
+			}
+		}
+		$fields = [];
+		$i = 0;
+		foreach (array_keys($keys) as $k) {
+			$fields[] = ['key' => $k, 'label' => $k, 'type' => 'text', 'sort' => $i, 'is_title' => $i === 0];
+			$i++;
+		}
+		$name = $this->l->t('Restored records');
+		$nid = (int)$this->recreateCollection($userId, ['settings' => ['id' => $goneId, 'name' => $name, 'icon' => '♻️'], 'fields' => $fields, 'records' => []]);
+		return ['how' => 'created', 'id' => $nid, 'name' => $name];
 	}
 
 	/**
@@ -1226,14 +1442,36 @@ class RegiBaseService {
 	 */
 	public function undoDownTo(string $userId, int $collectionId, int $targetId): array {
 		$done = 0;
+		$refused = 0;
+		$reason = null;
 		for ($i = 0; $i < 100000; $i++) { // hard cap; the id guard is the real terminator
 			$batch = $this->history->nextUndoBatch($userId, $collectionId);
 			if (!$batch || (int)$batch[0]->getId() < $targetId) {
 				break;
 			}
 			foreach ($batch as $entry) {
+				$p = $this->history->decode($entry);
+				if (($p['kind'] ?? '') === 'none') {
+					$this->history->markUndone($entry);
+					continue;
+				}
 				try {
-					$this->applyInverse($userId, $this->history->decode($entry));
+					try {
+						$this->applyInverse($userId, $p);
+					} catch (UndoTargetGoneException $e) {
+						// its collection's deletion, still waiting to be undone, brings it back first
+						if ($this->recoverUndoTarget($userId, $e->collectionId, false, $p) === null) {
+							throw $e;
+						}
+						$entry = $this->history->reload($userId, $entry);
+						$this->applyInverse($userId, $this->history->decode($entry));
+					}
+				} catch (UndoTargetGoneException $e) {
+					$refused++;
+					$reason = 'target_gone';
+				} catch (ForbiddenException|LockedException $e) {
+					$refused++;
+					$reason = $reason ?? 'forbidden';
 				} catch (\Throwable $e) {
 					// keep going; still mark undone so we never loop on a bad entry
 				}
@@ -1241,7 +1479,11 @@ class RegiBaseService {
 				$done++;
 			}
 		}
-		return ['undone' => $done, 'collection_id' => $collectionId];
+		$out = ['undone' => $done - $refused, 'refused' => $refused, 'collection_id' => $collectionId];
+		if ($reason !== null) {
+			$out['refused_reason'] = $reason;
+		}
+		return $out;
 	}
 
 	/**
@@ -1250,13 +1492,35 @@ class RegiBaseService {
 	 * collection was shared with could still undo into it after the share was taken
 	 * away, or over an edit lock (review P2).
 	 */
-	private function undoMayWrite(string $userId, int $collectionId): void {
-		[$c] = $this->require($userId, $collectionId, self::PERM_EDIT);
-		$this->assertEditable($c);
+	private function undoMayWrite(string $userId, int $collectionId): array {
+		$res = $this->require($userId, $collectionId, self::PERM_EDIT);
+		$this->assertEditable($res[0]);
+		return $res;
 	}
 	/** Collection-level undo (fields, settings, the collection itself, transfers): the owner only. */
 	private function undoOwnerOnly(string $userId, int $collectionId): void {
 		$this->assertEditable($this->findOwned($userId, $collectionId));
+	}
+	/**
+	 * Records are only put back into a collection that is still there. A collection deleted
+	 * and brought back by undo comes back under a new id, so an older entry naming the old
+	 * id used to insert its records under an id nothing shows: they were lost for good, and
+	 * a move undone that way also deleted the copies in the target first (review). Such an
+	 * undo is refused before anything is changed.
+	 * @throws UndoTargetGoneException
+	 */
+	private function assertUndoTargetsExist(array $recs): void {
+		foreach ($recs as $rec) {
+			$cid = (int)((is_array($rec) ? $rec : [])['collectionId'] ?? 0);
+			if ($cid <= 0) {
+				continue;
+			}
+			try {
+				$this->collections->findById($cid);
+			} catch (DoesNotExistException $e) {
+				throw UndoTargetGoneException::for($cid);
+			}
+		}
 	}
 	private function recordCollectionId(int $recordId): ?int {
 		try {
@@ -1285,9 +1549,10 @@ class RegiBaseService {
 					return null;
 				}
 				$cid = (int)$r->getCollectionId();
-				$this->undoMayWrite($userId, $cid);
+				[$uc, , , $ushare] = $this->undoMayWrite($userId, $cid);
 				$data = is_array($p['data'] ?? null) ? $p['data'] : [];
-				if ((string)$this->collections->findById($cid)->getUserId() !== $userId) {
+				$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($cid));
+				if ((string)$uc->getUserId() !== $userId) {
 					// somebody it is shared with: the attachments stay the owner's as they are now
 					$cur = json_decode($r->getData() ?: '{}', true) ?: [];
 					foreach ($this->attachmentFields($cid) as $f) {
@@ -1297,8 +1562,11 @@ class RegiBaseService {
 							unset($data[$f['key']]);
 						}
 					}
+					// and an undo is held to what their save could write: keys outside the fields and
+					// secret fields they were not given stay as they are now (review)
+					$data = $this->keepForeignKeys($userId, $uc, $fieldsJson, $data, $cur);
+					$data = $this->keepHiddenSecrets($userId, $uc, $ushare, $fieldsJson, $data, $cur);
 				}
-				$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($cid));
 				$r->setData(json_encode($data ?: new \stdClass(), JSON_UNESCAPED_UNICODE));
 				$r->setReading($this->computeReading($this->titleFor($fieldsJson, $data)));
 				$r->setUpdatedAt($this->now());
@@ -1307,10 +1575,12 @@ class RegiBaseService {
 				return $cid;
 			case 'reinsert':
 				$rec = is_array($p['record'] ?? null) ? $p['record'] : [];
+				$this->assertUndoTargetsExist([$rec]);
 				$this->undoMayWrite($userId, (int)($rec['collectionId'] ?? 0));
 				return $this->reinsertRecord($rec);
 			case 'reinsert_many':
 				$cid = null;
+				$this->assertUndoTargetsExist(array_map(fn ($r) => is_array($r) ? $r : [], is_array($p['records'] ?? null) ? $p['records'] : []));
 				foreach (($p['records'] ?? []) as $rec) {
 					$rec = is_array($rec) ? $rec : [];
 					$this->undoMayWrite($userId, (int)($rec['collectionId'] ?? 0));
@@ -1377,6 +1647,8 @@ class RegiBaseService {
 			case 'recreate_collection':
 				return $this->recreateCollection($userId, is_array($p['dump'] ?? null) ? $p['dump'] : []);
 			case 'undo_transfer':
+				// a move whose source collection is gone: the copies stay where they are
+				$this->assertUndoTargetsExist(is_array($p['restore'] ?? null) ? $p['restore'] : []);
 				foreach (($p['createdIds'] ?? []) as $id) {
 					try {
 						$r = $this->records->find((int)$id);
@@ -1510,9 +1782,22 @@ class RegiBaseService {
 		$c = $this->collections->insert($c);
 		$nid = (int)$c->getId();
 		$this->restoreFields($nid, is_array($dump['fields'] ?? null) ? $dump['fields'] : []);
-		$data = array_map(fn ($r) => is_array($r['data'] ?? null) ? $r['data'] : [], is_array($dump['records'] ?? null) ? $dump['records'] : []);
-		if ($data) {
-			$this->bulkInsertRecords($nid, $data);
+		$recs = is_array($dump['records'] ?? null) ? $dump['records'] : [];
+		$data = array_map(fn ($r) => is_array($r['data'] ?? null) ? $r['data'] : [], $recs);
+		$newIds = $data ? $this->bulkInsertRecordsIds($nid, $data) : [];
+		// The collection comes back under a new id, and so do its records. The older changes
+		// still waiting to be undone name the old ids: they are pointed at the new ones, so
+		// undoing them goes on in the collection brought back (owner, 2026-11-06). A deletion
+		// recorded before record ids were kept maps the collection only.
+		$oldCid = (int)($s['id'] ?? 0);
+		if ($oldCid > 0) {
+			$recMap = [];
+			foreach (array_values($recs) as $i => $r) {
+				if (isset($r['id'], $newIds[$i])) {
+					$recMap[(int)$r['id']] = $newIds[$i];
+				}
+			}
+			$this->history->remapPending($userId, $oldCid, $nid, $recMap);
 		}
 		return $nid;
 	}
@@ -1521,7 +1806,7 @@ class RegiBaseService {
 		$this->assertEditable($this->findOwned($userId, $id)); // ownership + not locked
 		$oldFields = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($id));
 		$this->journal->fieldsBefore($id, $oldFields);
-		$this->rec($userId, 'fields.replace', $id, $this->l->t('Edit fields'), ['kind' => 'restore_fields', 'collectionId' => $id, 'fields' => $oldFields], $grp);
+		$this->rec($userId, 'fields.replace', $id, $this->l->t('Edit fields'), self::withView(['kind' => 'restore_fields', 'collectionId' => $id, 'fields' => $oldFields], fn () => HistoryView::fieldsView($oldFields, $fields)), $grp);
 		// Old fields out and new ones in as one write: a field that failed to insert used to
 		// leave the collection with no fields at all (review).
 		$this->atomic(function () use ($id, $fields): void {
@@ -1690,7 +1975,7 @@ class RegiBaseService {
 			// before the title and the search below, so neither can tell a hidden value
 			$j['data'] = $this->hideSecrets(is_array($j['data']) ? $j['data'] : [], $fieldsJson, $isOwner, $share);
 			$j['title'] = $this->titleFor($fieldsJson, $j['data'], $sep);
-			$rows[] = $j;
+			$rows[] = $this->hideReading($j, $isOwner);
 		}
 
 		if ($q !== null && trim($q) !== '') {
@@ -1770,12 +2055,25 @@ class RegiBaseService {
 		return [$r, $c, $isOwner, $share];
 	}
 
+	/**
+	 * The stored reading is made from the whole record, a secret title field included (in
+	 * plain text when no master key is set). Somebody who is not the owner gets it made again
+	 * from what they are shown, as the title is (review).
+	 */
+	private function hideReading(array $j, bool $isOwner): array {
+		if (!$isOwner) {
+			$j['reading'] = $this->computeReading((string)($j['title'] ?? ''));
+		}
+		return $j;
+	}
+
 	public function getRecord(string $userId, int $id): array {
 		[$r, $c, $isOwner, $share] = $this->collectionOfRecord($userId, $id);
 		$fieldsJson = array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection((int)$c->getId()));
 		$j = $r->jsonSerialize();
 		$j['data'] = $this->hideSecrets(is_array($j['data']) ? $j['data'] : [], $fieldsJson, $isOwner, $share);
 		$j['title'] = $this->titleFor($fieldsJson, $j['data'], $this->keySep($c));
+		$j = $this->hideReading($j, $isOwner);
 		return $j;
 	}
 
@@ -1857,7 +2155,7 @@ class RegiBaseService {
 		$e->setCreatedAt($this->now());
 		$e->setUpdatedAt($this->recordNow());
 		$e = $this->records->insert($e);
-		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Added: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'del_record', 'id' => (int)$e->getId()]);
+		$this->rec($userId, 'record.create', $collectionId, $this->l->t('Added: %s', [$this->summaryTitle($fieldsJson, $data)]), self::withView(['kind' => 'del_record', 'id' => (int)$e->getId()], fn () => HistoryView::recordView($fieldsJson, $data)));
 		return $this->getRecord($userId, (int)$e->getId());
 	}
 
@@ -1895,7 +2193,7 @@ class RegiBaseService {
 		// edits and must not enter the snapshot history — undoing one would revert
 		// the encryption and expose the plaintext.
 		if (!$noHistory) {
-			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			$this->rec($userId, 'record.update', (int)$c->getId(), $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), self::withView(['kind' => 'set_data', 'id' => $id, 'data' => $oldData], fn () => HistoryView::editView($fieldsJson, $oldData, $data)), $grp);
 			// A numbered version of the record as it stood just before this write,
 			// kept beside it the way EditBase keeps versions beside a document —
 			// independent of the account-wide undo log above, and surviving past
@@ -2057,7 +2355,7 @@ class RegiBaseService {
 			} else {
 				$this->records->update($r);
 			}
-			$this->rec($userId, 'record.update', $collectionId, $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), ['kind' => 'set_data', 'id' => $id, 'data' => $oldData], $grp);
+			$this->rec($userId, 'record.update', $collectionId, $this->l->t('Edited: %s', [$this->summaryTitle($fieldsJson, $data)]), self::withView(['kind' => 'set_data', 'id' => $id, 'data' => $oldData], fn () => HistoryView::editView($fieldsJson, $oldData, $data)), $grp);
 			if ($autoVersion && $oldData !== []) {
 				try {
 					$this->versions->take($id, ['data' => $oldData, 'reading' => $oldReading], $keep);
@@ -2177,7 +2475,8 @@ class RegiBaseService {
 		$this->assertEditable($this->findOwned($userId, $collectionId)); // ownership + not locked
 		$existingFields = $this->fields->findForCollection($collectionId);
 		$this->journal->fieldsBefore($collectionId, array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields));
-		$this->rec($userId, 'fields.append', $collectionId, $this->l->t('Add fields'), ['kind' => 'restore_fields', 'collectionId' => $collectionId, 'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields)]);
+		$this->rec($userId, 'fields.append', $collectionId, $this->l->t('Add fields'), self::withView(['kind' => 'restore_fields', 'collectionId' => $collectionId, 'fields' => array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $existingFields)],
+			fn () => HistoryView::fieldsView([], array_values(array_filter($fields, fn ($f) => is_array($f) && ($f['key'] ?? '') !== '' && !in_array((string)$f['key'], array_map(fn (FieldEntity $x) => $x->getFieldKey(), $existingFields), true))))));
 		$existing = [];
 		$maxSort = 0;
 		foreach ($existingFields as $f) {
@@ -2367,11 +2666,12 @@ class RegiBaseService {
 		$grp = $mode === 'move' ? ('xfer-' . bin2hex(random_bytes(8))) : null;
 		$this->rec($userId, 'record.transfer', $targetId,
 			$mode === 'move' ? $this->l->t('Move %s records', [count($createdIds)]) : $this->l->t('Copy %s records', [count($createdIds)]),
-			['kind' => 'undo_transfer', 'createdIds' => $createdIds, 'restore' => $movedBack], $grp);
+			self::withView(['kind' => 'undo_transfer', 'createdIds' => $createdIds, 'restore' => $movedBack], fn () => ['m' => $mode, 'n' => count($createdIds),
+				'from' => HistoryView::cut((string)$srcEntity->getName()), 'to' => HistoryView::cut((string)$tgtEntity->getName())]), $grp);
 		if ($mode === 'move' && $sourceId !== $targetId) {
 			$this->rec($userId, 'record.transfer', $sourceId,
 				$this->l->t('Move %s records to “%s” (deleted here)', [count($createdIds), (string)$tgtEntity->getName()]),
-				['kind' => 'none'], $grp);
+				['kind' => 'none', 'view' => ['m' => 'move', 'n' => count($createdIds), 'to' => HistoryView::cut((string)$tgtEntity->getName())]], $grp);
 		}
 		return ['count' => count($createdIds)];
 	}
@@ -2546,9 +2846,42 @@ class RegiBaseService {
 	 * records into same-name collections) | 'add' (always create new collections).
 	 * @return array{collections: int, records: int, mode: string}
 	 */
+	/**
+	 * Names of the user's hidden (secret) collections not opened in this session that a restore
+	 * in $mode would have to change: every one for an overwrite (they are deleted first), those
+	 * whose name a collection of the backup has for a merge. A hidden collection is "not found"
+	 * until its 6-digit key is given, so such a restore used to stop half way and end with
+	 * "could not be completed", no reason given (review). It is refused up front instead.
+	 * @return string[]
+	 */
+	public function closedSecretsInTheWay(string $userId, array $struct, string $mode): array {
+		if ($mode !== 'overwrite' && $mode !== 'merge') {
+			return [];
+		}
+		$names = [];
+		foreach (($struct['collections'] ?? []) as $col) {
+			if (is_array($col)) {
+				$names[(string)($col['name'] ?? 'RegiBase')] = true;
+			}
+		}
+		$out = [];
+		foreach ($this->collections->findAllForUser($userId) as $c) {
+			if (!$c->getSecret() || $this->secretOpen((int)$c->getId())) {
+				continue;
+			}
+			if ($mode === 'overwrite' || isset($names[(string)$c->getName()])) {
+				$out[] = (string)$c->getName();
+			}
+		}
+		return $out;
+	}
+
 	public function importAll(string $userId, array $struct, array $fileIdMap, string $mode = 'overwrite'): array {
 		if (!in_array($mode, ['overwrite', 'merge', 'add'], true)) {
 			$mode = 'overwrite';
+		}
+		if ($this->closedSecretsInTheWay($userId, $struct, $mode) !== []) {
+			throw new SecretCollectionsClosedException('Open the secret collections with their 6-digit key first, then restore again.');
 		}
 		// The old attachments are only moved to the trash by the caller once everything
 		// has been written (an overwrite that failed half way used to leave the records
@@ -2866,7 +3199,8 @@ class RegiBaseService {
 		$this->assertEditable($this->findOwned($userId, $collectionId)); // owner + not locked
 		$ids = $this->bulkInsertRecordsIds($collectionId, $dataArray);
 		if ($ids) {
-			$this->rec($userId, 'record.bulk_add', $collectionId, $this->l->t('Import %s records', [count($ids)]), ['kind' => 'del_many', 'ids' => $ids]);
+			$this->rec($userId, 'record.bulk_add', $collectionId, $this->l->t('Import %s records', [count($ids)]), self::withView(['kind' => 'del_many', 'ids' => $ids], fn () => HistoryView::bulkView(
+				array_map(fn (FieldEntity $f) => $f->jsonSerialize(), $this->fields->findForCollection($collectionId)), $dataArray)));
 		}
 		return count($ids);
 	}

@@ -93,7 +93,8 @@ class TablesBridge {
 				$f['type'] = 'number';
 				break;
 			case 'datetime':
-				$f['type'] = ($sub === 'date') ? 'date' : 'text';
+				// a date, or a date and time; a time of day alone stays text
+				$f['type'] = ($sub === 'date') ? 'date' : (($sub === '' || $sub === null) ? 'datetime' : 'text');
 				break;
 			case 'text':
 				if ($sub === 'long' || $sub === 'rich') {
@@ -141,6 +142,9 @@ class TablesBridge {
 		}
 		if ($type === 'datetime' && $sub === 'date') {
 			return substr((string)$value, 0, 10);
+		}
+		if ($type === 'datetime' && ($sub === '' || $sub === null)) {
+			return str_replace('T', ' ', substr((string)$value, 0, 16));
 		}
 		if (is_array($value)) {
 			return implode(', ', array_map(fn ($v) => is_scalar($v) ? (string)$v : json_encode($v), $value));
@@ -270,6 +274,10 @@ class TablesBridge {
 			case 'date':
 			case 'month':
 				return new $dtoClass(title: $title, type: 'datetime', subtype: 'date');
+			case 'datetime':
+			case 'datetime_sec':
+				// Tables keeps minutes, not seconds
+				return new $dtoClass(title: $title, type: 'datetime');
 			default:
 				return new $dtoClass(title: $title, type: 'text', subtype: 'line');
 		}
@@ -287,6 +295,9 @@ class TablesBridge {
 		}
 		if ($type === 'date' || $type === 'month') {
 			return substr((string)$value, 0, 10);
+		}
+		if ($type === 'datetime' || $type === 'datetime_sec') {
+			return substr((string)$value, 0, 16);
 		}
 		return (string)$value;
 	}

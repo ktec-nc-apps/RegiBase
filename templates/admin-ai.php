@@ -40,11 +40,12 @@ $reasons = [
 			<?php } ?>
 		</div>
 
-		<h3><?php p($l->t('What it may read (read only — it never changes anything, and never secret fields)')); ?></h3>
+		<h3><?php p($l->t('What it may do (never secret field values; secret collections only once opened with their 6-digit key)')); ?></h3>
 		<?php
 		$sources = [
-			'collections' => $l->t('The names of the collections, and the open collection\'s field definitions (no secret values)'),
-			'records' => $l->t('The open collection\'s records — non-secret fields only (secret fields are never sent)'),
+			'collections' => $l->t('The collections the person can see, and their field definitions (no secret values)'),
+			'records' => $l->t('The records of every collection the person can see — non-secret fields only'),
+			'write' => $l->t('Make, change and delete records, fields and collections, with the person\'s own rights (“↶ Undo” takes it back)'),
 		];
 		foreach ($sources as $src => $label) { ?>
 			<p><input type="checkbox" class="checkbox" id="rb-ai-read-<?php p($src); ?>" data-read="<?php p($src); ?>"

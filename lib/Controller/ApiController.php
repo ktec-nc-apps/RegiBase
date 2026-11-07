@@ -31,6 +31,7 @@ use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\IRequest;
+use OCP\ISession;
 use OCP\ITempManager;
 use OCP\IUserManager;
 use OCP\IUserSession;
@@ -58,6 +59,7 @@ class ApiController extends Controller {
 		private IAppManager $appManager,
 		private ISearch $collaboratorSearch,
 		private IShareManager $shareManager,
+		private ISession $session,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -525,7 +527,8 @@ class ApiController extends Controller {
 		// Reading the list changes nothing: it used to create every collection's save folder,
 		// so a folder deleted in Files came back each time RegiBase was opened (review P18).
 		// A folder is made when the collection is made and when something is saved into it.
-		return new JSONResponse($this->service->listCollections($this->uid()));
+		$uid = $this->uid();
+		return new JSONResponse($this->withoutHiddenCategories($uid, $this->service->listCollections($uid)));
 	}
 
 	#[NoAdminRequired]
@@ -545,6 +548,240 @@ class ApiController extends Controller {
 		$ids = $this->request->getParam('ids', []);
 		$ids = is_array($ids) ? $ids : [];
 		return new JSONResponse(['changed' => $this->service->reorderCollections($this->uid(), $ids)]);
+	}
+
+	// The categories of the collection list (owner, 2026-11-07): each person's own, so someone a
+	// collection is shared with can file it where they like. {"<collection id>": "category"}
+	#[NoAdminRequired]
+	public function getCategories(): JSONResponse {
+		return new JSONResponse($this->readCategories($this->uid()));
+	}
+
+	/**
+	 * Replace them. map: only collections in the person's list are kept, a blank name means
+	 * none. order: the categories top to bottom, as dragged ("Uncategorized" is always first and
+	 * is not in it). A secret category not opened in this session is not seen by the page, so
+	 * what it holds is kept as it is.
+	 */
+	#[NoAdminRequired]
+	public function putCategories(): JSONResponse {
+		$uid = $this->uid();
+		$hidden = $this->hiddenCategories($uid);
+		$map = $this->request->getParam('map', null);
+		if (is_array($map)) {
+			$mine = $this->service->listedCollectionIds($uid);
+			$out = [];
+			foreach ($this->rawMap($uid) as $id => $name) {
+				if (isset($hidden[$name])) {
+					$out[$id] = $name;
+				}
+			}
+			foreach ($map as $id => $name) {
+				if (is_numeric($id) && isset($mine[(int)$id]) && is_scalar($name) && ($n = self::catName($name)) !== '' && !isset($hidden[$n]) && !isset($out[(string)(int)$id])) {
+					$out[(string)(int)$id] = $n;
+				}
+			}
+			$this->config->setUserValue($uid, Application::APP_ID, 'coll_categories', json_encode((object)$out, JSON_UNESCAPED_UNICODE));
+		}
+		$order = $this->request->getParam('order', null);
+		if (is_array($order)) {
+			$o = [];
+			foreach (array_slice($order, 0, 1000) as $name) {
+				if (is_scalar($name) && ($n = self::catName($name)) !== '' && !isset($hidden[$n]) && !in_array($n, $o, true)) {
+					$o[] = $n;
+				}
+			}
+			// the hidden ones go back where they were
+			$old = $this->rawOrder($uid);
+			foreach ($old as $pos => $name) {
+				if (isset($hidden[$name]) && !in_array($name, $o, true)) {
+					array_splice($o, min($pos, count($o)), 0, [$name]);
+				}
+			}
+			$this->config->setUserValue($uid, Application::APP_ID, 'coll_category_order', json_encode($o, JSON_UNESCAPED_UNICODE));
+		}
+		$this->pruneCategoryMeta($uid);
+		return new JSONResponse($this->readCategories($uid));
+	}
+
+	/**
+	 * Make a category or change one: name (from = the old name, '' for a new one), icon, note,
+	 * and whether it is secret. A secret category needs a 6-digit key, kept only as a hash; it is
+	 * open for the rest of this session once set.
+	 */
+	#[NoAdminRequired]
+	public function putCategoryMeta(): JSONResponse {
+		$uid = $this->uid();
+		$l = $this->appL10n();
+		$from = self::catName($this->request->getParam('from', ''));
+		$name = self::catName($this->request->getParam('name', ''));
+		if ($name === '') {
+			return new JSONResponse(['error' => $l->t('Enter a name for the category.')], Http::STATUS_BAD_REQUEST);
+		}
+		$hidden = $this->hiddenCategories($uid);
+		$map = $this->rawMap($uid);
+		$order = $this->rawOrder($uid);
+		$meta = $this->rawMeta($uid);
+		$exists = static fn (string $n): bool => in_array($n, $order, true) || in_array($n, $map, true);
+		if (($from !== '' && isset($hidden[$from])) || ($from !== '' && !$exists($from))) {
+			return new JSONResponse(['error' => $l->t('This category no longer exists.')], Http::STATUS_NOT_FOUND);
+		}
+		if ($name !== $from && $exists($name)) {
+			return new JSONResponse(['error' => $l->t('There is already a category “%s”.', [$name])], Http::STATUS_CONFLICT);
+		}
+		$m = $from !== '' ? ($meta[$from] ?? []) : [];
+		$m['icon'] = mb_substr(trim((string)$this->request->getParam('icon', '')), 0, 16);
+		$m['note'] = mb_substr(trim((string)$this->request->getParam('note', '')), 0, 1000);
+		$secret = in_array($this->request->getParam('secret'), [true, 1, '1', 'true'], true);
+		$pin = trim((string)$this->request->getParam('pin', ''));
+		if ($secret) {
+			if ($pin !== '' && !preg_match('/^\d{6}$/', $pin)) {
+				return new JSONResponse(['error' => $l->t('The secret key must be exactly 6 digits.')], Http::STATUS_BAD_REQUEST);
+			}
+			if ($pin === '' && empty($m['hash'])) {
+				return new JSONResponse(['error' => $l->t('Set a 6-digit secret key to make this category secret.')], Http::STATUS_BAD_REQUEST);
+			}
+			if ($pin !== '') {
+				$m['hash'] = password_hash($pin, PASSWORD_DEFAULT);
+			}
+			$m['secret'] = true;
+		} else {
+			unset($m['secret'], $m['hash']);
+		}
+		if ($from !== '' && $from !== $name) {
+			foreach ($map as $id => $n) {
+				if ($n === $from) {
+					$map[$id] = $name;
+				}
+			}
+			$order = array_map(fn ($n) => $n === $from ? $name : $n, $order);
+			unset($meta[$from]);
+			$this->config->setUserValue($uid, Application::APP_ID, 'coll_categories', json_encode((object)$map, JSON_UNESCAPED_UNICODE));
+		}
+		if (!in_array($name, $order, true)) {
+			$order[] = $name;
+		}
+		$meta[$name] = $m;
+		$this->config->setUserValue($uid, Application::APP_ID, 'coll_category_order', json_encode(array_values($order), JSON_UNESCAPED_UNICODE));
+		$this->config->setUserValue($uid, Application::APP_ID, 'coll_category_meta', json_encode((object)$meta, JSON_UNESCAPED_UNICODE));
+		if (!empty($m['secret'])) {
+			$this->openCategory($name);   // set with its key just now: stays in view for this session
+		}
+		return new JSONResponse($this->readCategories($uid));
+	}
+
+	/** "Hide secret collections": the secret categories close again. */
+	#[NoAdminRequired]
+	public function hideSecretCategories(): JSONResponse {
+		$this->session->remove(self::CAT_OPEN);
+		// the secret collections close on the server too, and the assistant loses them (2026-11-07)
+		$this->service->closeSecretCollections($this->uid());
+		\OCP\Server::get(\OCA\RegiBase\Service\AiTools::class)->forgetOpen($this->uid());
+		return new JSONResponse(['ok' => true]);
+	}
+
+	private const CAT_OPEN = 'regibase_cat_open';
+
+	private static function catName($v): string {
+		return mb_substr(trim((string)(preg_replace('/\s+/u', ' ', is_scalar($v) ? (string)$v : '') ?? '')), 0, 60);
+	}
+
+	private function rawMap(string $uid): array {
+		$raw = json_decode($this->config->getUserValue($uid, Application::APP_ID, 'coll_categories', '{}'), true);
+		$map = [];
+		foreach (is_array($raw) ? $raw : [] as $id => $name) {
+			if (is_numeric($id) && is_string($name) && $name !== '') {
+				$map[(string)(int)$id] = $name;
+			}
+		}
+		return $map;
+	}
+
+	private function rawOrder(string $uid): array {
+		$o = json_decode($this->config->getUserValue($uid, Application::APP_ID, 'coll_category_order', '[]'), true);
+		return array_values(array_filter(is_array($o) ? $o : [], 'is_string'));
+	}
+
+	/** name => {icon, note, secret, hash} */
+	private function rawMeta(string $uid): array {
+		$m = json_decode($this->config->getUserValue($uid, Application::APP_ID, 'coll_category_meta', '{}'), true);
+		return is_array($m) ? array_filter($m, 'is_array') : [];
+	}
+
+	private function openCategory(string $name): void {
+		$open = $this->session->get(self::CAT_OPEN);
+		$open = is_array($open) ? $open : [];
+		if (!in_array($name, $open, true)) {
+			$open[] = $name;
+		}
+		$this->session->set(self::CAT_OPEN, $open);
+	}
+
+	/** Secret categories whose key was not given in this session: name => true */
+	private function hiddenCategories(string $uid): array {
+		$open = $this->session->get(self::CAT_OPEN);
+		$open = is_array($open) ? $open : [];
+		$out = [];
+		foreach ($this->rawMeta($uid) as $name => $m) {
+			if (!empty($m['secret']) && !in_array((string)$name, $open, true)) {
+				$out[(string)$name] = true;
+			}
+		}
+		return $out;
+	}
+
+	/** The secret categories this key opens; returns the ids of their collections (id => true). */
+	private function revealSecretCategories(string $uid, string $pin): array {
+		if (!preg_match('/^\d{6}$/', trim($pin))) {
+			return [];
+		}
+		$names = [];
+		foreach ($this->rawMeta($uid) as $name => $m) {
+			if (!empty($m['secret']) && !empty($m['hash']) && password_verify(trim($pin), (string)$m['hash'])) {
+				$this->openCategory((string)$name);
+				$names[(string)$name] = true;
+			}
+		}
+		$ids = [];
+		foreach ($this->rawMap($uid) as $id => $name) {
+			if (isset($names[$name])) {
+				$ids[(int)$id] = true;
+			}
+		}
+		return $names === [] ? [] : ($ids === [] ? [0 => true] : $ids);
+	}
+
+	/** The collection list without the collections of the secret categories not opened yet. */
+	private function withoutHiddenCategories(string $uid, array $list): array {
+		$hidden = $this->hiddenCategories($uid);
+		if ($hidden === []) {
+			return $list;
+		}
+		$map = $this->rawMap($uid);
+		return array_values(array_filter($list, fn ($j) => !isset($hidden[$map[(string)(int)$j['id']] ?? ''])));
+	}
+
+	/** A category's details go when the category is gone from both the order and the map. */
+	private function pruneCategoryMeta(string $uid): void {
+		$meta = $this->rawMeta($uid);
+		$live = array_flip(array_merge($this->rawOrder($uid), array_values($this->rawMap($uid))));
+		$kept = array_filter($meta, fn ($k) => isset($live[$k]), ARRAY_FILTER_USE_KEY);
+		if (count($kept) !== count($meta)) {
+			$this->config->setUserValue($uid, Application::APP_ID, 'coll_category_meta', json_encode((object)$kept, JSON_UNESCAPED_UNICODE));
+		}
+	}
+
+	private function readCategories(string $uid): array {
+		$hidden = $this->hiddenCategories($uid);
+		$map = array_filter($this->rawMap($uid), fn ($n) => !isset($hidden[$n]));
+		$order = array_values(array_filter($this->rawOrder($uid), fn ($n) => !isset($hidden[$n])));
+		$meta = [];
+		foreach ($this->rawMeta($uid) as $name => $m) {
+			if (!isset($hidden[(string)$name])) {
+				$meta[(string)$name] = ['icon' => (string)($m['icon'] ?? ''), 'note' => (string)($m['note'] ?? ''), 'secret' => !empty($m['secret'])];
+			}
+		}
+		return ['map' => (object)$map, 'order' => $order, 'meta' => (object)$meta];
 	}
 
 	#[NoAdminRequired]
@@ -590,8 +827,18 @@ class ApiController extends Controller {
 	public function revealSecretCollections(): JSONResponse {
 		$pin = (string)($this->request->getParam('pin') ?? '');
 		$found = $this->service->revealSecretCollections($this->uid(), $pin);
+		// a secret category with the same key opens too, with its collections (owner, 2026-11-07)
+		$catIds = $this->revealSecretCategories($this->uid(), $pin);
+		if ($catIds !== []) {
+			$have = array_map(fn ($j) => (int)$j['id'], $found);
+			foreach ($this->service->listCollections($this->uid()) as $j) {
+				if (isset($catIds[(int)$j['id']]) && !in_array((int)$j['id'], $have, true)) {
+					$found[] = $j;
+				}
+			}
+		}
 		$res = new JSONResponse($found);
-		if (!$found) {
+		if (!$found && $catIds === []) {
 			$res->throttle(['uid' => $this->uid()]);
 		}
 		return $res;
@@ -801,7 +1048,10 @@ class ApiController extends Controller {
 	public function history(): JSONResponse {
 		$cid = $this->request->getParam('collection');
 		$cid = ($cid !== null && $cid !== '') ? (int)$cid : null;
-		return new JSONResponse(['entries' => $this->service->history($this->uid(), $cid)]);
+		// ?detail=1: each entry also says what it changed (the snapshot list); without it the list
+		// stays as light as before (it is read after every save for the undo button)
+		$detail = in_array($this->request->getParam('detail'), ['1', 'true', true], true);
+		return new JSONResponse(['entries' => $this->service->history($this->uid(), $cid, $detail)]);
 	}
 
 	#[NoAdminRequired]
@@ -834,7 +1084,7 @@ class ApiController extends Controller {
 		if ($downTo !== null && $downTo !== '' && $cid !== null) {
 			return new JSONResponse($this->service->undoDownTo($this->uid(), $cid, (int)$downTo));
 		}
-		return new JSONResponse($this->service->undo($this->uid(), $cid));
+		return new JSONResponse($this->service->undo($this->uid(), $cid, (bool)$this->request->getParam('createNew', false)));
 	}
 
 	#[NoAdminRequired]
@@ -1298,6 +1548,14 @@ class ApiController extends Controller {
 			$zip->close();
 			@unlink($tmp);
 			return new JSONResponse(['error' => $l->t('This backup was made with another master key, so its secret fields could not be read after merging or adding. Set the master key the backup was made with first, or restore by overwriting.')], Http::STATUS_CONFLICT);
+		}
+
+		// Hidden collections not opened in this session cannot be replaced or merged into: said so
+		// before anything is written, where the restore used to stop half way with no reason given.
+		if ($this->service->closedSecretsInTheWay($uid, $struct, $mode) !== []) {
+			$zip->close();
+			@unlink($tmp);
+			return new JSONResponse(['error' => $l->t('Open the secret collections with their 6-digit key first, then restore again.'), 'code' => 'secret_closed'], Http::STATUS_CONFLICT);
 		}
 
 		// re-save attachments, mapping old fileId → new fileId
