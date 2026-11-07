@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Cambiar una colección",
         "Change the fields": "Cambiar los campos",
         "Delete a collection": "Eliminar una colección",
-        "What was actually done": "Lo que se hizo realmente"
+        "What was actually done": "Lo que se hizo realmente",
+        "The existing shares could not be loaded: {error}": "No se pudieron cargar los usos compartidos existentes: {error}",
+        "The search failed: {error}": "La búsqueda ha fallado: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "No se encontró a nadie. Si la administración solo permite encontrar a las personas por su nombre de usuario completo, escriba el nombre entero."
     },
     "nplurals=2; plural=(n != 1);"
 );

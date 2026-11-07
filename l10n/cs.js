@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Změnit kolekci",
         "Change the fields": "Změnit pole",
         "Delete a collection": "Smazat kolekci",
-        "What was actually done": "Co se skutečně provedlo"
+        "What was actually done": "Co se skutečně provedlo",
+        "The existing shares could not be loaded: {error}": "Stávající sdílení se nepodařilo načíst: {error}",
+        "The search failed: {error}": "Hledání se nezdařilo: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Nikdo nenalezen. Pokud správce umožňuje najít lidi jen podle celého uživatelského jména, zadejte celé jméno."
     },
     "nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;"
 );

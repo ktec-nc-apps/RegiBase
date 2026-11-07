@@ -1238,3 +1238,6 @@ html.rb-col-resizing, html.rb-col-resizing * { cursor: col-resize !important; -w
 .rb-ai-acts-h { font-weight: 700; margin-bottom: 2px; }
 .rb-ai-act.ok .mk { color: #2e7d32; font-weight: 700; }
 .rb-ai-act.ng .mk, .rb-ai-act .ng-t { color: #c62828; font-weight: 700; }
+
+/* the search found no one (Issue #1, 2026-11-08) */
+.share-none { font-size: 12px; color: var(--muted, #6b7280); margin-top: 6px; }

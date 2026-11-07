@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Sammlung ändern",
         "Change the fields": "Felder ändern",
         "Delete a collection": "Sammlung löschen",
-        "What was actually done": "Tatsächlich ausgeführt"
+        "What was actually done": "Tatsächlich ausgeführt",
+        "The existing shares could not be loaded: {error}": "Die bestehenden Freigaben konnten nicht geladen werden: {error}",
+        "The search failed: {error}": "Die Suche ist fehlgeschlagen: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Niemand gefunden. Wenn die Administration Personen nur über den vollständigen Benutzernamen auffindbar macht, geben Sie den ganzen Namen ein."
     },
     "nplurals=2; plural=(n != 1);"
 );

@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "संग्रह बदलें",
         "Change the fields": "फ़ील्ड बदलें",
         "Delete a collection": "संग्रह हटाएँ",
-        "What was actually done": "वास्तव में क्या किया गया"
+        "What was actually done": "वास्तव में क्या किया गया",
+        "The existing shares could not be loaded: {error}": "मौजूदा साझाकरण लोड नहीं हो सके: {error}",
+        "The search failed: {error}": "खोज विफल रही: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "कोई नहीं मिला। अगर व्यवस्थापक लोगों को केवल पूरे उपयोगकर्ता नाम से खोजने देता है, तो पूरा नाम लिखें।"
     },
     "nplurals=2; plural=(n != 1);"
 );

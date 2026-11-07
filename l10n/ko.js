@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "컬렉션 변경",
         "Change the fields": "항목 변경",
         "Delete a collection": "컬렉션 삭제",
-        "What was actually done": "실제로 수행한 작업"
+        "What was actually done": "실제로 수행한 작업",
+        "The existing shares could not be loaded: {error}": "기존 공유를 불러오지 못했습니다: {error}",
+        "The search failed: {error}": "검색에 실패했습니다: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "찾은 사람이 없습니다. 관리자가 전체 사용자 이름으로만 찾을 수 있게 설정했다면 이름을 끝까지 입력하세요."
     },
     "nplurals=1; plural=0;"
 );

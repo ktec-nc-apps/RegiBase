@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Koleksiyonu değiştir",
         "Change the fields": "Alanları değiştir",
         "Delete a collection": "Koleksiyonu sil",
-        "What was actually done": "Gerçekte yapılanlar"
+        "What was actually done": "Gerçekte yapılanlar",
+        "The existing shares could not be loaded: {error}": "Mevcut paylaşımlar yüklenemedi: {error}",
+        "The search failed: {error}": "Arama başarısız oldu: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Kimse bulunamadı. Yönetici kişilerin yalnızca tam kullanıcı adıyla bulunmasına izin veriyorsa adın tamamını yazın."
     },
     "nplurals=2; plural=(n > 1);"
 );

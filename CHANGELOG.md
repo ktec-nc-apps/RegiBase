@@ -2,6 +2,13 @@
 
 All notable changes to RegiBase.
 
+## 0.22.4 — 2026-11-08
+
+### Fixed
+
+- **Sharing tab ([#1](https://github.com/ktec-nc-apps/RegiBase/issues/1))**: when the existing shares could not be loaded, or the search for people failed, the tab showed an empty list and said nothing. It now says so, with the reason. When the search finds no one, it says that the administrator may let people be found only by their full user name ("Allow username autocompletion" off), as in the Files share dialog.
+  （**共有のタブ**：既存の共有を読み込めなかったときや、相手の検索に失敗したとき、タブは何も言わずに空の一覧を出していました。理由とあわせて表示するようにしました。検索で誰も見つからないときは、管理者が「ユーザー名の全体を入力したときだけ見つかる」設定（「ユーザー名の自動補完」がオフ）にしている可能性を、Files の共有画面と同じように案内します。）
+
 ## 0.22.3 — 2026-11-08
 
 ### Fixed

@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Sửa bộ sưu tập",
         "Change the fields": "Sửa các trường",
         "Delete a collection": "Xóa bộ sưu tập",
-        "What was actually done": "Những gì đã thực sự làm"
+        "What was actually done": "Những gì đã thực sự làm",
+        "The existing shares could not be loaded: {error}": "Không tải được các chia sẻ hiện có: {error}",
+        "The search failed: {error}": "Tìm kiếm thất bại: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Không tìm thấy ai. Nếu quản trị viên chỉ cho phép tìm người theo tên người dùng đầy đủ, hãy nhập toàn bộ tên."
     },
     "nplurals=1; plural=0;"
 );

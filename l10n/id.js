@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Ubah koleksi",
         "Change the fields": "Ubah ruas",
         "Delete a collection": "Hapus koleksi",
-        "What was actually done": "Yang benar-benar dilakukan"
+        "What was actually done": "Yang benar-benar dilakukan",
+        "The existing shares could not be loaded: {error}": "Berbagi yang ada tidak dapat dimuat: {error}",
+        "The search failed: {error}": "Pencarian gagal: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Tidak ada yang ditemukan. Jika administrator hanya mengizinkan orang ditemukan dengan nama pengguna lengkap, ketik nama lengkapnya."
     },
     "nplurals=1; plural=0;"
 );

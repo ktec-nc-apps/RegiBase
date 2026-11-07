@@ -1154,6 +1154,7 @@
             <div class="share-top">
               <div v-if="!sharePanel.recipient" class="share-search">
                 <input v-model="sharePanel.q" @input="searchShareUsers" :placeholder="t('Search users or groups to share with…')" autocomplete="off" />
+                <div v-if="sharePanel.q.trim() && sharePanel.searched === sharePanel.q.trim() && !sharePanel.searching && !sharePanel.results.length" class="share-none">{{ t('No one found. If the administrator lets people be found only by their full user name, type the whole name.') }}</div>
                 <div v-if="sharePanel.results.length" class="share-results">
                   <button type="button" v-for="u in sharePanel.results" :key="(u.type||'user') + ':' + u.uid" class="share-result" @click="pickShareUser(u)">{{ u.type === 'group' ? '👥' : '👤' }} {{ u.name }} <span class="muted">({{ u.uid }})</span></button>
                 </div>
@@ -4736,7 +4737,10 @@
         try {
           const r = await api('collections/' + this.current.id + '/shares');
           this.sharePanel.shares = r.shares || [];
-        } catch (e) { /* not owner or none */ }
+        } catch (e) {
+          // said on the screen, where an empty list used to hide it (Issue #1, 2026-11-08)
+          this.sharePanel.err = T('The existing shares could not be loaded: {error}', { error: (e && e.message) || String(e) });
+        }
       },
       async searchShareUsers() {
         const q = this.sharePanel.q.trim();
@@ -4747,7 +4751,11 @@
           const already = new Set(this.sharePanel.shares.map((s) => (s.recipient_type || 'user') + ':' + s.recipient_uid));
           const all = [...(r.users || []), ...(r.groups || [])];
           this.sharePanel.results = all.filter((u) => !already.has((u.type || 'user') + ':' + u.uid));
-        } catch (e) { this.sharePanel.results = []; }
+          this.sharePanel.searched = q;
+        } catch (e) {
+          this.sharePanel.results = [];
+          this.sharePanel.err = T('The search failed: {error}', { error: (e && e.message) || String(e) });
+        }
         finally { this.sharePanel.searching = false; }
       },
       pickShareUser(u) { this.sharePanel.recipient = u.uid; this.sharePanel.recipientName = u.name; this.sharePanel.recipientType = u.type || 'user'; this.sharePanel.results = []; this.sharePanel.q = ''; },

@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "コレクションを変更",
         "Change the fields": "項目を変更",
         "Delete a collection": "コレクションを削除",
-        "What was actually done": "実際に行った操作"
+        "What was actually done": "実際に行った操作",
+        "The existing shares could not be loaded: {error}": "既存の共有を読み込めませんでした：{error}",
+        "The search failed: {error}": "検索に失敗しました：{error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "見つかりませんでした。管理者が「ユーザー名の全体を入力したときだけ見つかる」設定にしている場合は、ユーザー名を最後まで入力してください。"
     },
     "nplurals=1; plural=0;"
 );

@@ -1169,7 +1169,10 @@ OC.L10N.register(
         "Reverted {n} change(s)|few": "Cofnięto {n} zmiany",
         "{n} attachment(s) in the backup could not be restored.|one": "Nie udało się przywrócić {n} załącznika z kopii zapasowej.",
         "{n} secret collection(s) shown|one": "Pokazano {n} tajną kolekcję",
-        "{n} secret collection(s) shown|few": "Pokazano {n} tajne kolekcje"
+        "{n} secret collection(s) shown|few": "Pokazano {n} tajne kolekcje",
+        "The existing shares could not be loaded: {error}": "Nie udało się wczytać istniejących udostępnień: {error}",
+        "The search failed: {error}": "Wyszukiwanie nie powiodło się: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Nikogo nie znaleziono. Jeśli administrator pozwala znajdować osoby tylko po pełnej nazwie użytkownika, wpisz całą nazwę."
     },
     "nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);"
 );

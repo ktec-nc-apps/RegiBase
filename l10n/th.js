@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "เปลี่ยนคอลเลกชัน",
         "Change the fields": "เปลี่ยนช่อง",
         "Delete a collection": "ลบคอลเลกชัน",
-        "What was actually done": "สิ่งที่ทำจริง"
+        "What was actually done": "สิ่งที่ทำจริง",
+        "The existing shares could not be loaded: {error}": "ไม่สามารถโหลดการแชร์ที่มีอยู่ได้: {error}",
+        "The search failed: {error}": "การค้นหาล้มเหลว: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "ไม่พบผู้ใด หากผู้ดูแลระบบอนุญาตให้ค้นหาได้ด้วยชื่อผู้ใช้แบบเต็มเท่านั้น ให้พิมพ์ชื่อให้ครบ"
     },
     "nplurals=1; plural=0;"
 );

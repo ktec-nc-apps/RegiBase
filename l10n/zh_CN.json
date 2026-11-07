@@ -1122,7 +1122,10 @@
         "Change a collection": "修改集合",
         "Change the fields": "修改字段",
         "Delete a collection": "删除集合",
-        "What was actually done": "实际执行的操作"
+        "What was actually done": "实际执行的操作",
+        "The existing shares could not be loaded: {error}": "无法加载现有共享：{error}",
+        "The search failed: {error}": "搜索失败：{error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "未找到任何人。如果管理员设置为只能通过完整用户名查找，请输入完整的用户名。"
     },
     "pluralForm": "nplurals=1; plural=0;"
 }

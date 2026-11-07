@@ -1123,7 +1123,10 @@ OC.L10N.register(
         "Change a collection": "Change a collection",
         "Change the fields": "Change the fields",
         "Delete a collection": "Delete a collection",
-        "What was actually done": "What was actually done"
+        "What was actually done": "What was actually done",
+        "The existing shares could not be loaded: {error}": "The existing shares could not be loaded: {error}",
+        "The search failed: {error}": "The search failed: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "No one found. If the administrator lets people be found only by their full user name, type the whole name."
     },
     "nplurals=2; plural=(n != 1);"
 );

@@ -1122,7 +1122,10 @@
         "Change a collection": "Alterar uma coleção",
         "Change the fields": "Alterar os campos",
         "Delete a collection": "Excluir uma coleção",
-        "What was actually done": "O que foi realmente feito"
+        "What was actually done": "O que foi realmente feito",
+        "The existing shares could not be loaded: {error}": "Não foi possível carregar os compartilhamentos existentes: {error}",
+        "The search failed: {error}": "A pesquisa falhou: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "Ninguém encontrado. Se a administração só permite encontrar pessoas pelo nome de usuário completo, digite o nome inteiro."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

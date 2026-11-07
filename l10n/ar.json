@@ -1122,7 +1122,10 @@
         "Change a collection": "تعديل مجموعة",
         "Change the fields": "تعديل الحقول",
         "Delete a collection": "حذف مجموعة",
-        "What was actually done": "ما تم تنفيذه فعلًا"
+        "What was actually done": "ما تم تنفيذه فعلًا",
+        "The existing shares could not be loaded: {error}": "تعذّر تحميل المشاركات الحالية: {error}",
+        "The search failed: {error}": "فشل البحث: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "لم يُعثر على أحد. إذا كان المسؤول يسمح بالعثور على الأشخاص باسم المستخدم الكامل فقط، فاكتب الاسم كاملًا."
     },
     "pluralForm": "nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);"
 }

@@ -1122,7 +1122,10 @@
         "Change a collection": "تغییر مجموعه",
         "Change the fields": "تغییر فیلدها",
         "Delete a collection": "حذف مجموعه",
-        "What was actually done": "آنچه واقعاً انجام شد"
+        "What was actually done": "آنچه واقعاً انجام شد",
+        "The existing shares could not be loaded: {error}": "اشتراک‌گذاری‌های موجود بارگیری نشد: {error}",
+        "The search failed: {error}": "جست‌وجو ناموفق بود: {error}",
+        "No one found. If the administrator lets people be found only by their full user name, type the whole name.": "کسی پیدا نشد. اگر مدیر فقط با نام کاربری کامل اجازهٔ یافتن افراد را داده است، نام را کامل بنویسید."
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }
