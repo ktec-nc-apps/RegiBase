@@ -2,6 +2,13 @@
 
 All notable changes to RegiBase.
 
+## 0.22.3 — 2026-11-08
+
+### Fixed
+
+- Polish: messages with a number now use the right word form for 1 and for 2–4 ("1 element", "2 elementy", "5 elementów"), where they used the form for 5 and more in every case.
+  （ポーランド語：数を含む表示で、1 のときと 2〜4 のときの語の形を正しく使うようにしました。これまでは、どの数でも 5 以上の形になっていました。）
+
 ## 0.22.2 — 2026-11-07
 
 What the AI assistant actually did is now shown under its answer, the assistant follows the administrator's permissions in AI-Hub, and every translation was reviewed.
