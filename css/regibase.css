@@ -1232,3 +1232,9 @@ html.rb-col-resizing, html.rb-col-resizing * { cursor: col-resize !important; -w
 #regibase-root .cat-head:hover { border-color: var(--primary); }
 /* the collections of an open category sit one step in from its heading */
 #regibase-root .coll-list .coll-item { margin-left: 14px; width: calc(100% - 14px); }
+
+/* what the assistant's tools actually did, under its answer (2026-11-07) */
+.rb-ai-acts { margin-top: 8px; padding: 6px 8px; border-radius: 8px; background: var(--color-background-hover, rgba(0,0,0,.04)); border-left: 3px solid var(--color-primary-element, #3b82f6); font-size: 12.5px; white-space: normal; }
+.rb-ai-acts-h { font-weight: 700; margin-bottom: 2px; }
+.rb-ai-act.ok .mk { color: #2e7d32; font-weight: 700; }
+.rb-ai-act.ng .mk, .rb-ai-act .ng-t { color: #c62828; font-weight: 700; }

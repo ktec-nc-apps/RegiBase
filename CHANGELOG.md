@@ -2,6 +2,32 @@
 
 All notable changes to RegiBase.
 
+## 0.22.2 — 2026-11-07
+
+What the AI assistant actually did is now shown under its answer, the assistant follows the administrator's permissions in AI-Hub, and every translation was reviewed.
+（AI アシスタントが実際に行った操作を、答えの下に表示するようにしました。AI-Hub で管理者が決めた許可に従うようにしました。すべての言語の訳を見直しました。）
+
+### Added
+
+- **"What was actually done" under each answer** (with AI-Hub 0.1.7 or later). When the assistant adds, changes or deletes something, the list under its answer shows what really happened — for example "Add records — 1: Yamamoto" — made from the records themselves, not from the assistant's words, with a failure shown as one. If the answer and the list ever disagree, the list is right.
+  （**答えの下に「実際に行った操作」を表示します**（AI-Hub 0.1.7 以降）。アシスタントが追加・変更・削除をしたとき、実際に起きたことを、アシスタントの言葉とは別に、レコードそのものから作って一覧にします。失敗した操作は失敗として表示します。答えと一覧が食い違うときは、一覧が正しい内容です。）
+
+### Changed
+
+- **The assistant follows the permissions set in AI-Hub** (AI-Hub 0.1.7 or later): each of its tools says whether it reads, adds, changes or deletes, and what the administrator has not allowed there is not offered to it at all; it then tells you how to do it yourself.
+  （**AI-Hub で設定した許可に従います**（AI-Hub 0.1.7 以降）。ツールごとに、読む・追加・変更・削除のどれかを申告し、管理者が許可していない操作はアシスタントに渡しません。そのときは、自分で行う手順を案内します。）
+- **The assistant answers in the language you write in**, even when the screen and the data are in another language.
+  （**質問した言語で答えます。** 画面やデータが別の言語でも同じです。）
+- The README now describes what the assistant can do today.
+  （README の AI アシスタントの説明を、今の機能に合わせました。）
+
+### Fixed
+
+- **Translations reviewed in every language.** Japanese was gone through in full — wrong meanings, literal phrasing, terms used two ways and the style of the older change notes — and every other language was checked line by line for wrong meanings, literal phrasing and inconsistent terms.
+  （**すべての言語の訳を見直しました。** 日本語は、意味の誤り、直訳、用語の揺れ、古い変更履歴の文体を含めて全体を点検しました。ほかの言語も、意味の誤り、直訳、用語の揺れを 1 行ずつ点検して直しました。）
+- The check and cross marks in the list of what was done were too faint to read.
+  （「実際に行った操作」の ✓ と ✗ が薄くて読みにくかったのを直しました。）
+
 ## 0.22.1 — 2026-11-07
 
 The AI assistant can now work in RegiBase itself; categories for the collection list; date-and-time fields; collection settings wider and in tabs, with Share settings opening on their own tab; snapshots that show what each change did; undo that brings back a deleted collection, and the fixes from a review of the whole app.
@@ -12,7 +38,7 @@ The AI assistant can now work in RegiBase itself; categories for the collection 
 - **The AI assistant can work in RegiBase itself** (with AI-Hub). It looks through every collection the person can see — not only the open one — finds records, finds duplicates within and across collections or in one category, and, when the administrator allows it, adds, changes and deletes records, makes collections, renames them, files them in a category, changes their fields and deletes them. It acts with the rights of the person asking, so a shared collection only at its shared level, and every change can be taken back with "↶ Undo"; the page shows the change as soon as the answer comes. Secret collections and secret categories are open to it only after the person has entered their 6-digit key in this session, and "Hide secret collections" closes them to it again. The value of a secret field is never read or written by it: it knows only whether one is filled in, so when removing duplicates it keeps the record that holds a password. In the administration settings, "What it may do" now has a third choice, "Make, change and delete records, fields and collections"; reading covers every collection the person can see.
 
 - **Categories for the collection list**, for when there are too many collections to find your way. Make one with "＋ New category" under "＋ New collection", then put collections in it: in Collection settings (General tab, just under the name), with right-click → "Category…", or by dragging a collection onto the category's heading. A category made this way stays while it is empty. Collections in no category are under "Uncategorized", which is always at the top; the other categories are put in order by dragging their headings. One category is open at a time: Uncategorized at first, and opening another closes the one that was open. Right-click a heading also to remove the category (its collections go to Uncategorized; the collections themselves are not changed). A heading has a large open/close mark and its collections sit one step in, so it is not taken for a collection; the button at the top of the list now shows how many categories and collections there are instead of "All collections". The home screen shows the collections under the same headings. A category can have an icon and remarks (shown on the home screen and when pointing at its heading), and can be made secret with a 6-digit key: it and its collections stay out of the list until the key is entered with "Secret toggle" — the same key as a secret collection shows both. Right-click a heading → "Edit category…" to change its name, icon, remarks or secrecy. Categories are each person's own, so someone a collection is shared with can file it where they like.
-  （**コレクション一覧にカテゴリを追加しました。** コレクションが増えて探しにくいときに使います。「＋ 新規コレクション」の下の「＋ 新しいカテゴリ」でカテゴリを作り、コレクションを入れます。入れ方は3つあります。コレクション設定の「基本」タブ（名前のすぐ下）で選ぶ、コレクションを右クリックして「カテゴリ…」を選ぶ、コレクションをカテゴリの見出しにドラッグする、のどれでもできます。作ったカテゴリは、コレクションが0件でも残ります。どのカテゴリにも入っていないコレクションは「未分類」に入り、「未分類」は常に一番上に表示します。ほかのカテゴリは、見出しをドラッグして並べ替えられます。開くカテゴリは1つだけで、最初は「未分類」が開いており、別のカテゴリを開くと、開いていたカテゴリは閉じます。見出しを右クリックすると、カテゴリの解除もできます。解除すると、そのコレクションは「未分類」に移り、コレクションそのものは変わりません。見出しには大きな開閉の印を付け、中のコレクションを一段下げて表示するので、コレクションと見分けられます。一覧の一番上のボタンには、「コレクション一覧」の文字の代わりに、カテゴリ数とコレクション数を表示します。ホーム画面でも、同じ見出しでコレクションを分けて表示します。カテゴリにはアイコンと備考を付けられます（備考はホーム画面と、見出しにマウスを置いたときに表示します）。カテゴリは6桁のキーでシークレットにでき、「シークレット切り替え」でキーを入力するまで、カテゴリとその中のコレクションを一覧に表示しません。シークレットのコレクションと同じキーにすると、両方まとめて表示されます。名前・アイコン・備考・シークレットは、見出しを右クリックして「カテゴリを編集…」で変えられます。カテゴリは人ごとの設定なので、共有された人も自分でカテゴリに分けられます。）
+  （**コレクション一覧にカテゴリを追加しました。** コレクションが増えて探しにくいときに使います。「＋ 新規コレクション」の下の「＋ 新しいカテゴリ」でカテゴリを作り、コレクションを入れます。入れ方は3つあります。コレクション設定の「基本」タブ（名前のすぐ下）で選ぶ、コレクションを右クリックして「カテゴリ…」を選ぶ、コレクションをカテゴリの見出しにドラッグする、のどれでもできます。作ったカテゴリは、コレクションが0件でも残ります。どのカテゴリにも入っていないコレクションは「未分類」に入り、「未分類」は常に一番上に表示します。ほかのカテゴリは、見出しをドラッグして並べ替えられます。開くカテゴリは1つだけで、最初は「未分類」が開いており、別のカテゴリを開くと、開いていたカテゴリは閉じます。見出しを右クリックすると、カテゴリの解除もできます。解除すると、そのコレクションは「未分類」に移り、コレクションそのものは変わりません。見出しには大きな開閉のマークを付け、中のコレクションを一段下げて表示するので、コレクションと見分けられます。一覧の一番上のボタンには、「コレクション一覧」の文字の代わりに、カテゴリ数とコレクション数を表示します。ホーム画面でも、同じ見出しでコレクションを分けて表示します。カテゴリにはアイコンと備考を付けられます（備考はホーム画面と、見出しにマウスを置いたときに表示します）。カテゴリは6桁のキーでシークレットにでき、「シークレット切り替え」でキーを入力するまで、カテゴリとその中のコレクションを一覧に表示しません。シークレットのコレクションと同じキーにすると、両方まとめて表示されます。名前・アイコン・備考・シークレットは、見出しを右クリックして「カテゴリを編集…」で変えられます。カテゴリは人ごとの設定なので、共有された人も自分でカテゴリに分けられます。）
 - **Two new field types: "Date and time" (year, month, day, hours and minutes) and "Date and time (with seconds)".** A value is kept as `2026-11-07 14:30` (or `14:30:05`), so lists, titles and exports show it as it is, and it sorts in time order. The 📅 button adds it to the Calendar as a one-hour event at that time. Changing a field between Date, Year/Month and the two new types keeps the values that fit: a date becomes 00:00 of that day, a date and time keeps its date. Exporting to Tables makes a date-and-time column, and importing one from Tables gives this type.
   （**項目の種類に「日時」（年月日時分）と「日時（秒まで）」を追加しました。** 値は `2026-11-07 14:30`（秒までなら `14:30:05`）の形で保存するので、一覧・見出し・書き出しにそのまま表示され、時刻の順に並べ替えられます。📅 ボタンで、その時刻から1時間の予定としてカレンダーに追加できます。「日付」「年月」と新しい2つの種類の間で項目の種類を変えたときは、変換できる値を残します。日付はその日の 00:00 に、日時は日付の部分だけにします。Tables への書き出しでは日時の列になり、Tables から取り込むと日時の項目になります。）
 
@@ -23,7 +49,7 @@ The AI assistant can now work in RegiBase itself; categories for the collection 
 - **The collection editor (Edit collection) is wider too**, and its labels stay on one line. Both dialogs fit a 1366 × 768 screen. On a phone, the name box of a field is no longer squeezed to one letter.
   （**コレクション編集も横幅を広げ、見出しが途中で折り返さないようにしました。** どちらのダイアログも 1366 × 768 の画面に収まります。スマホで、項目名の欄が1文字分まで細くなる問題も直しました。）
 - **Snapshots show what each change did.** Each line names the kind of change and the record, and below it what changed: "Name: old → new" for an edit, the records added or deleted, the fields added. A secret field is shown only as "secret field changed", never with its value, and someone a collection is shared with is shown only what they may see.
-  （**スナップショットで、それぞれの変更の中身が見えるようにしました。** 各行に変更の種類と対象のレコードを出し、その下に中身を出します。編集なら「欄名：変更前 → 変更後」、追加・削除したレコード、追加した項目などです。秘匿項目は「秘匿項目を変更」とだけ出し、値は出しません。共有された人には、見てよい内容だけを出します。）
+  （**スナップショットで、それぞれの変更の中身が見えるようにしました。** 各行に変更の種類と対象のレコードを表示し、その下に変更の中身を表示します。編集なら「項目名：変更前 → 変更後」、追加・削除したレコード、追加した項目などです。秘匿項目は「秘匿項目を変更」とだけ表示し、値は表示しません。共有された人には、見てよい内容だけを表示します。）
 - **Undo brings back a deleted collection when it needs to.** When the records of a change belonged to a collection that has since been deleted, and that deletion can still be undone, the collection comes back first, with its settings, fields and records, and the change is undone into it. When it can no longer be brought back, you are asked whether to make a new collection for the records. Changes made before the deletion can still be undone in the collection brought back.
   （**元に戻すときに、必要なら削除したコレクションも復活させるようにしました。** 変更したレコードのコレクションがその後で削除されていても、その削除が元に戻せるなら、まずコレクションを設定・項目・レコードごと復活させ、そこへ変更を戻します。復活できない場合は、新しいコレクションを作ってレコードを戻すかどうかを確認します。削除より前の変更も、復活したコレクションで元に戻せます。）
 - **When an undo cannot be done, the reason is shown**, instead of "Nothing to undo".
@@ -32,9 +58,9 @@ The AI assistant can now work in RegiBase itself; categories for the collection 
 ### Fixed
 
 - **A secret collection could be opened without its 6-digit key** when its owner had shared it with a group the owner belongs to.
-  （**シークレットコレクションが、6桁のシークレットキーなしで開ける場合がありました。** 所有者が、自分も入っているグループにそのコレクションを共有していた場合です。）
+  （**シークレットコレクションが、6桁のシークレットキーなしで開ける場合がありました。** オーナーが、自分も入っているグループとそのコレクションを共有していた場合です。）
 - **Someone could send another user's held attachments to the trash** by clearing the snapshots of a collection that was not theirs. Only the owner can do this now.
-  （**ほかの人のコレクションのスナップショットを消去すると、その所有者が保管していた添付ファイルがゴミ箱へ移る問題を修正しました。** 消去できるのは所有者だけです。）
+  （**ほかの人のコレクションのスナップショットを消去すると、そのオーナーが保管していた添付ファイルがゴミ箱へ移る問題を修正しました。** 消去できるのはオーナーだけです。）
 - **A secret value could reach someone it was shared with without the key**, through the text shown for reading a field.
   （**秘匿項目の値が、鍵を渡していない共有相手に届く場合がありました。** 欄の読み仮名の表示を通じてです。）
 - **Someone a collection is shared with could put back secret fields they cannot change** by undoing their own change. Undo now writes only what their own save could write.
@@ -42,11 +68,11 @@ The AI assistant can now work in RegiBase itself; categories for the collection 
 - **Undoing a move could put the records into a deleted collection**, where they could not be seen.
   （**移動を元に戻すと、レコードが削除済みのコレクションに戻され、見えなくなる問題を修正しました。**）
 - **The secret fields of a duplicated collection could not be opened.** The copy now takes the collection's own key with it.
-  （**複製したコレクションの秘匿項目が開けない問題を修正しました。** 複製先にも、そのコレクションの鍵を引き継ぎます。）
+  （**複製したコレクションの秘匿項目が開けない問題を修正しました。** 複製先にも、そのコレクションのキーを引き継ぎます。）
 - **Restoring a backup over secret collections that are not open** stopped part way with no reason given. It now says so before anything is written: open them with their 6-digit key first.
   （**開いていないシークレットコレクションがあると、バックアップからの復元が理由も出さずに途中で止まる問題を修正しました。** 書き込む前に、先に6桁のシークレットキーで開くよう案内します。）
 - The order of the entries in `appinfo/info.xml` now follows the Nextcloud app schema.
-  （`appinfo/info.xml` の項目の並び順を、Nextcloud の決まりに合わせました。）
+  （`appinfo/info.xml` の項目の並び順を、Nextcloud のアプリのスキーマに合わせました。）
 
 ## 0.21.2 — 2026-10-19
 
@@ -66,16 +92,16 @@ An AI assistant, through the new AI-Hub app, and the fixes from a review of the 
 ### Added
 
 - **An AI assistant, through the AI-Hub app.** A chat beside the open collection that knows RegiBase. It answers in words and writes out what to type; it changes nothing. **It never sees the value of a secret field**: the browser strips them before anything is sent, and the server drops them again as a second line of defence. Administration settings → RegiBase → AI assistant: on or off, who may use it, what it may read. Shown only when AI-Hub is installed.
-  （**AI-Hub アプリを利用した AI アシスタントを追加しました。** 開いているコレクションの横に、RegiBase の使い方を理解したチャットが表示されます。質問には文章で答え、入力すべき内容を示しますが、データを変更することはありません。**秘密項目の値を見ることはありません**（ブラウザーが送信前に取り除き、念のためサーバー側でも再度取り除きます）。管理者設定 → RegiBase → AI アシスタントで、有効・無効、利用できるユーザー、読み取れる範囲を設定できます。AI-Hub がインストールされている場合にのみ表示されます。）
+  （**AI-Hub アプリを利用した AI アシスタントを追加しました。** 開いているコレクションの横に、RegiBase の使い方を理解したチャットが表示されます。質問には文章で答え、入力すべき内容を示しますが、データを変更することはありません。**秘匿項目の値を見ることはありません**（ブラウザーが送信前に取り除き、念のためサーバー側でも再度取り除きます）。管理者設定 → RegiBase → AI アシスタントで、有効・無効、利用できるユーザー、読み取れる範囲を設定できます。AI-Hub がインストールされている場合にのみ表示されます。）
 
 ### Fixed
 
 - **Someone a collection is shared with, view-only, no longer receives its secret fields** in records, exports or searches. They were returned as they stood, in plain text when the owner had not set a master key.
-  （**閲覧のみの権限で共有された相手には、秘密項目が渡らないようにしました。** これまでは、レコード、エクスポート、検索の結果で秘密項目がそのまま返され、所有者がマスターキーを設定していない場合は平文のままでした。）
+  （**閲覧のみの権限で共有された相手には、秘匿項目が渡らないようにしました。** これまでは、レコード、エクスポート、検索の結果で秘匿項目がそのまま返され、オーナーがマスターキーを設定していない場合は平文のままでした。）
 - **Putting a session version back no longer brings back plain secrets.** Encrypting, or changing the master key, now covers the versions kept by session as well; they were left as they were, and restoring one wrote the old text back.
-  （**セッションごとのバージョンを戻したときに、暗号化前の秘密項目が戻らないようにしました。** 暗号化やマスターキーの変更を、セッションごとに保存されたバージョンにも適用するようにしました。これまではバージョンが元のまま残っていたため、戻すと古い内容が書き戻されていました。）
+  （**セッションごとのバージョンを戻したときに、暗号化前の秘匿項目が戻らないようにしました。** 暗号化やマスターキーの変更を、セッションごとに保存されたバージョンにも適用するようにしました。これまではバージョンが元のまま残っていたため、戻すと古い内容が書き戻されていました。）
 - **A hidden collection's PIN is asked on every path to it**, including the owner's own: changing, duplicating or sharing it, and listing its secrets. Only some of them asked before.
-  （**隠しコレクションでは、所有者自身の操作も含め、すべての操作で PIN を求めるようにしました。** 変更、複製、共有、秘密項目の一覧表示などで、これまでは PIN を求めない場合がありました。）
+  （**シークレットコレクションでは、オーナー自身の操作も含め、すべての操作で 6 桁のキーを求めるようにしました。** 変更、複製、共有、秘匿項目の一覧表示などで、これまでは キーを求めない場合がありました。）
 - **Deleting an account clears the versions kept for it**; they were left behind.
   （**アカウントを削除すると、そのアカウントのバージョンも削除されるようにしました。** これまでは削除されずに残っていました。）
 
@@ -85,9 +111,7 @@ Three layers of protection against losing data. A move made on 2026-09-27 could 
 snapshots were limited to a small number shared by every collection, one saved form rewrote each
 of its records as a snapshot of its own and pushed everything older out, and a move was only kept
 in the collection the records went to.
-（データを失わないための3重の保護。移動を元に戻せなかった件がきっかけ：スナップショットの件数が
-全コレクション共通の少ない上限で、項目の保存1回でレコードの数だけ記録されて古いものが押し出され、
-移動は移動先にしか残らなかった。）
+（データを失わないための3重の保護を入れました。2026-09-27 に行った移動を元に戻せなかったことがきっかけです。スナップショットの件数が全コレクション共通の少ない上限で、項目を1回保存するだけでレコードの数だけ記録されて古い記録が押し出され、移動は移動先のコレクションにしか記録されていませんでした。）
 
 ### Added
 
@@ -96,38 +120,35 @@ in the collection the records went to.
   version can be put back: changed records get their contents back, deleted and moved records come
   back (and leave the collection they were moved to), records added in it go, and changed fields
   are put back. Open them from the collection's settings.
-  （セッションごとのバージョン。レコードを最初に変更・削除したときに始まり、ブラウザを閉じるか
-  サインアウトするまでの作業が入る。どのバージョンの前にも戻せる。コレクション設定から開く。）
+  （セッションごとのバージョンを追加しました。コレクションのバージョンは、レコードを最初に変更または削除したときに始まり、ブラウザーを閉じるかサインアウトするまでの作業がすべて入ります。どのバージョンも戻せます。変更したレコードは元の内容に戻り、削除・移動したレコードは戻り（移動先のコレクションからは消えます）、そのバージョンで追加したレコードは削除され、変更した項目も元に戻ります。コレクション設定から開きます。）
 
 ### Changed
 
 - **Snapshots keep every change and deletion in a collection, with no limit.** A move is kept in
   both collections — from the one it left, a moved record is a deleted record — and undoing either
   puts the records back.
-  （スナップショットは上限なく、コレクションの変更と削除をすべて残す。移動は移動元と移動先の両方に残る。）
+  （スナップショットに、コレクションの変更と削除を上限なくすべて残すようにしました。移動は移動元と移動先の両方に残ります。移動元から見ると、移動したレコードは削除したレコードと同じだからです。どちらを元に戻しても、レコードが戻ります。）
 - **Attachments are kept, not trashed.** The attachment of a deleted record, and one an edit
   replaced, goes to a hidden `.snapshot` folder inside the collection's folder, keeps its file id,
   and comes back with the record. It goes to the trash only when nothing can bring it back any more.
-  （削除や編集で外れた添付は、ゴミ箱ではなく隠しフォルダー `.snapshot` に保管し、レコードと一緒に戻る。）
+  （削除や編集で外れた添付ファイルを、ゴミ箱に移さずに保管するようにしました。コレクションのフォルダー内の隠しフォルダー `.snapshot` に、ファイル ID もそのままで移し、レコードと一緒に戻ります。ゴミ箱に移すのは、もう戻す手段がなくなったときだけです。）
 - **Putting a version back clears the collection's snapshots**, and the other half of any move in
   them, so nothing left can undo a change that is no longer there.
-  （バージョンで戻すと、そのコレクションのスナップショットと、対になった移動の記録も消去する。）
+  （バージョンを戻すと、そのコレクションのスナップショットと、そこに含まれる移動の対になる記録も消去するようにしました。もう存在しない変更を、残った記録で元に戻さないためです。）
 - **Restoring a backup with "overwrite" returns everything to the backed-up state** and clears the
   snapshots, the versions and the held attachments of what was there before. "Merge" and "add" keep
   what is there.
-  （バックアップを「上書き」で復元すると、バックアップ時点の状態に戻り、それまでのスナップショット・
-  バージョン・保管していた添付を消去する。「マージ」「追加」では今の中身を残す。）
+  （バックアップを「上書き」で復元すると、すべてがバックアップ時点の状態に戻り、それまでのスナップショット・バージョン・保管していた添付ファイルは消去されます。「マージ」と「追加」では、今のデータを残します。）
 - The per-record versions and the snapshot limit are no longer shown; the versions by session take
   their place.
-  （レコードごとのバージョンとスナップショットの件数の設定は、表示しなくなった。）
+  （レコードごとのバージョンとスナップショットの件数の設定は、表示しないようにしました。代わりにセッションごとのバージョンを使います。）
 
 ## 0.20.0 — 2026-09-25
 
 A release of fixes. Every part of RegiBase was reviewed line by line — the page, the server,
 encryption, sharing, backup and restore — and everything the review found is fixed here. Several
 of the fixes close security gaps, so **updating is recommended for every installation**.
-（修正の版。画面・サーバー・暗号化・共有・バックアップと復元のすべてを一行ずつ点検し、
-見つかったものをすべて直した。安全に関わる直しを含むので、**すべての環境で更新を勧める**。）
+（不具合を修正したリリースです。画面・サーバー・暗号化・共有・バックアップと復元のすべてを1行ずつ点検し、見つかった問題をすべて修正しました。セキュリティに関わる修正を含むため、**すべての環境で更新をおすすめします**。）
 
 ### Security
 
@@ -135,129 +156,105 @@ of the fixes close security gaps, so **updating is recommended for every install
   edits now respect the share's permission level, its edit lock and its removal; an editor can
   only write the collection's own fields, and can attach only files they own or may reshare.
   A hidden (secret) collection can no longer be opened by its id without the 6-digit key.
-  （共有されたコレクションの扱いを厳しくした。取り消し・版・添付・一括編集が、共有の権限・
-  編集ロック・共有の解除に従う。編集者は今ある欄にだけ書け、添付できるのは自分のファイルか
-  再共有できるファイルだけ。隠しコレクションは、6 桁のキーなしでは ID を指定しても開けない。）
+  （共有されたコレクションでできることを、厳しく制限しました。元に戻す操作・バージョン履歴・添付ファイル・一括編集は、共有の権限・編集ロック・共有の解除に従います。編集者が書き込めるのはそのコレクションの項目だけで、添付できるのは自分のファイルか、再共有できるファイルだけです。シークレットコレクションは、6 桁のキーがなければ ID を指定しても開けません。）
 - **Sharing follows your Nextcloud sharing settings** — sharing off, group sharing off, "only
   with members of your own groups" and excluded groups — when searching for people, when
   sharing, and when restoring a backup. If the administrator tightens those settings later, a
   share they no longer allow is paused (it cannot be listed or opened) until they allow it
   again; the owner sees it marked **⏸ Paused**.
-  （共有は Nextcloud の共有設定に従う — 相手の検索・共有・バックアップの復元のいずれでも。
-  管理者が後から設定を厳しくすると、合わなくなった共有は、合わない間は使えない（一覧に出ず、
-  開けない）。オーナーの画面には **⏸ 停止中** と出る。設定を戻せば元どおり使える。）
+  （共有は、Nextcloud の共有設定（共有の無効化、グループ共有の無効化、「自分のグループのメンバーとだけ共有」、除外するグループ）に従うようにしました。相手の検索、共有、バックアップの復元のいずれでも同じです。管理者が後から設定を厳しくすると、許可されなくなった共有は、再び許可されるまで停止します（一覧に出ず、開けません）。オーナーの画面には **⏸ 停止中** と表示されます。）
 - **Repeated wrong passwords are slowed down** — for the backup password, share passwords and
   the secret-collection key.
-  （バックアップのパスワード・共有パスワード・隠しコレクションのキーを何度も間違えると、
-  間隔を空けないと試せない。）
+  （バックアップのパスワード・共有パスワード・シークレットコレクションのキーを何度も間違えると、しばらく待たないと次を試せないようにしました。）
 - **An unlocked share is tied to that share and its password**: changing the share password
   or sharing again locks it.
-  （共有の解錠は、その共有とパスワードに結びつく。共有パスワードの変更や再共有で解錠は解ける。）
+  （共有のロック解除を、その共有とパスワードに結び付けるようにしました。共有パスワードを変更したり、共有し直したりすると、再びロックされます。）
 - Deleting a user or group now removes their shares, so a new account with the same name
   does not inherit them. Images are served only in image formats (no SVG). Reading a
   collection no longer creates folders, and "delete the folder too" only ever removes folders
   under RegiBase's own save folder.
-  （ユーザーやグループを削除すると、その共有も消える。同じ名前で作り直したアカウントが
-  共有を引き継がない。画像は画像形式だけで返す（SVG は返さない）。コレクションを読むだけでは
-  フォルダを作らず、「フォルダも削除」は RegiBase の保存先の中のフォルダだけを対象にする。）
+  （ユーザーやグループを削除すると、その共有も削除するようにしました。同じ名前で作り直したアカウントが、共有を引き継ぐことはありません。画像は画像形式でだけ返します（SVG は返しません）。コレクションを読み込むだけではフォルダーを作らず、「フォルダーも削除」で消すのは RegiBase の保存先の中のフォルダーだけにしました。）
 
 ### Encryption
 
 - **Secret fields shared with others no longer use your own key.** A share carries the
   collection's own key, wrapped with the share password, and the share password itself never
   reaches the server.
-  （秘密項目を共有するとき、自分の鍵そのものではなく、コレクション専用の鍵を共有パスワードで
-  包んで渡す。共有パスワードそのものはサーバーに届かない。）
+  （秘匿項目を共有するときに、自分のキーを使わないようにしました。コレクション専用のキーを共有パスワードで暗号化して渡します。共有パスワードそのものがサーバーに届くことはありません。）
 - **Changing or removing the master key now covers everything** — hidden collections, record
   versions and the undo history included — and is all-or-nothing: if anything cannot be
   converted, nothing is changed.
-  （マスターキーの変更・解除が、隠しコレクション・レコードの版・取り消しの履歴まで含めて
-  すべてに及ぶ。一つでも変換できなければ、何も変えない。）
+  （マスターキーの変更・削除を、シークレットコレクション・レコードのバージョン・元に戻す履歴まで含めて、すべてに適用するようにしました。1 つでも変換できないものがあれば、何も変更しません。）
 - **New or changed master keys must be at least 8 characters** and are strengthened with
   600,000 PBKDF2 rounds (was 250,000). **Your current master key keeps working unchanged.**
-  （新しく設定・変更するマスターキーは 8 文字以上。PBKDF2 は 60 万回（これまでは 25 万回）。
-  **今のマスターキーはそのまま使える。**）
+  （新しく設定・変更するマスターキーは 8 文字以上とし、PBKDF2 による 60 万回（これまでは 25 万回）の反復処理で強化するようにしました。**今のマスターキーは、そのまま使えます。**）
 - The remembered key is kept in the browser in a form that cannot be read out, per device and
   per login; a device where encryption is off no longer keeps an old key.
-  （記憶した鍵は、ブラウザの中で取り出せない形で、端末ごと・ログインごとに持つ。暗号化を
-  切った端末には古い鍵を残さない。）
+  （記憶したキーは、取り出せない形でブラウザーの中に、端末ごと・ログインごとに保存するようにしました。暗号化をオフにした端末には、古いキーを残しません。）
 - A failed decryption no longer overwrites the secret value when the record is saved.
-  （復号に失敗したレコードを保存しても、秘密の値を上書きしない。）
+  （復号に失敗したレコードを保存しても、秘匿項目の値が上書きされないようにしました。）
 
 ### Backup and restore
 
 - **A backup can have a password of its own**, instead of your login password. Restoring
   always asks for your login password first (and the archive's own password, if it has one).
-  （**バックアップに専用のパスワードを付けられる**。付けない場合はこれまでどおりログイン
-  パスワード。復元では、まずログインパスワードで本人確認をする（専用のパスワードがあれば、それも）。）
+  （**バックアップに、専用のパスワードを付けられるようにしました。** 付けない場合は、これまでどおりログインパスワードを使います。復元するときは、必ず先にログインパスワードを確認します（専用のパスワードを付けたアーカイブでは、そのパスワードも入力します）。）
 - Backup and restore stream the data instead of loading it all into memory, so large
   attachments no longer fail.
-  （バックアップと復元は、全部をメモリに載せずに流して処理する。大きな添付でも失敗しない。）
+  （バックアップと復元で、データ全体をメモリに読み込まず、ストリーミングで処理するようにしました。大きな添付ファイルでも失敗しなくなりました。）
 - A backup now also brings back settings, shares, templates, hidden collections and the date
   each record was created. An overwrite restore checks the archive first and changes nothing
   if it is not whole; if saving an attachment fails, the files already saved are cleaned up.
-  （設定・共有・テンプレート・隠しコレクション・レコードの登録日も戻る。上書きの復元は、
-  先に中身を確かめ、欠けていれば何も変えない。添付の保存に失敗したら、保存した分を片付ける。）
+  （バックアップから、設定・共有・テンプレート・シークレットコレクション・レコードの登録日も復元するようにしました。上書きで復元するときは、先にアーカイブの中身を確かめ、欠けていれば何も変更しません。添付ファイルの保存に失敗したときは、保存済みのファイルを片付けます。）
 - Merge and add match fields by name and type (secret fields only with secret fields), refuse
   a backup made with a different master key, and never merge into a locked collection.
-  （統合・追加は、欄を名前と型で合わせる（秘密の欄は秘密の欄とだけ）。別のマスターキーの
-  バックアップは断り、ロック中のコレクションには統合しない。）
+  （「マージ」と「追加」では、項目を名前と種類で照合するようにしました（秘匿項目は秘匿項目とだけ照合します）。別のマスターキーで作ったバックアップは受け付けず、ロック中のコレクションにはマージしません。）
 
 ### Editing records
 
 - **Two people editing the same record no longer overwrite each other silently**: the later
   save is stopped and you are asked what to do. Replace-all skips records someone else has
   saved since you loaded them, and tells you how many.
-  （同じレコードを 2 人が編集しても、黙って上書きしない。後から保存した側には確認を出す。
-  一括置換は、読み込んだ後にほかの人が保存したレコードを飛ばし、その件数を知らせる。）
+  （同じレコードを 2 人が編集したときに、知らないうちに上書きされないようにしました。後から保存した人には、どうするかを確認します。「すべて置換」は、読み込んだ後にほかの人が保存したレコードを飛ばし、その件数を知らせます。）
 - Decimal numbers, URLs without `https://` and e-mail addresses with international domains
   can be saved. Phone fields accept `#`, `*` and full-width hyphens. Only the fields you changed
   are checked against the input rules, and the server now checks them too.
-  （数値欄の小数、`https://` のない URL、日本語ドメインのメールを保存できる。電話欄は
-  `#`・`*`・全角のハイフンを受け付ける。入力規則で確かめるのは変えた欄だけで、サーバーでも確かめる。）
+  （数値の項目の小数、`https://` のない URL、国際化ドメイン名（日本語ドメインなど）のメールアドレスを保存できるようにしました。電話番号の項目では `#`・`*`・全角のハイフンを使えます。入力規則で確認するのは変更した項目だけで、サーバー側でも確認します。）
 - Saving twice quickly no longer creates two records; switching collections quickly no longer
   shows or edits the wrong records; checkbox values are kept; closing an editor with unsaved
   changes asks first; failed saves are reported.
-  （保存の連打で 2 件できない。コレクションをすばやく切り替えても、別のレコードを表示・
-  編集しない。チェックボックスの値が消えない。未保存のまま閉じると確認する。保存の失敗を知らせる。）
+  （保存ボタンを続けて押しても、レコードが 2 件できないようにしました。コレクションをすばやく切り替えても、別のレコードを表示・編集しないようにしました。チェックボックスの値が消えないようにしました。保存していない変更があるまま閉じようとすると確認します。保存に失敗したときは、その旨を表示します。）
 - Saving a template, or editing one, keeps its view and join settings. Bulk edits keep record
   versions.
-  （テンプレートの保存・編集で、表示設定と連結設定が消えない。一括編集でも版を残す。）
+  （テンプレートを保存・編集しても、表示設定と連結設定が消えないようにしました。一括編集でもレコードのバージョンを残します。）
 
 ### Search and import
 
 - Normal search looks only in the values; regular-expression search has help that matches what
   it does, and an invalid or too-heavy pattern is reported instead of matching everything.
-  （通常の検索は値だけを探す。正規表現の検索は、ヘルプを実際の動きに合わせ、誤ったパターンや
-  重すぎるパターンは、全件を返さずに知らせる。）
+  （通常の検索では、値だけを探すようにしました。正規表現の検索は、ヘルプを実際の動作に合わせ、正しくないパターンや重すぎるパターンは、全件を一致とせずにその旨を知らせます。）
 - CSV import reads Shift_JIS files (Excel's Japanese CSV) and detects `,` `;` or tab
   separators. Columns whose headings would give the same key are no longer overwritten.
   Contacts import keeps second and later phone numbers, e-mails and birthdays without a year
   (in the notes); JSON import keeps large whole numbers exactly.
-  （CSV の取り込みは Shift_JIS（Excel の日本語 CSV）を読み、区切り（`,` `;` タブ）を判断する。
-  見出しから同じキーになる列を上書きしない。連絡先の 2 件目以降の電話・メールと、年のない
-  誕生日はメモに残す。JSON の大きな整数を丸めない。）
+  （CSV のインポートで、Shift_JIS（Excel の日本語 CSV）のファイルを読み込み、区切り文字（`,`・`;`・タブ）を自動で判別するようにしました。見出しが同じキーになる列も、上書きせずに取り込みます。連絡先からのインポートでは、2 件目以降の電話番号・メールアドレスと、年のない誕生日をメモに残します。JSON のインポートでは、大きな整数を丸めずにそのまま取り込みます。）
 
 ### Other
 
 - `occ` commands mask secret fields unless `--reveal` is given (also for accounts without
   encryption), and `regibase:master` no longer leaves data half-converted.
-  （`occ` は `--reveal` がなければ秘密項目を伏せる（暗号化していないアカウントでも）。
-  `regibase:master` がデータを変換途中で残さない。）
+  （`occ` のコマンドは、`--reveal` を付けない限り秘匿項目をマスクするようにしました（暗号化していないアカウントでも同じです）。`regibase:master` が、データを変換の途中のまま残すことはなくなりました。）
 - Error responses no longer show internal messages; names, icons and colours are checked
   against what the database and the page can hold.
-  （エラーの応答に内部のメッセージを出さない。名前・アイコン・色は、データベースと画面に
-  合う長さと形だけを受け付ける。）
+  （エラーの応答に、内部のメッセージを表示しないようにしました。名前・アイコン・色は、データベースと画面で扱える長さと形式のものだけを受け付けます。）
 - **21 languages**: Portuguese now comes as **Brazilian Portuguese** and **European
   Portuguese** (the previous "Português" was Brazilian and stays selected). All languages were
   reviewed by a second translator, and counts use the right singular or plural form in every
   language (for example "1 Eintrag" / "2 Einträge", or the one / few / many forms of Russian, Polish
   and Czech).
-  （**21 言語**。ポルトガル語は **ブラジル** と **ポルトガル** の 2 つになった（これまでの
-  「Português」はブラジル版で、選んでいた人はそのまま）。全言語の訳を見直し、件数の単数・複数を全言語で正した（ドイツ語の「1 Eintrag／2 Einträge」、
-  ロシア語・ポーランド語・チェコ語の数による形の違いなど）。）
+  （**21 言語**に対応しました。ポルトガル語は **ブラジル** と **ポルトガル** の 2 つに分けました（これまでの「Português」はブラジル版で、選んでいた場合は、そのまま選ばれています）。すべての言語の訳を別の翻訳者が見直し、件数の単数形・複数形を全言語で正しくしました（ドイツ語の「1 Eintrag／2 Einträge」、ロシア語・ポーランド語・チェコ語の数による形の違いなど）。）
 - The unused full build of Vue is no longer shipped.
-  （使っていない Vue のフルビルドを同梱しない。）
+  （使っていない Vue のフルビルドを同梱しないようにしました。）
 
 ## 0.19.2 — 2026-09-17
 
@@ -267,9 +264,7 @@ of the fixes close security gaps, so **updating is recommended for every install
   is widened from 30–34 to 30–35. The app itself is unchanged from 0.19.1: it was tested
   on Nextcloud 35 against the changes that release makes for apps, and ran without
   modification.
-  （**Nextcloud 35 に対応した。それ以外の変更はない。** 対応範囲を 30〜34 から 30〜35 に
-  広げた。アプリ本体は 0.19.1 から変わっていない。Nextcloud 35 でアプリ向けに変わった点に
-  照らして試験し、修正なしで動くことを確かめた。）
+  （**Nextcloud 35 に対応しました。それ以外の変更はありません。** 対応範囲を 30〜34 から 30〜35 に広げました。アプリ本体は 0.19.1 から変わっていません。Nextcloud 35 でアプリ向けに変わった点に照らして試験し、修正なしで動くことを確認しました。）
 
 ## 0.19.1 — 2026-09-08
 
@@ -279,13 +274,14 @@ of the fixes close security gaps, so **updating is recommended for every install
   disappear.** In every editing dialog — the record editor, collection edit, collection
   settings, Settings and the rest — clicking outside no longer closes it and discards what you
   were entering; close it with ✕, Cancel or Save.
-  （各ダイアログで編集中に編集画面外をクリックした際、編集画面が消えてしまうバグを修正した。）
+  （**編集中にダイアログの外をクリックすると、編集画面が消えてしまう不具合を修正しました。** レコードの編集、コレクション編集、コレクション設定、設定などのすべての編集ダイアログで、外側をクリックしても閉じず、入力中の内容も消えなくなりました。閉じるときは ✕、「キャンセル」、「保存」を使います。）
 - **The package now passes Nextcloud's integrity check.** The signature shipped with 0.19.0
   listed two files the package does not contain (`appinfo/CHANGELOG.md` and
   `appinfo/README.md` — duplicates of the ones at the root), so every server running
   RegiBase reported "Some files have not passed the integrity check" in its admin
   overview. The signature is now generated from the packaged files alone. No app code
   has changed.
+  （**Nextcloud の整合性チェックを通るようにしました。** 0.19.0 の署名には、パッケージに含まれていない 2 つのファイル（`appinfo/CHANGELOG.md` と `appinfo/README.md`。ルートにあるファイルの複製）が載っていたため、RegiBase を入れたすべてのサーバーで、管理画面の概要に「Some files have not passed the integrity check」と表示されていました。署名は、パッケージに入れたファイルだけから作るようにしました。アプリのコードは変わっていません。）
 
 ## 0.19.0 — 2026-09-01
 

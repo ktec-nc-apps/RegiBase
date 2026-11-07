@@ -88,7 +88,7 @@ RegiBase can use a few other Nextcloud apps when they happen to be installed:
 - **Files** — attach any document, or pick images, straight from your Files.
 - **Notes** — attach a note to a record.
 - **Calendar** — add a reminder from a date field; it opens Calendar's new-event editor prefilled with the date.
-- **AI-Hub** — an AI assistant beside the open collection that answers in words and writes out what to type. It changes nothing and never sees the value of a secret field. The AI service, its key and its limits are set once in AI-Hub, for every app on the server; without AI-Hub the assistant is simply not shown.
+- **AI-Hub** — an AI assistant beside the collections. It looks through every collection you can see, finds records and duplicates, and — when the administrator allows it — adds, changes and deletes records, fields and collections for you, with your own rights; every change can be taken back with ↶ Undo, and what it actually did is listed under its answer, apart from its own words. It never reads or writes the value of a secret field, and secret collections and categories are open to it only after you entered their 6-digit key in the session. The AI service, its key and its limits are set once in AI-Hub, for every app on the server; without AI-Hub the assistant is simply not shown.
 
 An **Address** field type adds a 🌐 button that opens the value in Google Maps,
 OpenStreetMap or Apple Maps (chosen in Settings).
@@ -159,20 +159,20 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
 - **項目ごとの入力規則** — 使える文字の種類、最小・最大の文字数、パターン（正規表現）を設定できます。
 - **多彩な表示形式** — リスト、詳細リスト、**表計算ソフトのようなテーブル**（先頭列を固定し、
   ドラッグでスクロール可能）、カード、サムネイル付きカードで表示できます。
-- **クライアント側での暗号化（任意）** — パスワード、暗証番号、カード番号などの秘密項目は、
+- **クライアント側での暗号化（任意）** — パスワード、暗証番号、カード番号などの秘匿項目は、
   ブラウザー内で **AES-GCM** によって暗号化されます。マスターキーや平文がサーバーに渡ることはありません。
   マスターキーは 8 文字以上で、PBKDF2 による 60 万回の反復処理で強化されます。
   *マスターキーを忘れると、データは復元できません。*
 - **インポート** — **CSV / JSON**（Google パスワードマネージャーのエクスポートなど）や、
   **Nextcloud Contacts**（写真を含む）からインポートできます。インポートは一方向で、Contacts 側のデータは変更しません。
-  インポートしたデータは、秘密項目も含めてそのままサーバーに保存されます。マスターキーを設定している場合は、
+  インポートしたデータは、秘匿項目も含めてそのままサーバーに保存されます。マスターキーを設定している場合は、
   ロックを解除した状態でそのコレクションを開いた時点で暗号化されます（ロック中にインポートした場合は、
-  インポート後にその旨をお知らせします）。暗号化されるまでの間も、秘密項目が共有相手に送られることはありません。
+  インポート後にその旨をお知らせします）。暗号化されるまでの間も、秘匿項目が共有相手に送られることはありません。
 - **添付ファイル** — **Nextcloud Files** や **Notes** から画像やファイルを添付できます。添付の保存先フォルダーは
   コレクションごとに用意され、**基準フォルダー**（既定は `RegiBase`。**設定**で変更できます）の下に
   「基準フォルダー／コレクション名」として**自動で作成**されます。コレクション名を変更すると、フォルダー名も
   合わせて変更するかを確認します（ファイルはそのまま残ります）。コレクションを削除するときは、保存先フォルダーをゴミ箱へ移動することもできます。
-- **整理** — コレクション間でレコードを移動、コピー、マージできます。
+- **整理** — コレクション間でレコードを移動、複製、マージできます。
 - **コレクションの複製** — 項目の構成だけを複製することも、**レコードも含めて**まるごと複製することもできます。
 - **データを失わないための 3 つの保護機能**
   1. **スナップショット** — コレクション内の変更と削除を、件数の上限なくすべて記録します。直前の操作を
@@ -192,7 +192,7 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
      スナップショット、バージョン、保管されていた添付ファイルは消去されます。**マージ**と**追加**では、既存のデータは
      そのまま残ります。大きな添付ファイルは、メモリーにまとめて読み込まず、ストリーミングで処理します。
 - **コレクションの共有** — 他の Nextcloud ユーザーと、**閲覧 / 編集 / 削除** の 3 段階の権限で共有できます。
-  アクセスパスワードの設定や、秘密項目の共有も選べます。共有は Nextcloud の共有設定に従い、
+  共有パスワードの設定や、秘匿項目の共有も選べます。共有は Nextcloud の共有設定に従い、
   設定の変更で許可されなくなった共有は、再び許可されるまで一時停止します。
 - **Nextcloud Tables 連携** — Tables のテーブルを新しいコレクションとして**インポート**したり、
   コレクションを新しい Tables のテーブルとして**エクスポート**したりできます。
@@ -208,9 +208,9 @@ RegiBase は、次のアプリがインストールされている場合に、�
 - **Contacts（連絡先）** — 連絡先を写真ごとコレクションにインポートできます。
 - **Tables** — テーブルを新しいコレクションとしてインポートしたり、コレクションを Tables にエクスポートしたりできます。
 - **Files（ファイル）** — Files から直接、任意のファイルを添付したり、画像を選んだりできます。
-- **Notes（メモ）** — レコードにメモを添付できます。
+- **Notes（ノート）** — レコードにノートを添付できます。
 - **Calendar（カレンダー）** — 日付の項目からリマインダーを追加できます。その日付が入力された状態で、Calendar の新規イベント画面が開きます。
-- **AI-Hub** — 開いているコレクションの横に AI アシスタントを表示します。アシスタントは質問に文章で答え、入力すべき内容を示します。データを変更することはなく、秘密項目の値を見ることもありません。AI サービスとそのキー、利用制限は AI-Hub で一度設定すれば、サーバー上のすべてのアプリで共通して使われます。AI-Hub がない場合、アシスタントは表示されません。
+- **AI-Hub** — 開いているコレクションの横に AI アシスタントを表示します。アシスタントは、利用者が見られるすべてのコレクションを調べ、レコードや重複を探します。管理者が許可すれば、利用者本人の権限で、レコード・項目・コレクションの追加・変更・削除も行います。どの変更も「↶ 元に戻す」で取り消せます。答えの下には、AI の言葉とは別に、実際に行った操作が表示されます。秘匿項目の値は読みも書きもしません。シークレットのコレクションとカテゴリは、そのセッションで 6 桁のキーを入力した後だけ扱います。AI サービスとそのキー、利用制限は AI-Hub で一度設定すれば、サーバー上のすべてのアプリで共通して使われます。AI-Hub がない場合、アシスタントは表示されません。
 
 項目の種類で「住所」を選ぶと、値の横に 🌐 ボタンが表示され、Google マップ、OpenStreetMap、Apple マップ
 （設定で選択）で開けます。
@@ -251,11 +251,11 @@ occ regibase:find <collection> <query> [--regex]   # 項目の値で検索（正
 occ regibase:master <status|set|change|remove> --user=UID   # マスターキーの管理
 ```
 
-`<collection>` には ID または名前を指定します。`regibase:master` 以外のコマンドは**読み取り専用**です。秘密項目は
+`<collection>` には ID または名前を指定します。`regibase:master` 以外のコマンドは**読み取り専用**です。秘匿項目は
 通常マスクされ、`--reveal` を付けたときだけ復号して表示します。このとき、マスターキーは
 環境変数 `REGIBASE_PASSWORD` から読み込むか、入力内容が画面に表示されない対話形式で入力します（サーバー側の
 復号処理はブラウザーと同じ PBKDF2 / AES-GCM を使い、先にマスターキーが正しいかを確認します）。
-以下は、スクリプトで秘密の値を 1 つ取り出す例です。
+以下は、スクリプトで秘匿項目の値を 1 つ取り出す例です。
 
 ```bash
 REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token

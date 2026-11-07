@@ -8,6 +8,7 @@ use OCA\RegiBase\AppInfo\Application;
 use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\ISession;
+use OCP\L10N\IFactory;
 
 /**
  * What the assistant can do inside RegiBase by itself (the owner, 2026-11-07: "RegiBase の中は
@@ -39,7 +40,22 @@ class AiTools {
 		private IConfig $config,
 		private ISession $session,
 		private ICacheFactory $cacheFactory,
+		private IFactory $l10nFactory,
 	) {
+	}
+
+	/** In the asker's language: AI-Hub runs the tools in a request of its own, without theirs. */
+	private function l(string $uid = ''): \OCP\IL10N {
+		$lang = $uid !== '' ? $this->config->getUserValue($uid, 'core', 'lang', '') : '';
+		return $lang !== '' ? $this->l10nFactory->get(Application::APP_ID, $lang) : $this->l10nFactory->get(Application::APP_ID);
+	}
+
+	/** What a change did, for the list shown under the answer: "label — n: names". */
+	private static function report(string $label, array $names, int $n = -1): string {
+		$n = $n < 0 ? count($names) : $n;
+		$names = array_values(array_filter(array_map(fn ($x) => trim((string)$x), $names), fn ($x) => $x !== ''));
+		$shown = array_slice($names, 0, 20);
+		return $label . ' — ' . $n . ($shown !== [] ? ': ' . implode(', ', $shown) . (count($names) > 20 ? ', …' : '') : '');
 	}
 
 	// ---- what was open when the question was asked ----
@@ -121,18 +137,25 @@ class AiTools {
 			};
 		};
 		$ids = ['type' => 'array', 'items' => ['type' => 'integer']];
+		$l = $this->l();
 		return [
 			'list_collections' => [
+				'kind' => 'read',
+				'label' => $l->t('Look at the collections'),
 				'description' => 'Every collection the person can see now, with its id, name, icon, category ("" = uncategorized), number of records, whether it is theirs or shared to them (and at what level), and whether it is secret (shown only when opened with its key in this session).',
 				'input' => ['type' => 'object', 'properties' => new \stdClass()],
 				'run' => $wrap('collections', fn ($uid) => $this->listCollections($uid)),
 			],
 			'get_collection' => [
+				'kind' => 'read',
+				'label' => $l->t('Look at a collection'),
 				'description' => 'One collection\'s settings and field definitions: key, label, type, choices, required, secret, title field.',
 				'input' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']], 'required' => ['id']],
 				'run' => $wrap('collections', fn ($uid, $a) => $this->getCollection($uid, (int)$a['id'])),
 			],
 			'find_records' => [
+				'kind' => 'read',
+				'label' => $l->t('Find records'),
 				'description' => 'Records of one or more collections (all the person can see when collection_ids is left out), each as {id, collection, data: {field key: value}}. Secret fields are never included. query: words that must all appear in the non-secret values (case and width ignored). Up to limit (default 200, at most 500) from offset.',
 				'input' => ['type' => 'object', 'properties' => [
 					'collection_ids' => $ids, 'category' => ['type' => 'string'], 'query' => ['type' => 'string'],
@@ -141,6 +164,8 @@ class AiTools {
 				'run' => $wrap('records', fn ($uid, $a) => $this->findRecords($uid, $a)),
 			],
 			'find_duplicates' => [
+				'kind' => 'read',
+				'label' => $l->t('Find duplicates'),
 				'description' => 'Groups of records that are the same in the given fields (matched by field key or label, case, width and spaces ignored), within and across the collections given (all the person can see when left out; or one category by name, "" = uncategorized). fields left out: the title field. Returns only groups of two or more, with each record\'s values; secret_fields_filled names the secret fields that hold a value (never the value) -- keep that record when removing duplicates.',
 				'input' => ['type' => 'object', 'properties' => [
 					'collection_ids' => $ids, 'category' => ['type' => 'string'],
@@ -149,23 +174,31 @@ class AiTools {
 				'run' => $wrap('records', fn ($uid, $a) => $this->findDuplicates($uid, $a)),
 			],
 			'create_records' => [
+				'kind' => 'create',
+				'label' => $l->t('Add records'),
 				'description' => 'Add records to a collection: records is a list of {field key: value}. Choices are given as in the field\'s choices (checkbox: a list). Up to 200 at once.',
 				'input' => ['type' => 'object', 'properties' => ['collection_id' => ['type' => 'integer'],
 					'records' => ['type' => 'array', 'items' => ['type' => 'object']]], 'required' => ['collection_id', 'records']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->createRecords($uid, (int)$a['collection_id'], (array)$a['records'])),
 			],
 			'update_records' => [
+				'kind' => 'update',
+				'label' => $l->t('Change records'),
 				'description' => 'Change records: updates is a list of {id, data: {field key: new value}}; only the fields given change ("" empties one). Up to 200 at once.',
 				'input' => ['type' => 'object', 'properties' => ['updates' => ['type' => 'array', 'items' => ['type' => 'object',
 					'properties' => ['id' => ['type' => 'integer'], 'data' => ['type' => 'object']], 'required' => ['id', 'data']]]], 'required' => ['updates']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->updateRecords($uid, (array)$a['updates'])),
 			],
 			'delete_records' => [
+				'kind' => 'delete',
+				'label' => $l->t('Delete records'),
 				'description' => 'Delete records by id (they can be brought back with "↶ Undo").',
 				'input' => ['type' => 'object', 'properties' => ['ids' => $ids], 'required' => ['ids']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->deleteRecords($uid, array_map('intval', (array)$a['ids']))),
 			],
 			'create_collection' => [
+				'kind' => 'create',
+				'label' => $l->t('Make a collection'),
 				'description' => 'Make a collection: name, icon (an emoji), description, category, and fields: a list of {label, type, choices (for select/radio/checkbox), required, is_title}. Types: text, textarea, password, number, date, month, datetime, datetime_sec, email, tel, url, address, select, radio, checkbox.',
 				'input' => ['type' => 'object', 'properties' => ['name' => ['type' => 'string'], 'icon' => ['type' => 'string'],
 					'description' => ['type' => 'string'], 'category' => ['type' => 'string'],
@@ -173,18 +206,24 @@ class AiTools {
 				'run' => $wrap('write', fn ($uid, $a) => $this->createCollection($uid, $a)),
 			],
 			'update_collection' => [
+				'kind' => 'update',
+				'label' => $l->t('Change a collection'),
 				'description' => 'Change a collection of the person\'s own: name, icon, description, category ("" = uncategorized). Only what is given changes.',
 				'input' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'], 'name' => ['type' => 'string'],
 					'icon' => ['type' => 'string'], 'description' => ['type' => 'string'], 'category' => ['type' => 'string']], 'required' => ['id']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->updateCollection($uid, $a)),
 			],
 			'set_fields' => [
+				'kind' => 'update',
+				'label' => $l->t('Change the fields'),
 				'description' => 'Replace a collection\'s fields with this list, in this order: each {key (keep an existing key to keep its values; leave out for a new field), label, type, choices, required, is_title}. A field left out is removed with its values. A secret field must be kept as it is (give its key, label and type unchanged).',
 				'input' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'],
 					'fields' => ['type' => 'array', 'items' => ['type' => 'object']]], 'required' => ['id', 'fields']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->setFields($uid, (int)$a['id'], (array)$a['fields'])),
 			],
 			'delete_collection' => [
+				'kind' => 'delete',
+				'label' => $l->t('Delete a collection'),
 				'description' => 'Delete a collection of the person\'s own, with its records (it can be brought back with "↶ Undo"; attachment files go to the trash bin).',
 				'input' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']], 'required' => ['id']],
 				'run' => $wrap('write', fn ($uid, $a) => $this->deleteCollection($uid, (int)$a['id'])),
@@ -464,7 +503,14 @@ class AiTools {
 			$this->checkWrite($uid, $cid, $data);
 			$made[] = (int)$this->service->createRecord($uid, $cid, $data)['id'];
 		}
-		return ['created' => count($made), 'ids' => $made];
+		$titles = [];
+		foreach ($made as $rid) {
+			try {
+				$titles[] = (string)($this->service->getRecord($uid, $rid)['title'] ?? '');
+			} catch (\Throwable $e) {
+			}
+		}
+		return ['created' => count($made), 'ids' => $made, '_report' => self::report($this->l($uid)->t('Add records'), $titles, count($made))];
 	}
 
 	private function updateRecords(string $uid, array $updates): array {
@@ -472,6 +518,7 @@ class AiTools {
 			throw new \InvalidArgumentException('At most 200 records at once.');
 		}
 		$done = [];
+		$doneNames = [];
 		$failed = [];
 		foreach ($updates as $u) {
 			$id = (int)($u['id'] ?? 0);
@@ -481,27 +528,33 @@ class AiTools {
 				$cid = (int)$r['collection_id'];
 				$this->mustSee($uid, $cid);
 				$this->checkWrite($uid, $cid, $patch);
-				$this->service->updateRecord($uid, $id, array_merge((array)($r['data'] ?? []), $patch));
+				$saved = $this->service->updateRecord($uid, $id, array_merge((array)($r['data'] ?? []), $patch));
 				$done[] = $id;
+				$doneNames[] = (string)($saved['title'] ?? $r['title'] ?? '');
 			} catch (\Throwable $e) {
 				$failed[] = ['id' => $id, 'why' => $e instanceof \InvalidArgumentException || $e instanceof FieldRuleException ? $e->getMessage() : (new \ReflectionClass($e))->getShortName()];
 			}
 		}
-		return ['updated' => count($done), 'ids' => $done, 'failed' => $failed];
+		return ['updated' => count($done), 'ids' => $done, 'failed' => $failed,
+			'_report' => self::report($this->l($uid)->t('Change records'), $doneNames) . ($failed !== [] ? ' / ' . $this->l($uid)->t('Failed') . ' — ' . count($failed) : '')];
 	}
 
 	private function deleteRecords(string $uid, array $ids): array {
 		$ok = [];
+		$okNames = [];
 		foreach ($ids as $id) {
 			try {
 				$r = $this->service->getRecord($uid, $id);
 				$this->mustSee($uid, (int)$r['collection_id']);
 				$ok[] = $id;
+				$okNames[$id] = (string)($r['title'] ?? '');
 			} catch (\Throwable $e) {
 			}
 		}
 		$n = $ok === [] ? 0 : $this->service->deleteRecords($uid, $ok);
-		return ['deleted' => $n, 'not_deleted' => array_values(array_diff($ids, $ok))];
+		$not = array_values(array_diff($ids, $ok));
+		return ['deleted' => $n, 'not_deleted' => $not,
+			'_report' => self::report($this->l($uid)->t('Delete records'), array_values($okNames), $n) . ($not !== [] ? ' / ' . $this->l($uid)->t('Failed') . ' — ' . count($not) : '')];
 	}
 
 	private static function fieldIn(array $f, int $i): array {
@@ -551,7 +604,7 @@ class AiTools {
 		if (is_string($a['category'] ?? null) && trim($a['category']) !== '') {
 			$this->setCategory($uid, (int)$c['id'], $a['category']);
 		}
-		return ['created' => (int)$c['id'], 'name' => $c['name']];
+		return ['created' => (int)$c['id'], 'name' => $c['name'], '_report' => self::report($this->l($uid)->t('Make a collection'), [(string)$c['name'] . (is_string($a['category'] ?? null) && trim($a['category']) !== '' ? ' (' . trim($a['category']) . ')' : '')])];
 	}
 
 	private function updateCollection(string $uid, array $a): array {
@@ -565,7 +618,8 @@ class AiTools {
 			$this->service->getCollection($uid, $id); // still there and visible
 			$this->setCategory($uid, $id, $a['category']);
 		}
-		return ['updated' => $id];
+		$name = (string)($this->service->getCollection($uid, $id)['name'] ?? '');
+		return ['updated' => $id, '_report' => self::report($this->l($uid)->t('Change a collection'), [$name])];
 	}
 
 	private function setFields(string $uid, int $id, array $fields): array {
@@ -593,14 +647,14 @@ class AiTools {
 				throw new \InvalidArgumentException('"' . $f['label'] . '" is a secret or attachment field: the assistant does not remove it. The person removes it in "🧩 Edit collection".');
 			}
 		}
-		$this->service->replaceFields($uid, $id, $new);
-		return ['fields' => count($new)];
+		$c = $this->service->replaceFields($uid, $id, $new);
+		return ['fields' => count($new), '_report' => self::report($this->l($uid)->t('Change the fields'), [(string)($c['name'] ?? '')]) . ' (' . count($new) . ')'];
 	}
 
 	private function deleteCollection(string $uid, int $id): array {
-		$this->mustSee($uid, $id);
+		$v = $this->mustSee($uid, $id);
 		$this->service->deleteCollection($uid, $id);
 		$this->setCategory($uid, $id, '');
-		return ['deleted' => $id];
+		return ['deleted' => $id, '_report' => self::report($this->l($uid)->t('Delete a collection'), [(string)($v['name'] ?? '')])];
 	}
 }

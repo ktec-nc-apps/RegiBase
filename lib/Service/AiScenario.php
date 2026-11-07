@@ -49,8 +49,9 @@ final class AiScenario {
 		$parts[] = $search
 			? 'You may search the web when the writer asks for something you need to look up. Say where what you found came from.'
 			: 'You have no access to the internet. If the writer asks for something you would have to look up, say that web search is not allowed here.';
+		// the language the writer writes in; the screen's language only when that is unclear (2026-11-07)
 		$parts[] = $lang === 'ja'
-			? 'Answer in Japanese, politely (です・ます), plainly and briefly. Everything you write is in Japanese; field keys stay as they are typed.'
+			? 'Language: answer in the language of the writer\'s latest message. If it is written in English (or another language), answer wholly in that language, even though the screen and the data are in Japanese -- names of collections, records and buttons stay as they are. If it is in Japanese, answer in Japanese, politely (です・ます), plainly and briefly. Field keys stay as they are typed.'
 			: 'Answer in the language the writer uses, plainly and briefly; field keys stay as they are typed.';
 		$names = self::screenNames($lang);
 		if ($names !== '') {

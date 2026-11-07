@@ -1112,7 +1112,18 @@ OC.L10N.register(
         "What it may do (never secret field values; secret collections only once opened with their 6-digit key)": "What it may do (never secret field values; secret collections only once opened with their 6-digit key)",
         "The collections the person can see, and their field definitions (no secret values)": "The collections the person can see, and their field definitions (no secret values)",
         "The records of every collection the person can see — non-secret fields only": "The records of every collection the person can see — non-secret fields only",
-        "Make, change and delete records, fields and collections, with the person's own rights (“↶ Undo” takes it back)": "Make, change and delete records, fields and collections, with the person's own rights (“↶ Undo” takes it back)"
+        "Make, change and delete records, fields and collections, with the person's own rights (“↶ Undo” takes it back)": "Make, change and delete records, fields and collections, with the person's own rights (“↶ Undo” takes it back)",
+        "Look at the collections": "Look at the collections",
+        "Look at a collection": "Look at a collection",
+        "Find records": "Find records",
+        "Find duplicates": "Find duplicates",
+        "Add records": "Add records",
+        "Change records": "Change records",
+        "Make a collection": "Make a collection",
+        "Change a collection": "Change a collection",
+        "Change the fields": "Change the fields",
+        "Delete a collection": "Delete a collection",
+        "What was actually done": "What was actually done"
     },
     "nplurals=2; plural=(n != 1);"
 );
