@@ -626,6 +626,7 @@
     <div class="modal wide">
       <div class="modal-head"><h3>{{ t('New collection') }}</h3><button class="icon-btn" @click="modal=null">✕</button></div>
       <div class="modal-body">
+        <button class="btn block" style="margin-bottom:8px" @click="openPwImport">{{ t('🔑 Import passwords (KeePass, Bitwarden, LastPass, Chrome…)') }}</button>
         <button class="btn block" style="margin-bottom:8px" @click="openImport">{{ t('📥 Import from CSV / JSON file (auto-create fields)') }}</button>
         <button class="btn block" style="margin-bottom:8px" :disabled="!apps.contacts" :title="apps.contacts ? '' : t('The Contacts app is not enabled')" @click="openContactsImport">{{ t('📇 Import from Contacts') }}</button>
         <button class="btn block" style="margin-bottom:14px" :disabled="!apps.tables" :title="apps.tables ? '' : t('The Tables app is not enabled')" @click="openTablesImport">{{ t('📊 Import from Tables') }}</button>
@@ -1212,10 +1213,12 @@
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="btn sm" @click="exportCollection('csv')">{{ t('⬇ Export as CSV') }}</button>
             <button type="button" class="btn sm" @click="exportCollection('json')">{{ t('⬇ Export as JSON') }}</button>
+            <button type="button" class="btn sm" @click="openPwExport">{{ t('🔑 Export as KeePass (.kdbx)') }}</button>
             <button type="button" class="btn sm" :disabled="tablesExportBusy || !apps.tables" :title="apps.tables ? '' : t('The Tables app is not enabled')" @click="exportToTables">{{ t('📊 Export to Tables') }}</button>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('JSON includes field definitions and can be re-imported into RegiBase directly.') }}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">{{ t('Export to Tables creates a new table. Secret and attachment fields are skipped.') }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">{{ t('The KeePass file holds the secret fields too, opened with a master password you choose. It is made in your browser.') }}</div>
         </div>
 
         <div class="field">
@@ -1305,6 +1308,77 @@
       <div class="modal-foot">
         <button type="button" class="btn" @click="cancelShareUnlock">{{ t('Cancel') }}</button>
         <button class="btn primary" :disabled="shareUnlock.busy" @click="doShareUnlock">{{ t('Unlock') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Passwords in: KeePass (.kdbx) and other password managers. Read in the browser only (js/pwmanager.js). -->
+  <div v-if="modal && modal.type==='pwimport'" class="modal-mask">
+    <div class="modal wide">
+      <div class="modal-head"><h3>{{ t('🔑 Import passwords') }}</h3><button class="icon-btn" @click="closePwImport">✕</button></div>
+      <div class="modal-body">
+        <template v-if="pw.step===1">
+          <p style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('Bring in a KeePass file or the export of another password manager. The file is read in your browser: its password and what is inside are never sent to the server, and the passwords are encrypted with your RegiBase key before they are saved.') }}</p>
+          <label class="filepick">
+            <input type="file" accept=".kdbx,.csv,.json,.txt" @change="onPwFile" />
+            <span class="btn sm">{{ t('📄 Choose file') }}</span>
+            <span class="filepick-name">{{ pw.fileName || t('No file selected') }}</span>
+          </label>
+          <div style="font-size:12px;color:var(--muted);margin:6px 0 10px">{{ t('KeePass (.kdbx), KeePassXC, Bitwarden, LastPass, 1Password, Dashlane, Proton Pass, Chrome, Edge, Firefox, Passwords (Nextcloud): a .kdbx file, or the CSV / JSON file the program exports.') }}</div>
+          <template v-if="pw.isKdbx">
+            <div class="field"><label>{{ t('KeePass master password') }}</label><input type="password" v-model="pw.password" autocomplete="off" @keydown.enter="readPw" /></div>
+            <div class="field"><label>{{ t('Key file (only if the database has one)') }}</label>
+              <label class="filepick"><input type="file" @change="onPwKeyFile" /><span class="btn sm">{{ t('📄 Choose file') }}</span><span class="filepick-name">{{ pw.keyFileName || t('No file selected') }}</span></label>
+            </div>
+          </template>
+          <div v-if="pw.busy" style="margin-top:10px;color:var(--muted)">{{ t('Opening the file…') }}</div>
+          <div v-if="pw.err" style="margin-top:10px;color:var(--danger)">{{ pw.err }}</div>
+        </template>
+        <template v-else>
+          <div style="margin-bottom:10px"><span class="chip">{{ t('Detected format:') }} {{ pw.result.label }}</span> <span class="chip">{{ tn('{n} entries', pw.result.entries.length, '{n} entry') }}</span> <span v-if="pw.groups" class="chip">{{ tn('{n} groups', pw.groups, '{n} group') }}</span></div>
+          <div v-if="pw.notes.length" style="margin-bottom:10px;font-size:12px;color:var(--muted)">
+            <div v-for="(n, i) in pw.notes" :key="i">• {{ n }}</div>
+          </div>
+          <div class="field"><label>{{ t('Collection name') }}</label><input v-model="pw.collName" maxlength="120" /></div>
+          <div v-if="enc.enabled && !enc.unlocked" style="color:var(--danger);font-size:13px;margin-bottom:8px">{{ t('The master key is locked. Unlock it first, so the passwords can be encrypted.') }}</div>
+          <div v-else-if="!enc.enabled" style="color:var(--muted);font-size:12px;margin-bottom:8px">{{ t('No master key is set in RegiBase, so the passwords are saved without one. Set a master key in the settings to have them encrypted.') }}</div>
+          <div v-if="pw.busy" style="margin:8px 0">
+            <div style="height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden"><div :style="{width: (pw.total ? Math.round(pw.progress * 100 / pw.total) : 0) + '%', height: '100%', background: 'var(--primary)'}"></div></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ pw.progress }} / {{ pw.total }}</div>
+          </div>
+          <div v-if="pw.err" style="margin-top:8px;color:var(--danger)">{{ pw.err }}</div>
+        </template>
+      </div>
+      <div class="modal-foot">
+        <button v-if="pw.step===2" type="button" class="btn" :disabled="pw.busy" @click="pw.step=1; pw.err=''">{{ t('← Back') }}</button>
+        <button type="button" class="btn" :disabled="pw.busy && pw.step===2" @click="closePwImport">{{ t('Cancel') }}</button>
+        <button v-if="pw.step===1" type="button" class="btn primary" :disabled="pw.busy || !pw.file || (pw.isKdbx && !pw.password && !pw.keyFile)" @click="readPw">{{ t('Open') }}</button>
+        <button v-else type="button" class="btn primary" :disabled="pw.busy || !pw.result.entries.length || (enc.enabled && !enc.unlocked)" @click="commitPwImport">{{ tn('Import {n} entries', pw.result.entries.length, 'Import {n} entry') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Passwords out: a KeePass (.kdbx) file of this collection, made in the browser. -->
+  <div v-if="modal && modal.type==='pwexport'" class="modal-mask">
+    <div class="modal">
+      <div class="modal-head"><h3>{{ t('🔑 Export as KeePass (.kdbx)') }}</h3><button class="icon-btn" @click="closePwExport">✕</button></div>
+      <div class="modal-body">
+        <p style="margin:0 0 12px;color:var(--muted);font-size:13px">{{ t('The file is made in your browser and holds every record of this collection, the secret fields too, readable. It is locked with the master password you choose here, and opens in KeePass 2 and KeePassXC.') }}</p>
+        <div class="field"><label>{{ t('Master password for the KeePass file') }}</label><input type="password" v-model="pwx.password" autocomplete="new-password" /></div>
+        <div class="field"><label>{{ t('Type it again') }}</label><input type="password" v-model="pwx.password2" autocomplete="new-password" @keydown.enter="commitPwExport" /></div>
+        <div class="field"><label>{{ t('Strength') }}</label>
+          <select v-model="pwx.level">
+            <option value="standard">{{ t('Standard (64 MiB, about a second)') }}</option>
+            <option value="strong">{{ t('Strong (256 MiB, several seconds)') }}</option>
+          </select>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">{{ t('This password cannot be recovered. Keep the file safe: anyone who knows the password can read everything in it.') }}</div>
+        <div v-if="pwx.busy" style="margin-top:10px;color:var(--muted)">{{ t('Making the file…') }}</div>
+        <div v-if="pwx.err" style="margin-top:10px;color:var(--danger)">{{ pwx.err }}</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" :disabled="pwx.busy" @click="closePwExport">{{ t('Cancel') }}</button>
+        <button type="button" class="btn primary" :disabled="pwx.busy || !pwx.password" @click="commitPwExport">{{ t('Make the file') }}</button>
       </div>
     </div>
   </div>
@@ -2118,6 +2192,9 @@
         filePicker: { open: false, field: null, mode: 'image', path: '', parent: null, entries: [], selected: null, loading: false, error: '' },
         importStep: 1, importCsv: '', importFileName: '', importAnalysis: null,
         importColl: { name: '', icon: '', color: '' }, importCols: [], importBusy: false,
+        // passwords in (KeePass and the others) and out (KeePass), js/pwmanager.js
+        pw: { step: 1, file: null, fileName: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 },
+        pwx: { password: '', password2: '', level: 'standard', busy: false, err: '' },
         views: [
           { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
           { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
@@ -5575,6 +5652,138 @@
         if (!confirm(T('Delete this record?'))) return;
         await api('records/' + rec.id, { method: 'DELETE' });
         this.modal = null; await this.loadRecords(); await this.loadCollections(); this.showToast(T('Deleted'));
+      },
+      // ---- passwords in and out: KeePass (.kdbx) and other password managers (js/pwmanager.js) ----
+      // Everything is read and made in the browser. The KeePass password, the key file and the
+      // plain passwords stay here; the secret fields are encrypted with the RegiBase key before
+      // they are sent, the way a record saved by hand is.
+      openPwImport() {
+        this.pw = { step: 1, file: null, fileName: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 };
+        this.modal = { type: 'pwimport' };
+      },
+      closePwImport() { if (this.pw.busy && this.pw.step === 2) return; this.pw = { ...this.pw, password: '', file: null, keyFile: null, result: null }; this.modal = null; },
+      async onPwFile(ev) {
+        const f = ev.target.files && ev.target.files[0];
+        this.pw.err = '';
+        if (!f) return;
+        if (f.size > 200 * 1024 * 1024) { this.pw.err = T('This file is too large.'); return; }
+        this.pw.fileName = f.name; this.pw.isKdbx = /\.kdbx$/i.test(f.name);
+        this.pw.file = this.pw.isKdbx ? await f.arrayBuffer() : await f.text();
+        this.pw.password = ''; this.pw.keyFile = null; this.pw.keyFileName = '';
+      },
+      async onPwKeyFile(ev) {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) { this.pw.keyFile = null; this.pw.keyFileName = ''; return; }
+        if (f.size > 10 * 1024 * 1024) { this.pw.err = T('This file is too large.'); return; }
+        this.pw.keyFile = await f.arrayBuffer(); this.pw.keyFileName = f.name;
+      },
+      pwError(e) {
+        const m = {
+          badkey: T('The master password (or key file) is not right, or the file is damaged.'),
+          notkdbx: T('This is not a KeePass 2 (.kdbx) file. A KeePass 1 (.kdb) file has to be opened in KeePass 2 and saved as .kdbx first.'),
+          corrupt: T('The file is damaged.'),
+          unsupported: T('This file uses an option of KeePass that is not supported here.'),
+          encrypted: T('This Bitwarden export is encrypted. Export it again as an unencrypted .json file.'),
+          nolib: T('The part that reads KeePass files did not load. Reload the page and try again.'),
+          insecure: T('This page is not on a secure connection (https), so the browser does not allow the cryptography KeePass files need.'),
+        };
+        return m[e && e.code] || ((e && e.message) || String(e));
+      },
+      async readPw() {
+        if (this.pw.busy || !this.pw.file) return;
+        if (!window.RBPw) { this.pw.err = this.pwError({ code: 'nolib' }); return; }
+        this.pw.busy = true; this.pw.err = '';
+        try {
+          let res;
+          if (this.pw.isKdbx) res = await window.RBPw.readKdbx(this.pw.file, this.pw.password, this.pw.keyFile);
+          else {
+            res = window.RBPw.fromText(this.pw.fileName, this.pw.file);
+            if (!res) { this.pw.err = T('This file is not in a format RegiBase knows. For other files, use “Import from CSV / JSON file”.'); return; }
+          }
+          if (!res.entries.length) { this.pw.err = T('There is nothing to import in this file.'); return; }
+          const notes = []; const sk = res.skipped || {};
+          if (sk.attachments) notes.push(TN('{n} attachments are not imported.', sk.attachments, '{n} attachment is not imported.', '{n} attachments are not imported.', { n: sk.attachments }));
+          if (sk.history) notes.push(T('The older versions kept by KeePass are not imported.'));
+          if (sk.recycle) notes.push(TN('{n} entries in the recycle bin are left out.', sk.recycle, '{n} entry in the recycle bin is left out.', '{n} entries in the recycle bin are left out.', { n: sk.recycle }));
+          for (const w of res.warnings || []) if (w.code === 'notLogin') notes.push(TN('{n} items are cards, identities or notes: they are brought in with their details as extra fields.', w.n, '{n} item is a card, an identity or a note: it is brought in with its details as extra fields.', '{n} items are cards, identities or notes: they are brought in with their details as extra fields.', { n: w.n }));
+          const cust = new Set(); res.entries.forEach((e) => e.custom.forEach((c) => cust.add(c.name)));
+          if (cust.size > 40) notes.push(T('There are more than 40 kinds of extra fields; those past the 40th are put into the notes.'));
+          this.pw.result = res; this.pw.notes = notes;
+          this.pw.groups = new Set(res.entries.map((e) => e.group).filter(Boolean)).size;
+          this.pw.collName = (res.name || (this.pw.fileName || '').replace(/\.[^.]*$/, '') || res.label).slice(0, 120);
+          this.pw.password = ''; this.pw.step = 2;
+        } catch (e) { this.pw.err = this.pwError(e); }
+        finally { this.pw.busy = false; }
+      },
+      async commitPwImport() {
+        if (this.pw.busy || !this.pw.result) return;
+        if (this.enc.enabled && !this.enc.unlocked) { this.pw.err = T('The master key is locked. Unlock it first, so the passwords can be encrypted.'); return; }
+        const L = { title: T('Title'), group: T('Group'), url: 'URL', username: T('Username / ID'), password: T('Password'), totp: T('One-time password (TOTP)'), notes: T('Memo'), tags: T('Tags') };
+        const spec = window.RBPw.toCollection(this.pw.result.entries, L);
+        this.pw.busy = true; this.pw.err = ''; this.pw.progress = 0; this.pw.total = spec.records.length;
+        let coll = null;
+        try {
+          coll = await api('collections', { method: 'POST', body: JSON.stringify({ name: (this.pw.collName || '').trim() || this.pw.result.label, icon: '🔑', fields: spec.fields, folder_choice: 'suffix' }) });
+          const key = await this.keyFor({ ...coll, is_owner: true });
+          const secretKeys = spec.fields.filter((f) => f.secret).map((f) => f.key);
+          let next = 0;
+          const worker = async () => {
+            while (next < spec.records.length) {
+              const i = next++; const data = { ...spec.records[i] };
+              if (key) for (const k of secretKeys) if (data[k]) data[k] = await rbcrypto.encrypt(key, String(data[k]));
+              await api('collections/' + coll.id + '/records', { method: 'POST', body: JSON.stringify({ data }) });
+              this.pw.progress++;
+            }
+          };
+          await Promise.all([worker(), worker(), worker(), worker()]);
+          await this.loadCollections(); await this.selectCollection(coll.id);
+          this.showToast(TN('Imported {n} entries', spec.records.length, 'Imported {n} entry', 'Imported {n} entries', { n: spec.records.length }));
+          this.pw = { ...this.pw, result: null, file: null, keyFile: null, busy: false }; this.modal = null;
+        } catch (e) {
+          this.pw.err = T('Import failed') + ': ' + (e.message || e) + (coll ? ' — ' + TN('{n} entries were saved before it stopped, in the collection “{name}”.', this.pw.progress, '{n} entry was saved before it stopped, in the collection “{name}”.', '{n} entries were saved before it stopped, in the collection “{name}”.', { n: this.pw.progress, name: coll.name }) : '');
+          this.pw.busy = false;
+          if (coll) this.loadCollections();
+        }
+      },
+      openPwExport() {
+        if (!this.current) return;
+        if (this.enc.enabled && !this.enc.unlocked) { alert(T('The master key is locked. Unlock it first, so the passwords can be encrypted.')); return; }
+        this.pwx = { password: '', password2: '', level: 'standard', busy: false, err: '' };
+        this.modal = { type: 'pwexport' };
+      },
+      closePwExport() { if (this.pwx.busy) return; this.pwx = { ...this.pwx, password: '', password2: '' }; this.modal = null; },
+      async commitPwExport() {
+        if (this.pwx.busy || !this.current) return;
+        if (!window.RBPw) { this.pwx.err = this.pwError({ code: 'nolib' }); return; }
+        if (this.pwx.password !== this.pwx.password2) { this.pwx.err = T('The two passwords are not the same.'); return; }
+        if (this.pwx.password.length < 8 && !confirm(T('This master password is short. A KeePass file can be copied and tried for ever, so a short password protects it poorly. Use it anyway?'))) return;
+        this.pwx.busy = true; this.pwx.err = '';
+        try {
+          const coll = this.current; const key = await this.keyFor(coll);
+          const recs = await api('collections/' + coll.id + '/records');
+          const secretKeys = (coll.fields || []).filter((f) => f.secret).map((f) => f.key);
+          const plain = [];
+          for (const r of recs) {
+            const d = { ...(r.data || {}) };
+            for (const k of secretKeys) {
+              if (d[k] == null || d[k] === '') continue;
+              if (rbcrypto.isEnc(d[k])) {
+                if (!key) throw new Error(T('A secret field could not be read: the key for it is not available.'));
+                try { d[k] = await rbcrypto.decrypt(key, d[k]); } catch (e) { throw new Error(T('A secret field could not be decrypted, so nothing was exported.')); }
+              }
+            }
+            plain.push({ data: d });
+          }
+          const entries = window.RBPw.fromCollection(coll.fields || [], plain);
+          if (!entries.length) throw new Error(T('This collection has no records to export.'));
+          const buf = await window.RBPw.writeKdbx(entries, { password: this.pwx.password, name: coll.name, level: this.pwx.level });
+          const name = (String(coll.name || 'RegiBase').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').trim() || 'RegiBase') + '.kdbx';
+          const url = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
+          const a = document.createElement('a'); a.href = url; a.download = name; a.rel = 'noopener';
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+          this.showToast(TN('Exported {n} entries to {file}', entries.length, 'Exported {n} entry to {file}', 'Exported {n} entries to {file}', { n: entries.length, file: name }));
+          this.pwx = { password: '', password2: '', level: 'standard', busy: false, err: '' }; this.modal = null;
+        } catch (e) { this.pwx.err = this.pwError(e); this.pwx.busy = false; }
       },
       // ---- import ----
       openImport() {

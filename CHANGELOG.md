@@ -2,6 +2,32 @@
 
 All notable changes to RegiBase.
 
+## 0.23.0 — 2026-11-26
+
+Passwords in and out: KeePass (.kdbx), and the exports of other password managers.
+（パスワードの出入り：KeePass（.kdbx）と、ほかのパスワード管理ソフトの書き出しに対応しました。）
+
+### Added
+
+- **Import passwords** (New collection → "🔑 Import passwords"): a KeePass database (.kdbx, KDBX 3 and 4, with a master password and/or a key file), or the export of KeePassXC, Bitwarden (CSV and JSON), LastPass, 1Password, Dashlane, Proton Pass, Chrome / Edge, Firefox, or Passwords (Nextcloud). The format is recognised from the file. Groups, user names, URLs, notes, tags, one-time-password seeds and extra fields come along; the protected fields of KeePass stay secret fields. Attachments, the history and the recycle bin of KeePass are not imported (the dialog says how many).
+  （**パスワードの取り込み**（新規コレクション →「🔑 パスワードを取り込む」）：KeePass のデータベース（.kdbx、KDBX 3・4、マスターパスワードとキーファイルに対応）や、KeePassXC、Bitwarden（CSV・JSON）、LastPass、1Password、Dashlane、Proton Pass、Chrome／Edge、Firefox、Passwords（Nextcloud）の書き出しを取り込めます。形式はファイルの中身から判定します。グループ、ユーザー名、URL、メモ、タグ、ワンタイムパスワードの種、追加の項目も取り込みます。KeePass の「保護された欄」は、秘密の欄になります。添付ファイル、履歴、ごみ箱は取り込みません（件数は画面に出ます）。）
+- **Export as KeePass** (collection settings → Export → "🔑 Export as KeePass (.kdbx)"): the collection becomes a KDBX 4 file (AES-256, Argon2d) locked with a master password you choose, for KeePass 2 and KeePassXC. The secret fields are decrypted into it, so the file is as sensitive as the passwords it holds; the dialog says so and warns about a short password.
+  （**KeePass として書き出す**（コレクションの設定 → 書き出し →「🔑 KeePass（.kdbx）として書き出す」）：コレクションを、決めたマスターパスワードで鍵をかけた KDBX 4 のファイル（AES-256・Argon2d）にします。KeePass 2 と KeePassXC で開けます。秘密の欄は復号して入れるので、ファイルはパスワードと同じだけ大切に扱う必要があります。画面にも、そのことと、短いパスワードへの注意を書いてあります。）
+
+### Security
+
+- **All of it happens in your browser.** The KeePass master password, the key file and what is in the file are never sent to the server. Secret fields are encrypted with your RegiBase key before they are saved (the CSV / JSON import still writes them as they come and encrypts them later). The parts that read and write KeePass files are shipped with the app, not loaded from elsewhere: kdbxweb and the Argon2 of hash-wasm, both MIT (js/vendor/LICENSES.txt).
+  （**すべてブラウザーの中で行います。** KeePass のマスターパスワード、キーファイル、ファイルの中身は、サーバーに送りません。秘密の欄は、保存する前に、RegiBase の鍵で暗号化します（CSV／JSON の取り込みは、これまでどおり、そのまま保存して、あとで暗号化します）。KeePass のファイルを読み書きする部品は、アプリに同梱していて、外から読み込みません（kdbxweb と、hash-wasm の Argon2。どちらも MIT）。）
+- The RegiBase page now allows WebAssembly (Content-Security-Policy `'wasm-unsafe-eval'`), which Argon2 needs. It does not allow `eval()` of text, and no other page of Nextcloud is changed.
+  （RegiBase のページで、WebAssembly を許可するようにしました（Argon2 に必要なため。CSP の `'wasm-unsafe-eval'`）。文章を実行する許可（`eval()`）は、足していません。ほかのページには、影響しません。）
+
+### Notes
+
+- A KeePass file needs the browser's own cryptography, which a page has only over https (or on localhost); on plain http the dialog says so.
+  （KeePass のファイルには、ブラウザーの暗号機能が必要です。https（または localhost）のページでだけ使えます。http のときは、画面にそう出ます。）
+- The new texts are in all 21 languages.
+  （新しい文言は、21 言語すべてに訳しました。）
+
 ## 0.22.4 — 2026-11-08
 
 ### Fixed

@@ -36,6 +36,11 @@ fields you set up yourself.
   your master key or the plaintext. The master key is at least 8 characters and is
   strengthened with 600,000 PBKDF2 rounds. *Forgetting the master key means the data
   cannot be recovered.*
+- **Passwords in and out** — import a **KeePass** database (`.kdbx`, KDBX 3 and 4) or the export of
+  **KeePassXC, Bitwarden, LastPass, 1Password, Dashlane, Proton Pass, Chrome, Edge, Firefox, Passwords
+  (Nextcloud)**, and export a collection as a KeePass file. Everything is read and written in the browser:
+  the KeePass password and the passwords inside are never sent to the server, and secret fields are encrypted
+  with your master key before they are saved. Attachments, history and the recycle bin of KeePass are not imported.
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
   An import is written by the server as it comes in, secret fields included: with a master
@@ -163,6 +168,11 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   ブラウザー内で **AES-GCM** によって暗号化されます。マスターキーや平文がサーバーに渡ることはありません。
   マスターキーは 8 文字以上で、PBKDF2 による 60 万回の反復処理で強化されます。
   *マスターキーを忘れると、データは復元できません。*
+- **パスワードの出入り** — **KeePass**（`.kdbx`、KDBX 3・4）のデータベースや、**KeePassXC、Bitwarden、LastPass、
+  1Password、Dashlane、Proton Pass、Chrome、Edge、Firefox、Passwords（Nextcloud）**の書き出しを取り込めます。
+  コレクションを KeePass のファイルとして書き出すこともできます。読み書きはすべてブラウザーの中で行い、
+  KeePass のパスワードも中のパスワードも、サーバーには送りません。秘密の欄は、保存する前にマスターキーで暗号化します。
+  KeePass の添付ファイル、履歴、ごみ箱は取り込みません。
 - **インポート** — **CSV / JSON**（Google パスワードマネージャーのエクスポートなど）や、
   **Nextcloud Contacts**（写真を含む）からインポートできます。インポートは一方向で、Contacts 側のデータは変更しません。
   インポートしたデータは、秘匿項目も含めてそのままサーバーに保存されます。マスターキーを設定している場合は、
