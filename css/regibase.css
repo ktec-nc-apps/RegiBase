@@ -504,6 +504,9 @@
 #regibase-root .detail-row .dv a.val.link { color: var(--primary); text-decoration: none; word-break: break-all; }
 #regibase-root .detail-row .dv a.val.link:hover { text-decoration: underline; }
 #regibase-root .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+#regibase-root .totp-now { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); }
+#regibase-root .totp-now b { font-size: 15px; letter-spacing: 2px; }
+#regibase-root .totp-now small { color: var(--muted); min-width: 2.4em; }
 
 /* template picker */
 #regibase-root .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

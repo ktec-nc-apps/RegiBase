@@ -111,7 +111,23 @@
     return body;
   }
 
+  /**
+   * A file of the user's own Files, read through WebDAV (the browse API gives the path).
+   * Read here, so a KeePass file never goes through RegiBase's server code.
+   * @returns {Promise<{buf: ArrayBuffer, etag: string}>}
+   */
+  async function davRead(path) {
+    const uid = (window.OC && OC.getCurrentUser && OC.getCurrentUser()) ? OC.getCurrentUser().uid : '';
+    if (!uid) throw new Error('unauthorized');
+    const base = (window.OC && OC.linkToRemote) ? OC.linkToRemote('dav') : ((window.OC && OC.webroot) || '') + '/remote.php/dav';
+    const url = base + '/files/' + encodeURIComponent(uid) + '/' + String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    const res = await fetch(url, { credentials: 'same-origin', headers: { requesttoken: TOKEN }, cache: 'no-store' });
+    if (!res.ok) { const e = new Error(res.status === 404 ? 'notfound' : res.statusText); e.status = res.status; throw e; }
+    return { buf: await res.arrayBuffer(), etag: res.headers.get('ETag') || '' };
+  }
+
   let _slugSeq = 0;
+  let totpTimer = null;   // ticks the one-time password codes of the open record
   function slug(s) {
     // A monotonic counter keeps the fallback unique even when several fields are
     // slugged in the same synchronous pass (non-ASCII labels all fall through here,
@@ -547,6 +563,7 @@
                       <button v-if="f.type==='date' || f.type==='month' || isDateTime(f)" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(noteCur, f)">📅</button>
                       <button v-if="fieldHasMap(f) && noteCur.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(noteCur.data[f.key])">🌐</button>
                       <button v-if="!(f.secret && secretsMasked)" type="button" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : noteCur.data[f.key])" :title="t('Copy')">⧉</button>
+                      <span v-if="totpNow[f.key]" class="totp-now" :title="t('The one-time password for now')">🔢 <b class="mono">{{ totpNow[f.key].code }}</b> <small>{{ totpNow[f.key].remaining }}s</small><button type="button" class="icon-btn" @click="copyVal(totpNow[f.key].code)" :title="t('Copy the code')">⧉</button></span>
                     </div>
                   </div>
                 </div>
@@ -721,7 +738,7 @@
             <input type="datetime-local" :step="f.type==='datetime_sec' ? 1 : 60" :value="dtIn(f, form[f.key])" @input="form[f.key] = dtOut(f, $event.target.value)" />
           </div>
           <div v-else class="control">
-            <input :type="inputType(f)" :step="inputType(f)==='number' ? 'any' : null" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="f.secret && secretsMasked" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
+            <input :type="inputType(f)" :step="inputType(f)==='number' ? 'any' : null" :class="{'secret-mask': f.secret && !reveal[f.key]}" v-model="form[f.key]" :placeholder="(f.secret && secretsMasked) ? t('(hidden — not shared)') : (f.placeholder||'')" :readonly="(f.secret && secretsMasked) || f.key==='kp_uuid'" :title="f.key==='kp_uuid' ? t('The ID of the entry in KeePass. It is set by the import and used to refresh the collection.') : null" :autocomplete="f.secret?'off':''" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" :maxlength="ruleMax(f)" />
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click.stop="openPwGen('record', f)" :title="t('Generate a password')">🎲</button>
             <button v-if="f.secret && !secretsMasked" type="button" class="icon-btn" @click="toggleReveal(f.key)">{{ reveal[f.key]?'🙈':'👁' }}</button>
           </div>
@@ -758,6 +775,7 @@
             <button v-if="f.type==='date' || f.type==='month' || isDateTime(f)" type="button" class="icon-btn" :disabled="!apps.calendar" :title="apps.calendar ? t('Add reminder') : t('The Calendar app is not enabled')" @click="addReminder(modal.rec, f)">📅</button>
             <button v-if="fieldHasMap(f) && modal.rec.data[f.key]" type="button" class="icon-btn" :title="t('Open in map')" @click="openMap(modal.rec.data[f.key])">🌐</button>
             <button v-if="!(f.secret && secretsMasked)" class="icon-btn" @click="copyVal(f.secret ? openDecrypted[f.key] : modal.rec.data[f.key])" :title="t('Copy')">⧉</button>
+            <span v-if="totpNow[f.key]" class="totp-now" :title="t('The one-time password for now')">🔢 <b class="mono">{{ totpNow[f.key].code }}</b> <small>{{ totpNow[f.key].remaining }}s</small><button type="button" class="icon-btn" @click="copyVal(totpNow[f.key].code)" :title="t('Copy the code')">⧉</button></span>
           </div>
         </div>
       </div>
@@ -1208,6 +1226,15 @@
           <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Duplicate copies the fields (optionally the records). Save as template adds it to the New collection picker.') }}</div>
         </div>
 
+        <div v-if="pwRefreshable" class="field">
+          <label>🔄 {{ t('KeePass file') }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn sm" @click="openPwRefresh">{{ t('🔄 Refresh from KeePass file') }}</button>
+            <span v-if="kdbxPath" style="font-size:12px;color:var(--muted)">📂 {{ kdbxPath }}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Brings the changes made in KeePass into this collection. KeePass stays the master: nothing is written to the KeePass file.') }}</div>
+        </div>
+
         <div class="field">
           <label>📤 {{ t('Export (all records in this collection)') }}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1319,11 +1346,15 @@
       <div class="modal-body">
         <template v-if="pw.step===1">
           <p style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('Bring in a KeePass file or the export of another password manager. The file is read in your browser: its password and what is inside are never sent to the server, and the passwords are encrypted with your RegiBase key before they are saved.') }}</p>
-          <label class="filepick">
-            <input type="file" accept=".kdbx,.csv,.json,.txt" @change="onPwFile" />
-            <span class="btn sm">{{ t('📄 Choose file') }}</span>
-            <span class="filepick-name">{{ pw.fileName || t('No file selected') }}</span>
-          </label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn sm" :disabled="pw.busy" @click="openFilePicker(null, 'pw')">{{ t('📂 Choose from Nextcloud') }}</button>
+            <label class="filepick">
+              <input type="file" accept=".kdbx,.csv,.json,.txt" @change="onPwFile" />
+              <span class="btn sm">{{ t('📄 Choose file') }}</span>
+              <span class="filepick-name">{{ pw.ncPath ? '📂 ' + pw.ncPath : (pw.fileName || t('No file selected')) }}</span>
+            </label>
+          </div>
+          <div v-if="pw.ncPath && pw.isKdbx" style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('The file stays in your Nextcloud. RegiBase remembers where it is, so the collection can be refreshed from it later.') }}</div>
           <div style="font-size:12px;color:var(--muted);margin:6px 0 10px">{{ t('KeePass (.kdbx), KeePassXC, Bitwarden, LastPass, 1Password, Dashlane, Proton Pass, Chrome, Edge, Firefox, Passwords (Nextcloud): a .kdbx file, or the CSV / JSON file the program exports.') }}</div>
           <template v-if="pw.isKdbx">
             <div class="field"><label>{{ t('KeePass master password') }}</label><input type="password" v-model="pw.password" autocomplete="off" @keydown.enter="readPw" /></div>
@@ -1354,6 +1385,68 @@
         <button type="button" class="btn" :disabled="pw.busy && pw.step===2" @click="closePwImport">{{ t('Cancel') }}</button>
         <button v-if="pw.step===1" type="button" class="btn primary" :disabled="pw.busy || !pw.file || (pw.isKdbx && !pw.password && !pw.keyFile)" @click="readPw">{{ t('Open') }}</button>
         <button v-else type="button" class="btn primary" :disabled="pw.busy || !pw.result.entries.length || (enc.enabled && !enc.unlocked)" @click="commitPwImport">{{ tn('Import {n} entries', pw.result.entries.length, 'Import {n} entry') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Refresh a collection from its KeePass file. KeePass is the master; the file is only read. -->
+  <div v-if="modal && modal.type==='pwrefresh'" class="modal-mask">
+    <div class="modal wide">
+      <div class="modal-head"><h3>{{ t('🔄 Refresh from KeePass file') }}</h3><button class="icon-btn" @click="closePwRefresh">✕</button></div>
+      <div class="modal-body">
+        <template v-if="pwr.step===1">
+          <p style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('The changes made in KeePass are brought into this collection. Entries are found by their KeePass ID, so a renamed or moved entry is updated, not added again. Nothing is written to the KeePass file, and the file and its password are used in your browser only.') }}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn sm" :disabled="pwr.busy" @click="openFilePicker(null, 'pwr')">{{ t('📂 Choose from Nextcloud') }}</button>
+            <label class="filepick">
+              <input type="file" accept=".kdbx,.csv,.json,.txt" @change="onPwrFile" />
+              <span class="btn sm">{{ t('📄 Choose file') }}</span>
+              <span class="filepick-name">{{ pwr.ncPath ? '📂 ' + pwr.ncPath : (pwr.fileName || t('No file selected')) }}</span>
+            </label>
+          </div>
+          <template v-if="pwr.isKdbx">
+            <div class="field" style="margin-top:10px"><label>{{ t('KeePass master password') }}</label><input type="password" v-model="pwr.password" autocomplete="off" @keydown.enter="readPwr" /></div>
+            <div class="field"><label>{{ t('Key file (only if the database has one)') }}</label>
+              <label class="filepick"><input type="file" @change="onPwrKeyFile" /><span class="btn sm">{{ t('📄 Choose file') }}</span><span class="filepick-name">{{ pwr.keyFileName || t('No file selected') }}</span></label>
+            </div>
+          </template>
+          <div v-if="pwr.busy" style="margin-top:10px;color:var(--muted)">{{ t('Opening the file…') }}</div>
+        </template>
+        <template v-else>
+          <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="chip">＋ {{ tn('{n} new', pwr.plan.add.length, '{n} new') }}</span>
+            <span class="chip">✎ {{ tn('{n} changed', pwr.plan.update.length, '{n} changed') }}</span>
+            <span class="chip">＝ {{ tn('{n} unchanged', pwr.plan.same, '{n} unchanged') }}</span>
+            <span v-if="pwr.plan.gone.length" class="chip">－ {{ tn('{n} no longer in KeePass', pwr.plan.gone.length, '{n} no longer in KeePass') }}</span>
+          </div>
+          <div v-if="pwr.notes.length" style="margin-bottom:10px;font-size:12px;color:var(--muted)"><div v-for="(n, i) in pwr.notes" :key="i">• {{ n }}</div></div>
+          <div v-if="!pwr.plan.add.length && !pwr.plan.update.length && !pwr.plan.gone.length && !pwr.plan.fields" style="margin:8px 0">{{ t('This collection is already the same as the KeePass file.') }}</div>
+          <div v-if="pwr.plan.update.length" class="field"><label>{{ t('Changed') }}</label>
+            <div style="max-height:160px;overflow:auto;font-size:13px">
+              <div v-for="u in pwr.plan.update.slice(0, 200)" :key="u.id">✎ {{ u.title }} <span style="color:var(--muted)">— {{ u.changed.join(', ') }}</span></div>
+            </div>
+          </div>
+          <div v-if="pwr.plan.add.length" class="field"><label>{{ t('New') }}</label>
+            <div style="max-height:120px;overflow:auto;font-size:13px"><div v-for="(a, i) in pwr.plan.add.slice(0, 200)" :key="i">＋ {{ pwrTitle(a) }}</div></div>
+          </div>
+          <div v-if="pwr.plan.gone.length" class="field"><label>{{ t('No longer in KeePass') }}</label>
+            <div style="max-height:120px;overflow:auto;font-size:13px"><div v-for="g in pwr.plan.gone.slice(0, 200)" :key="g.id">－ {{ g.title }}</div></div>
+            <label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-weight:normal"><input type="checkbox" v-model="pwr.delGone" /> {{ tn('Delete these {n} records from RegiBase too', pwr.plan.gone.length, 'Delete this record from RegiBase too') }}</label>
+            <div style="font-size:12px;color:var(--muted)">{{ t('Left unticked, they stay in RegiBase. A deletion can be undone with Undo.') }}</div>
+          </div>
+          <div v-if="enc.enabled && !enc.unlocked" style="color:var(--danger);font-size:13px;margin-bottom:8px">{{ t('The master key is locked. Unlock it first, so the passwords can be encrypted.') }}</div>
+          <div v-if="pwr.busy" style="margin:8px 0">
+            <div style="height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden"><div :style="{width: (pwr.total ? Math.round(pwr.progress * 100 / pwr.total) : 0) + '%', height: '100%', background: 'var(--primary)'}"></div></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ pwr.progress }} / {{ pwr.total }}</div>
+          </div>
+        </template>
+        <div v-if="pwr.err" style="margin-top:8px;color:var(--danger)">{{ pwr.err }}</div>
+      </div>
+      <div class="modal-foot">
+        <button v-if="pwr.step===2" type="button" class="btn" :disabled="pwr.busy" @click="pwr.step=1; pwr.err=''">{{ t('← Back') }}</button>
+        <button type="button" class="btn" :disabled="pwr.busy && pwr.step===2" @click="closePwRefresh">{{ t('Cancel') }}</button>
+        <button v-if="pwr.step===1" type="button" class="btn primary" :disabled="pwr.busy || (!pwr.file && !pwr.ncPath) || (pwr.isKdbx && !pwr.password && !pwr.keyFile)" @click="readPwr">{{ t('Compare') }}</button>
+        <button v-else type="button" class="btn primary" :disabled="pwr.busy || !pwrHasWork || (enc.enabled && !enc.unlocked)" @click="commitPwr">{{ t('Apply the changes') }}</button>
       </div>
     </div>
   </div>
@@ -2193,8 +2286,10 @@
         importStep: 1, importCsv: '', importFileName: '', importAnalysis: null,
         importColl: { name: '', icon: '', color: '' }, importCols: [], importBusy: false,
         // passwords in (KeePass and the others) and out (KeePass), js/pwmanager.js
-        pw: { step: 1, file: null, fileName: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 },
+        pw: { step: 1, file: null, fileName: '', ncPath: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 },
         pwx: { password: '', password2: '', level: 'standard', busy: false, err: '' },
+        pwr: { step: 1, file: null, fileName: '', ncPath: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, progress: 0, total: 0 },
+        totpNow: {},
         views: [
           { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
           { key: 'table', label: 'Table', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.2"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
@@ -2277,6 +2372,17 @@
       // (detailed list, thumbnail cards) falls back to the plain list.
       curView() { const v = this.current ? this.current.view : 'list'; return (v === 'card' || v === 'table' || v === 'note') ? v : 'list'; },
       isOwner() { return this.current ? this.current.is_owner !== false : true; },
+      // "Refresh from KeePass file": a collection that came from KeePass (it has the KeePass ID
+      // field), or one imported before the ID was kept (the importer's title + password fields).
+      pwRefreshable() {
+        const fs = (this.current && this.current.fields) || [];
+        return this.isOwner && (fs.some((f) => f.key === 'kp_uuid') || (fs.some((f) => f.key === 'title') && fs.some((f) => f.key === 'password' && f.secret)));
+      },
+      kdbxPath() {
+        const f = ((this.current && this.current.fields) || []).find((x) => x.key === 'kp_uuid');
+        return (f && f.options && f.options.kdbx && f.options.kdbx.path) || '';
+      },
+      pwrHasWork() { const p = this.pwr.plan; return !!(p && (p.add.length || p.update.length || p.fields || (this.pwr.delGone && p.gone.length))); },
       // ---- categories of the collection list (owner, 2026-11-07) ----
       // Each person's own. "Uncategorized" holds the collections in no category and is always
       // first; the others are in the order they were dragged into, new ones at the end.
@@ -2614,6 +2720,8 @@
       pwgenNote() { return this.pwgen.field ? this.ruleHint(this.pwgen.field) : ''; },
     },
     watch: {
+      // the codes of the one-time password fields of the open record, while it is open
+      openDecrypted() { this.startTotp(); },
       // the picker floats above the dialogs, so it must never outlive the one that opened it
       modal() { this.iconPickerOpen = false; this.closePwGen(); },
       // another collection is another subject: the assistant starts a new conversation
@@ -3377,12 +3485,14 @@
         if (this.filePicker.mode === 'folder') return false; // folder mode: pick a location, not a file
         if (this.filePicker.mode === 'image') return !!x.is_image;
         const ext = (x.name.split('.').pop() || '').toLowerCase();
+        if (this.filePicker.mode === 'pw' || this.filePicker.mode === 'pwr') return ['kdbx', 'csv', 'json', 'txt'].includes(ext);
         return ['pdf', 'odt', 'ods', 'odp', 'docx', 'xlsx', 'md', 'txt'].includes(ext);
       },
       fpIcon(x) {
         if (x.is_image) return '🖼';
         const ext = (x.name.split('.').pop() || '').toLowerCase();
         if (ext === 'pdf') return '📕';
+        if (ext === 'kdbx') return '🔑';
         if (['odt', 'docx'].includes(ext)) return '📄';
         if (['ods', 'xlsx'].includes(ext)) return '📊';
         if (['odp'].includes(ext)) return '📑';
@@ -3410,6 +3520,7 @@
         const f = this.filePicker.field;
         const mode = this.filePicker.mode;
         this.filePicker.open = false;
+        if (mode === 'pw' || mode === 'pwr') { await this.pwFromNc(mode === 'pw' ? this.pw : this.pwr, x); return; }
         if (mode === 'image') {
           if (!x.is_image) { this.showToast(T('Please choose an image file')); return; }
           if (f.type === 'image_crop') { this.openCropper(this.imgUrl(x.id), f); }
@@ -5089,6 +5200,7 @@
             _pattern: (RULE_TYPES.includes(f.type) && o.pattern) ? o.pattern : '',
             _rmin: (RULE_TYPES.includes(f.type) && o.min > 0) ? o.min : '',
             _rmax: (RULE_TYPES.includes(f.type) && o.max > 0) ? o.max : '',
+            _kdbx: o.kdbx || null,
             _uid: this.uidCounter++,
             _cnext: 0,                              // _uid of the next field to append (chain)
             _csep: (f.concat_sep || 'space'),       // separator placed after this field
@@ -5163,6 +5275,7 @@
             if (Number(f._rmax) > 0) rule.max = Number(f._rmax);
             options = Object.keys(rule).length ? rule : undefined;
           }
+          if (f._kdbx) options = { ...(options || {}), kdbx: f._kdbx }; // where the KeePass file is (kp_uuid): kept when the fields are edited
           const existing = (f.key || '').trim();
           return {
             key: existing || freshKey(slug(f.label)),
@@ -5658,7 +5771,7 @@
       // plain passwords stay here; the secret fields are encrypted with the RegiBase key before
       // they are sent, the way a record saved by hand is.
       openPwImport() {
-        this.pw = { step: 1, file: null, fileName: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 };
+        this.pw = { step: 1, file: null, fileName: '', ncPath: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 };
         this.modal = { type: 'pwimport' };
       },
       closePwImport() { if (this.pw.busy && this.pw.step === 2) return; this.pw = { ...this.pw, password: '', file: null, keyFile: null, result: null }; this.modal = null; },
@@ -5667,7 +5780,7 @@
         this.pw.err = '';
         if (!f) return;
         if (f.size > 200 * 1024 * 1024) { this.pw.err = T('This file is too large.'); return; }
-        this.pw.fileName = f.name; this.pw.isKdbx = /\.kdbx$/i.test(f.name);
+        this.pw.fileName = f.name; this.pw.ncPath = ''; this.pw.isKdbx = /\.kdbx$/i.test(f.name);
         this.pw.file = this.pw.isKdbx ? await f.arrayBuffer() : await f.text();
         this.pw.password = ''; this.pw.keyFile = null; this.pw.keyFileName = '';
       },
@@ -5719,7 +5832,8 @@
         if (this.pw.busy || !this.pw.result) return;
         if (this.enc.enabled && !this.enc.unlocked) { this.pw.err = T('The master key is locked. Unlock it first, so the passwords can be encrypted.'); return; }
         const L = { title: T('Title'), group: T('Group'), url: 'URL', username: T('Username / ID'), password: T('Password'), totp: T('One-time password (TOTP)'), notes: T('Memo'), tags: T('Tags') };
-        const spec = window.RBPw.toCollection(this.pw.result.entries, L);
+        L.kpid = T('KeePass ID');
+        const spec = window.RBPw.toCollection(this.pw.result.entries, L, this.pw.ncPath && this.pw.isKdbx ? { path: this.pw.ncPath } : null);
         this.pw.busy = true; this.pw.err = ''; this.pw.progress = 0; this.pw.total = spec.records.length;
         let coll = null;
         try {
@@ -5744,6 +5858,136 @@
           this.pw.busy = false;
           if (coll) this.loadCollections();
         }
+      },
+      // A file chosen in the Nextcloud picker for the import (st = this.pw) or the refresh (this.pwr).
+      // keep: the password and key file typed in stay (the refresh reads the remembered file again).
+      async pwFromNc(st, x, keep) {
+        st.err = '';
+        if (x.size > 200 * 1024 * 1024) { st.err = T('This file is too large.'); return; }
+        st.busy = true;
+        try {
+          const { buf } = await davRead(x.path);
+          st.isKdbx = /\.kdbx$/i.test(x.name);
+          st.file = st.isKdbx ? buf : new TextDecoder().decode(buf);
+          st.fileName = x.name; st.ncPath = x.path;
+          if (!keep) { st.password = ''; st.keyFile = null; st.keyFileName = ''; }
+        } catch (e) { st.err = T('The file could not be read from Nextcloud.') + (e.status ? ' (' + e.status + ')' : ''); }
+        finally { st.busy = false; }
+      },
+      // ---- refresh a collection from its KeePass file (KeePass is the master; the file is only read) ----
+      openPwRefresh() {
+        if (!this.current || !this.pwRefreshable) return;
+        const path = this.kdbxPath;
+        this.pwr = { step: 1, file: null, fileName: path ? path.split('/').pop() : '', ncPath: path, isKdbx: !path || /\.kdbx$/i.test(path), password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, progress: 0, total: 0, recs: null };
+        this.modal = { type: 'pwrefresh' };
+      },
+      closePwRefresh() { if (this.pwr.busy && this.pwr.step === 2) return; this.pwr = { ...this.pwr, password: '', file: null, keyFile: null, plan: null, recs: null }; this.modal = null; },
+      async onPwrFile(ev) {
+        const f = ev.target.files && ev.target.files[0];
+        this.pwr.err = '';
+        if (!f) return;
+        if (f.size > 200 * 1024 * 1024) { this.pwr.err = T('This file is too large.'); return; }
+        this.pwr.fileName = f.name; this.pwr.ncPath = ''; this.pwr.isKdbx = /\.kdbx$/i.test(f.name);
+        this.pwr.file = this.pwr.isKdbx ? await f.arrayBuffer() : await f.text();
+        this.pwr.password = ''; this.pwr.keyFile = null; this.pwr.keyFileName = '';
+      },
+      async onPwrKeyFile(ev) {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) { this.pwr.keyFile = null; this.pwr.keyFileName = ''; return; }
+        if (f.size > 10 * 1024 * 1024) { this.pwr.err = T('This file is too large.'); return; }
+        this.pwr.keyFile = await f.arrayBuffer(); this.pwr.keyFileName = f.name;
+      },
+      pwrTitle(d) { const f = (this.current.fields || []).find((x) => x.is_title) || { key: 'title' }; return (d && (d[f.key] || d.title)) || '(no title)'; },
+      async readPwr() {
+        const st = this.pwr;
+        if (st.busy || !this.current) return;
+        if (!window.RBPw) { st.err = this.pwError({ code: 'nolib' }); return; }
+        if (this.enc.enabled && !this.enc.unlocked) { st.err = T('The master key is locked. Unlock it first, so the passwords can be encrypted.'); return; }
+        // the remembered file is read fresh every time, so the newest version is compared
+        if (st.ncPath) { const name = st.ncPath.split('/').pop(); await this.pwFromNc(st, { path: st.ncPath, name, size: 0 }, true); if (st.err) return; }
+        if (!st.file) return;
+        st.busy = true; st.err = '';
+        try {
+          let res;
+          if (st.isKdbx) res = await window.RBPw.readKdbx(st.file, st.password, st.keyFile);
+          else {
+            res = window.RBPw.fromText(st.fileName, st.file);
+            if (!res) { st.err = T('This file is not in a format RegiBase knows. For other files, use “Import from CSV / JSON file”.'); return; }
+          }
+          const coll = this.current; const key = await this.keyFor(coll);
+          const secretKeys = (coll.fields || []).filter((f) => f.secret).map((f) => f.key);
+          const recs = [];
+          for (const r of await api('collections/' + coll.id + '/records')) {
+            const d = { ...(r.data || {}) };
+            for (const k of secretKeys) {
+              if (d[k] == null || d[k] === '' || !rbcrypto.isEnc(d[k])) continue;
+              if (!key) throw new Error(T('A secret field could not be read: the key for it is not available.'));
+              try { d[k] = await rbcrypto.decrypt(key, d[k]); } catch (e) { throw new Error(T('A secret field could not be decrypted, so nothing was changed.')); }
+            }
+            recs.push({ id: r.id, data: d });
+          }
+          const L = { kpid: T('KeePass ID'), group: T('Group'), username: T('Username / ID'), password: T('Password'), totp: T('One-time password (TOTP)'), notes: T('Memo'), tags: T('Tags'),
+            source: st.ncPath && st.isKdbx ? { path: st.ncPath } : null };
+          const plan = window.RBPw.planRefresh(coll.fields || [], recs, res.entries, L);
+          const notes = []; const sk = res.skipped || {};
+          if (plan.byName) notes.push(TN('{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', plan.byName, '{n} record imported before was matched by group, title and user name; it gets its KeePass ID now.', '{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', { n: plan.byName }));
+          if (plan.newFields.length) notes.push(T('New fields:') + ' ' + plan.newFields.join(', '));
+          if (sk.attachments) notes.push(TN('{n} attachments are not imported.', sk.attachments, '{n} attachment is not imported.', '{n} attachments are not imported.', { n: sk.attachments }));
+          if (sk.recycle) notes.push(TN('{n} entries in the recycle bin are left out.', sk.recycle, '{n} entry in the recycle bin is left out.', '{n} entries in the recycle bin are left out.', { n: sk.recycle }));
+          st.plan = plan; st.notes = notes; st.recs = recs; st.delGone = false; st.password = ''; st.step = 2;
+        } catch (e) { st.err = this.pwError(e); }
+        finally { st.busy = false; }
+      },
+      async commitPwr() {
+        const st = this.pwr; const plan = st.plan;
+        if (st.busy || !plan || !this.current) return;
+        if (this.enc.enabled && !this.enc.unlocked) { st.err = T('The master key is locked. Unlock it first, so the passwords can be encrypted.'); return; }
+        const cid = this.current.id;
+        const grp = 'kprefresh-' + cid + '-' + (this.uidCounter++);   // the changes are undone as one step
+        const gone = st.delGone ? plan.gone.map((g) => g.id) : [];
+        st.busy = true; st.err = ''; st.progress = 0; st.total = plan.add.length + plan.update.length + (gone.length ? 1 : 0);
+        const done = { add: 0, update: 0, del: 0 };
+        try {
+          if (plan.fields) this.current = await api('collections/' + cid + '/fields', { method: 'PUT', body: JSON.stringify({ fields: plan.fields, _undoGroup: grp }) });
+          const coll = this.current; const key = await this.keyFor(coll);
+          const secretKeys = (coll.fields || []).filter((f) => f.secret).map((f) => f.key);
+          const enc = async (d) => { const o = { ...d }; if (key) for (const k of secretKeys) if (o[k] != null && o[k] !== '' && !rbcrypto.isEnc(o[k])) o[k] = await rbcrypto.encrypt(key, String(o[k])); return o; };
+          const jobs = plan.update.map((u) => async () => { await api('records/' + u.id, { method: 'PUT', body: JSON.stringify({ data: await enc(u.data), _undoGroup: grp }) }); done.update++; })
+            .concat(plan.add.map((a) => async () => { await api('collections/' + cid + '/records', { method: 'POST', body: JSON.stringify({ data: await enc(a) }) }); done.add++; }));
+          let next = 0;
+          const worker = async () => { while (next < jobs.length) { const j = jobs[next++]; await j(); st.progress++; } };
+          await Promise.all([worker(), worker(), worker(), worker()]);
+          if (gone.length) { const r = await api('records/delete', { method: 'POST', body: JSON.stringify({ ids: gone }) }); done.del = (r && r.deleted) || 0; st.progress++; }
+          await this.loadRecords();
+          this.showToast(T('Refreshed from KeePass: {a} added, {u} updated, {d} deleted', { a: done.add, u: done.update, d: done.del }));
+          this.pwr = { ...this.pwr, plan: null, recs: null, file: null, keyFile: null, busy: false }; this.modal = null;
+        } catch (e) {
+          st.err = T('The refresh stopped') + ': ' + (e.message || e) + ' — ' + T('Done before it stopped: {a} added, {u} updated, {d} deleted', { a: done.add, u: done.update, d: done.del });
+          st.busy = false;
+          this.loadRecords();
+        }
+      },
+      // ---- one-time passwords: the code for now, next to a TOTP field of the open record ----
+      totpFields() {
+        return ((this.current && this.current.fields) || []).filter((f) => f.secret && (f.key === 'totp' || f.key === 'otp' || /\b(totp|otp)\b/i.test(f.label || '')));
+      },
+      startTotp() {
+        if (totpTimer) { clearInterval(totpTimer); totpTimer = null; }
+        if (!window.RBPw || !this.totpFields().some((f) => this.openDecrypted[f.key])) { if (Object.keys(this.totpNow).length) this.totpNow = {}; return; }
+        this.tickTotp();
+        totpTimer = setInterval(() => this.tickTotp(), 1000);
+      },
+      async tickTotp() {
+        // only while the record is on the screen (its window, or the note view)
+        if (!((this.modal && this.modal.type === 'detail') || this.noteCur)) { this.totpNow = {}; if (totpTimer) { clearInterval(totpTimer); totpTimer = null; } return; }
+        const out = {};
+        for (const f of this.totpFields()) {
+          const v = this.openDecrypted[f.key];
+          if (!v || v === '••••••••') continue;
+          try { out[f.key] = await window.RBPw.totpCode(v); } catch (e) { /* not a TOTP secret (recovery codes, for example): no code */ }
+        }
+        this.totpNow = out;
+        if (!Object.keys(out).length && totpTimer) { clearInterval(totpTimer); totpTimer = null; }
       },
       openPwExport() {
         if (!this.current) return;

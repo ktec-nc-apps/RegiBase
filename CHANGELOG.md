@@ -2,6 +2,29 @@
 
 All notable changes to RegiBase.
 
+## 0.24.0 — 2026-11-27
+
+A KeePass file kept in Nextcloud, and refreshing a collection from it.
+（Nextcloud に置いた KeePass のファイルと、そのファイルからのコレクションの更新に対応しました。）
+
+### Added
+
+- **Choose the file from Nextcloud** (Import passwords → "📂 Choose from Nextcloud"): a .kdbx, CSV or JSON in your Files can be picked in the app's own file browser. It is read by your browser straight from your Files, so the KeePass password is still never sent anywhere; the collection remembers where the file is.
+  （**Nextcloud からファイルを選ぶ**（パスワードの取り込み →「📂 Nextcloud から選ぶ」）：Files にある .kdbx・CSV・JSON を、アプリのファイル選択画面で選べます。ブラウザーが Files から直接読むので、KeePass のパスワードは、これまでどおり、どこにも送りません。コレクションは、ファイルの場所を覚えます。）
+- **Each entry keeps its KeePass ID** (a "KeePass ID" field, not shown in the list, the table or the cards; read-only in the editor). Exporting the collection as .kdbx writes the same IDs back.
+  （**各項目が KeePass の ID を持つ**ようにしました（「KeePass の ID」の欄。一覧・表・カードには出さず、編集画面では変更できません）。.kdbx に書き出すときも、同じ ID で書き戻します。）
+- **Refresh from KeePass file** (collection settings → "🔄 Refresh from KeePass file"): one way, KeePass is the master and the file is never written to. "Compare" shows what is new, what changed (and in which fields) and what is no longer in KeePass; "Apply the changes" brings it in. Entries are matched by their KeePass ID, so a renamed or moved entry updates the same record. A collection imported with 0.23.0 is matched once by group + title + user name, and gets the IDs from then on. Records made in RegiBase, and fields added in RegiBase, are left alone. Records whose entry is gone from KeePass are deleted only when you tick it. The changed records keep their previous version, and the change can be undone.
+  （**KeePass のファイルから更新**（コレクションの設定 →「🔄 KeePass のファイルから更新」）：一方向で、KeePass が「正」です。ファイルには書き込みません。「比べる」で、新しいもの・変わったもの（どの欄か）・KeePass にもう無いものを見せ、「変更を反映する」で取り込みます。項目は KeePass の ID で対応づけるので、名前を変えたり移したりした項目も、同じ記録が更新されます。0.23.0 で取り込んだコレクションは、最初の一回だけグループ・タイトル・ユーザー名で対応づけ、それ以降は ID を使います。RegiBase で作った記録と、RegiBase で足した欄には、手を付けません。KeePass から消えた項目の記録は、チェックしたときだけ削除します。変わった記録は前の版を残し、変更は元に戻せます。）
+- **One-time password codes**: a one-time password field (TOTP) of the open record shows the code for now, the seconds it has left, and a copy button. The secrets of KeePass 2 (`TimeOtp-*`, with its length, period and algorithm), KeePassXC (`otp`, and the older `TOTP Seed` / `TOTP Settings`, Steam included) and `otpauth://` URIs are understood; SHA-1, SHA-256 and SHA-512. The code is made in your browser.
+  （**ワンタイムパスワードのコード**：開いた記録のワンタイムパスワード（TOTP）の欄に、今のコード・残りの秒数・コピーのボタンを出します。KeePass 2 の `TimeOtp-*`（桁数・周期・方式も）、KeePassXC の `otp` と古い `TOTP Seed`／`TOTP Settings`（Steam も）、`otpauth://` の形に対応します。SHA-1・SHA-256・SHA-512。コードはブラウザーの中で作ります。）
+
+### Notes
+
+- Writing back to the .kdbx (two-way sync) is not in this version.
+  （.kdbx への書き戻し（双方向の同期）は、この版には入っていません。）
+- The new texts are in all 21 languages.
+  （新しい文言は、21 言語すべてに訳しました。）
+
 ## 0.23.0 — 2026-11-26
 
 Passwords in and out: KeePass (.kdbx), and the exports of other password managers.

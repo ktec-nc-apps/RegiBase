@@ -9,8 +9,12 @@
  *
  * The entry model — one object per login:
  *   { title, group, url, username, password, totp, notes, tags: [], custom: [{name, value, secret}],
- *     created?, modified? }
+ *     uuid?, created?, modified? }
  *   group is a path with "/" between the levels ("Bank/Cards"), "" for none.
+ *   uuid is the KeePass entry's own ID (base64), "" for the other formats. A collection made from
+ *   a .kdbx keeps it in the field "kp_uuid", so a later "refresh from the KeePass file" finds
+ *   the same entry again even after it was renamed or moved to another group.
+ *   totp is an otpauth:// URI, or the bare Base32 secret.
  *
  * Needs kdbxweb and hash-wasm's Argon2 for .kdbx (js/vendor/). The CSV and JSON formats need nothing.
  * kdbxweb (MIT) — https://github.com/keeweb/kdbxweb ; hash-wasm (MIT) — https://github.com/Daninet/hash-wasm
@@ -30,7 +34,7 @@
       title: str(o.title), group: str(o.group), url: str(o.url), username: str(o.username), password: str(o.password),
       totp: str(o.totp), notes: str(o.notes), tags: Array.isArray(o.tags) ? o.tags.map(str).filter(Boolean) : [],
       custom: Array.isArray(o.custom) ? o.custom.filter((c) => c && str(c.name) !== '' && str(c.value) !== '').map((c) => ({ name: str(c.name), value: str(c.value), secret: !!c.secret })) : [],
-      created: o.created || null, modified: o.modified || null,
+      uuid: str(o.uuid), created: o.created || null, modified: o.modified || null,
     };
   }
   function str(v) { return v == null ? '' : String(v); }
@@ -201,8 +205,108 @@
   }
   function plain(v, k) { return v == null ? '' : (v instanceof k.ProtectedValue ? v.getText() : String(v)); }
   const STD = ['Title', 'UserName', 'Password', 'URL', 'Notes'];
-  const TOTP_NAMES = ['otp', 'TOTP Seed', 'TimeOtp-Secret-Base32', 'TimeOtp-Secret'];
+  const TOTP_NAMES = ['otp', 'TOTP Seed', 'TimeOtp-Secret-Base32', 'TimeOtp-Secret', 'TimeOtp-Secret-Hex', 'TimeOtp-Secret-Base64'];
   const TOTP_SKIP = ['TOTP Settings', 'TimeOtp-Length', 'TimeOtp-Period', 'TimeOtp-Algorithm'];
+
+  /**
+   * The one-time password of an entry, however it is kept: KeePassXC's "otp" (an otpauth:// URI),
+   * KeePassXC's older "TOTP Seed" + "TOTP Settings" ("30;6", "30;S" for Steam), or KeePass 2's own
+   * "TimeOtp-Secret-*" + "TimeOtp-Length/-Period/-Algorithm". Returned as one otpauth:// URI (or the
+   * bare Base32 secret when nothing is set but the secret), so the period, the digits and the
+   * algorithm are not lost.
+   */
+  function kdbxTotp(get) {
+    const otp = get('otp').trim();
+    if (otp) return otp;
+    const seed = get('TOTP Seed').trim();
+    if (seed) {
+      const st = get('TOTP Settings').trim();
+      if (!st) return seed;
+      const [period, digits] = st.split(';');
+      const p = { secret: b32clean(seed) };
+      if (Number(period) > 0 && Number(period) !== 30) p.period = String(Number(period));
+      if (digits === 'S') p.encoder = 'steam'; else if (Number(digits) > 0 && Number(digits) !== 6) p.digits = String(Number(digits));
+      return otpUri(p);
+    }
+    let secret = get('TimeOtp-Secret-Base32').trim();
+    if (!secret) { const hex = get('TimeOtp-Secret-Hex').replace(/\s+/g, ''); if (/^([0-9a-f]{2})+$/i.test(hex)) secret = b32encode(hex.match(/../g).map((h) => parseInt(h, 16))); }
+    if (!secret) { const b64 = get('TimeOtp-Secret-Base64').trim(); if (b64) { try { secret = b32encode(Array.from(atobAny(b64))); } catch (e) { /* not Base64 */ } } }
+    if (!secret) { const raw = get('TimeOtp-Secret'); if (raw) secret = b32encode(Array.from(utf8(raw))); }
+    if (!secret) return '';
+    const p = { secret: b32clean(secret) };
+    const len = Number(get('TimeOtp-Length')); const per = Number(get('TimeOtp-Period'));
+    const alg = get('TimeOtp-Algorithm').toUpperCase().replace(/^HMAC-/, '').replace('-', '');
+    if (len > 0 && len !== 6) p.digits = String(len);
+    if (per > 0 && per !== 30) p.period = String(per);
+    if (alg === 'SHA256' || alg === 'SHA512') p.algorithm = alg;
+    return (p.digits || p.period || p.algorithm) ? otpUri(p) : p.secret;
+  }
+  function otpUri(p) { return 'otpauth://totp/?' + Object.keys(p).map((k) => k + '=' + encodeURIComponent(p[k])).join('&'); }
+  function utf8(s) { return new TextEncoder().encode(s); }
+  function atobAny(b64) {
+    const bin = typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+
+  // ------------------------------------------------------------------ one-time passwords (TOTP, RFC 6238)
+  const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  function b32clean(s) { return str(s).toUpperCase().replace(/[\s=-]+/g, ''); }
+  function b32decode(s) {
+    s = b32clean(s); const out = []; let bits = 0; let val = 0;
+    for (const c of s) {
+      const i = B32.indexOf(c); if (i < 0) throw fail('badtotp', 'This is not a Base32 secret.');
+      val = (val << 5) | i; bits += 5;
+      if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; }
+    }
+    return new Uint8Array(out);
+  }
+  function b32encode(bytes) {
+    let out = ''; let bits = 0; let val = 0;
+    for (const b of bytes) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } }
+    if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+    return out;
+  }
+  /** What a TOTP value says: {secret, digits, period, algorithm, steam}. Throws 'badtotp' when it is not one. */
+  function parseTotp(spec) {
+    spec = str(spec).trim();
+    const o = { secret: '', digits: 6, period: 30, algorithm: 'SHA-1', steam: false };
+    if (/^otpauth:\/\//i.test(spec)) {
+      let u; try { u = new URL(spec); } catch (e) { throw fail('badtotp', 'This is not an otpauth:// address.'); }
+      if (!/^totp$/i.test(u.host || u.pathname.replace(/^\/\//, '').split('/')[0])) throw fail('badtotp', 'Only time-based one-time passwords (TOTP) are supported.');
+      const q = u.searchParams; o.secret = q.get('secret') || '';
+      if (Number(q.get('digits')) > 0) o.digits = Number(q.get('digits'));
+      if (Number(q.get('period')) > 0) o.period = Number(q.get('period'));
+      const a = (q.get('algorithm') || '').toUpperCase().replace('-', '');
+      if (a === 'SHA256') o.algorithm = 'SHA-256'; else if (a === 'SHA512') o.algorithm = 'SHA-512';
+      if ((q.get('encoder') || '').toLowerCase() === 'steam') o.steam = true;
+    } else o.secret = spec;
+    const key = b32decode(o.secret);
+    if (!key.length) throw fail('badtotp', 'The secret is empty.');
+    if (o.digits < 4 || o.digits > 10) o.digits = 6;
+    return { ...o, key };
+  }
+  /**
+   * The code for now: {code, period, remaining (seconds)}. Uses the browser's HMAC.
+   * @param {string} spec otpauth:// URI or Base32 secret  @param {number} [nowMs]
+   */
+  async function totpCode(spec, nowMs) {
+    const p = parseTotp(spec);
+    const cr = root.crypto || (typeof globalThis !== 'undefined' ? globalThis.crypto : null);
+    const subtle = cr && cr.subtle;
+    if (!subtle) throw fail('insecure', 'This page is not on a secure connection (https).');
+    const now = Math.floor((nowMs == null ? Date.now() : nowMs) / 1000);
+    const counter = Math.floor(now / p.period);
+    const msg = new Uint8Array(8); let c = counter;
+    for (let i = 7; i >= 0; i--) { msg[i] = c & 255; c = Math.floor(c / 256); }
+    const key = await subtle.importKey('raw', p.key, { name: 'HMAC', hash: p.algorithm }, false, ['sign']);
+    const h = new Uint8Array(await subtle.sign('HMAC', key, msg));
+    const off = h[h.length - 1] & 15;
+    let bin = ((h[off] & 127) << 24) | (h[off + 1] << 16) | (h[off + 2] << 8) | h[off + 3];
+    let code;
+    if (p.steam) { const A = '23456789BCDFGHJKMNPQRTVWXY'; code = ''; for (let i = 0; i < 5; i++) { code += A[bin % A.length]; bin = Math.floor(bin / A.length); } }
+    else code = String(bin % (10 ** p.digits)).padStart(p.digits, '0');
+    return { code, period: p.period, remaining: p.period - (now % p.period) };
+  }
 
   /**
    * @param {ArrayBuffer} data the .kdbx  @param {string} password  @param {ArrayBuffer|null} keyFile
@@ -225,18 +329,18 @@
       if (recycle && g.uuid && g.uuid.id === recycle) { skipped.recycle += countEntries(g); return; }
       const here = isRoot ? '' : (path ? path + GROUP_SEP : '') + g.name;
       for (const e of g.entries) {
-        const f = e.fields; const custom = []; let totp = '';
+        const f = e.fields; const custom = [];
+        const totp = kdbxTotp((name) => plain(f.get(name), k));
         for (const [name, v] of f.entries()) {
-          if (STD.includes(name) || TOTP_SKIP.includes(name)) continue;
+          if (STD.includes(name) || TOTP_SKIP.includes(name) || TOTP_NAMES.includes(name)) continue;
           const val = plain(v, k);
-          if (TOTP_NAMES.includes(name)) { if (!totp && val) totp = val; continue; }
           if (val !== '') custom.push({ name, value: val, secret: v instanceof k.ProtectedValue });
         }
         skipped.attachments += e.binaries ? e.binaries.size : 0;
         skipped.history += e.history ? e.history.length : 0;
         out.push(entry({
           title: plain(f.get('Title'), k), group: here, url: plain(f.get('URL'), k), username: plain(f.get('UserName'), k), password: plain(f.get('Password'), k),
-          totp, notes: plain(f.get('Notes'), k), tags: e.tags || [], custom,
+          totp, notes: plain(f.get('Notes'), k), tags: e.tags || [], custom, uuid: e.uuid && e.uuid.id ? e.uuid.id : '',
           created: e.times && e.times.creationTime ? e.times.creationTime.getTime() : null, modified: e.times && e.times.lastModTime ? e.times.lastModTime.getTime() : null,
         }));
       }
@@ -278,8 +382,11 @@
       return g;
     };
     const prot = (s) => k.ProtectedValue.fromString(s);
+    const usedIds = new Set();
     for (const e of entries) {
       const en = db.createEntry(groupFor(e.group));
+      // the KeePass ID it came with (kp_uuid) is kept, so the file still matches the collection
+      if (/^[A-Za-z0-9+/]{22}==$/.test(e.uuid || '') && !usedIds.has(e.uuid)) { en.uuid = new k.KdbxUuid(e.uuid); usedIds.add(e.uuid); }
       en.fields.set('Title', e.title); en.fields.set('UserName', e.username); en.fields.set('Password', prot(e.password));
       en.fields.set('URL', e.url); en.fields.set('Notes', e.notes);
       if (e.totp) en.fields.set('otp', prot(e.totp));       // KeePassXC reads "otp"; KeePass keeps it as a protected string
@@ -297,13 +404,21 @@
 
   // ------------------------------------------------------------------ entries <-> a RegiBase collection
   const FIELD_KEYS = { title: 'title', group: 'group', url: 'url', username: 'username', password: 'password', totp: 'totp', memo: 'memo', tags: 'tags' };
+  const UUID_KEY = 'kp_uuid';
+  /** The field that keeps each entry's KeePass ID. Not shown in the list, the table or the cards. */
+  function uuidField(label, source) {
+    const f = { key: UUID_KEY, label: label || 'KeePass ID', type: 'text', list_show: false, table_show: false, card_show: false };
+    if (source && source.path) f.options = { kdbx: { path: String(source.path) } };
+    return f;
+  }
 
   /**
    * The collection that holds the entries, and one record per entry.
-   * @param {object[]} entries @param {Record<string,string>} L labels: title, group, url, username, password, totp, notes, tags
+   * @param {object[]} entries @param {Record<string,string>} L labels: title, group, url, username, password, totp, notes, tags, kpid
+   * @param {{path?: string}} [source] the .kdbx in the user's Files it came from, remembered for "refresh"
    * @returns {{fields: object[], records: object[], moved: number}}
    */
-  function toCollection(entries, L) {
+  function toCollection(entries, L, source) {
     const used = (fn) => entries.some(fn);
     const fields = [{ key: FIELD_KEYS.title, label: L.title, type: 'text', is_title: true, required: false }];
     if (used((e) => e.group)) fields.push({ key: FIELD_KEYS.group, label: L.group, type: 'text' });
@@ -318,9 +433,12 @@
     for (const e of entries) for (const c of e.custom) { if (!names.includes(c.name)) names.push(c.name); if (c.secret) secret[c.name] = true; }
     const kept = names.slice(0, CUSTOM_MAX); const keyOf = {};
     kept.forEach((n, i) => { keyOf[n] = 'c' + (i + 1); fields.push({ key: keyOf[n], label: n, type: secret[n] ? 'password' : 'text', secret: !!secret[n] }); });
+    const withUuid = used((e) => e.uuid);
+    if (withUuid) fields.push(uuidField(L.kpid, source));
     let moved = 0;
     const records = entries.map((e) => {
       const d = {};
+      if (withUuid && e.uuid) d[UUID_KEY] = e.uuid;
       const set = (key, v) => { if (v !== '' && v != null) d[key] = v; };
       set(FIELD_KEYS.title, e.title || e.url || e.username || '(no title)'); set(FIELD_KEYS.group, e.group); set(FIELD_KEYS.url, e.url); set(FIELD_KEYS.username, e.username);
       set(FIELD_KEYS.password, e.password); set(FIELD_KEYS.totp, e.totp); set(FIELD_KEYS.tags, e.tags.join(', '));
@@ -349,9 +467,9 @@
    * field goes along as a custom field, protected when it is secret.
    * @param {object[]} fields @param {object[]} records [{data: {key: plainValue}}]
    */
-  function fromCollection(fields, records) {
+  function roles(fields) {
     const byKey = {}; fields.forEach((f) => { byKey[f.key] = f; });
-    const role = {}; const taken = new Set();
+    const role = {}; const taken = new Set([UUID_KEY]);
     const claim = (r, key) => { if (key && !taken.has(key)) { role[r] = key; taken.add(key); } };
     const find = (r, test) => { if (role[r]) return; const f = fields.find((x) => !taken.has(x.key) && test(x)); if (f) claim(r, f.key); };
     for (const r of Object.keys(ROLE_KEYS)) for (const k of ROLE_KEYS[r]) { if (!role[r] && byKey[k] && !taken.has(k)) claim(r, k); }
@@ -360,6 +478,10 @@
     find('password', (f) => f.secret && f.type === 'password');
     find('notes', (f) => f.type === 'textarea' && !f.secret);
     find('username', (f) => f.type === 'email');
+    return { role, taken };
+  }
+  function fromCollection(fields, records) {
+    const { role, taken } = roles(fields);
     return records.map((rec) => {
       const d = rec.data || rec; const get = (r) => (role[r] ? str(d[role[r]]) : '');
       const custom = [];
@@ -369,9 +491,112 @@
         custom.push({ name: f.label || f.key, value: v, secret: !!f.secret });
       }
       return entry({ title: get('title'), group: get('group'), url: get('url'), username: get('username'), password: get('password'), totp: get('totp'), notes: get('notes'),
-        tags: splitTags(get('tags')), custom });
+        tags: splitTags(get('tags')), custom, uuid: str(d[UUID_KEY]) });
     });
   }
 
-  return { parseCsv, toCsv, fromCsv, fromText, fromBitwardenJson, readKdbx, writeKdbx, toCollection, fromCollection, entry, CSV_FORMATS, FORMAT_LIST, KDF_LEVELS };
+  // ------------------------------------------------------------------ refresh a collection from the file
+  const norm = (s) => str(s).trim().toLowerCase();
+  /**
+   * What "refresh from the KeePass file" would change in a collection. KeePass is the master:
+   * nothing is ever written to the file. Entries are matched by their KeePass ID; a record that
+   * has none yet (a collection imported before IDs were kept) is matched once by group + title +
+   * user name, when that is unique on both sides, and gets the ID from then on. Records made in
+   * RegiBase (no ID, no match) are left alone. Fields the file does not know (added in RegiBase)
+   * are left alone too.
+   *
+   * @param {object[]} fields the collection's fields
+   * @param {{id, data}[]} records with the secret values already decrypted
+   * @param {object[]} entries from the file
+   * @param {{kpid?: string, notes?: string, source?: {path?: string}}} [o]
+   * @returns {{add: object[], update: {id, title, data, changed: string[]}[], gone: {id, title}[], same: number,
+   *           fields: object[]|null, newFields: string[], byName: number}}
+   *   add/update data are the plain values of the fields the file sets (update: merged onto the record);
+   *   fields is the new field list when fields had to be added (null when unchanged).
+   */
+  function planRefresh(fields, records, entries, o) {
+    o = o || {};
+    const out = fields.map((f) => ({ ...f }));
+    const { role, taken } = roles(out);
+    const newFields = [];
+    const addField = (f) => { out.push(f); newFields.push(f.label); return f.key; };
+    const freeKey = (base) => { let i = 1; while (out.some((f) => f.key === base + i)) i++; return base + i; };
+    // the roles the file needs that the collection has no field for
+    const need = (r, test) => entries.some(test);
+    const ROLE_NEW = {
+      group: () => ({ key: role.group || FIELD_KEYS.group, label: o.group || 'Group', type: 'text' }),
+      url: () => ({ key: FIELD_KEYS.url, label: 'URL', type: 'url' }),
+      username: () => ({ key: FIELD_KEYS.username, label: o.username || 'Username', type: 'text' }),
+      password: () => ({ key: FIELD_KEYS.password, label: o.password || 'Password', type: 'password', secret: true }),
+      totp: () => ({ key: FIELD_KEYS.totp, label: o.totp || 'TOTP', type: 'password', secret: true }),
+      notes: () => ({ key: FIELD_KEYS.memo, label: o.notes || 'Notes', type: 'textarea' }),
+      tags: () => ({ key: FIELD_KEYS.tags, label: o.tags || 'Tags', type: 'text' }),
+    };
+    const want = { group: (e) => e.group, url: (e) => e.url, username: (e) => e.username, password: (e) => e.password, totp: (e) => e.totp, notes: (e) => e.notes, tags: (e) => e.tags.length };
+    for (const r of Object.keys(want)) {
+      if (role[r] || !need(r, want[r])) continue;
+      const f = ROLE_NEW[r]();
+      if (out.some((x) => x.key === f.key)) f.key = freeKey(f.key + '_');
+      role[r] = addField(f); taken.add(f.key);
+    }
+    if (!role.title) { const t = out.find((f) => f.is_title) || out[0]; if (t) role.title = t.key; }
+    // custom fields: matched by label; a new name gets a new field
+    const customKey = {};
+    for (const f of out) if (!taken.has(f.key) && f.label && !(f.label in customKey)) customKey[f.label] = f.key;
+    const fileKeys = new Set(Object.values(role)); // the fields the file "owns": the roles, and the custom names it has
+    for (const e of entries) for (const c of e.custom) {
+      if (!customKey[c.name]) customKey[c.name] = addField({ key: freeKey('c'), label: c.name, type: c.secret ? 'password' : 'text', secret: !!c.secret });
+      fileKeys.add(customKey[c.name]);
+    }
+    if (!out.some((f) => f.key === UUID_KEY)) addField(uuidField(o.kpid, o.source));
+    else if (o.source && o.source.path) {
+      const u = out.find((f) => f.key === UUID_KEY);
+      const was = u.options && u.options.kdbx ? u.options.kdbx.path : '';
+      if (was !== o.source.path) u.options = { ...(u.options && typeof u.options === 'object' && !Array.isArray(u.options) ? u.options : {}), kdbx: { path: String(o.source.path) } };
+    }
+    fileKeys.add(UUID_KEY);
+    const dataOf = (e) => {
+      const d = {};
+      const put = (r, v) => { if (role[r]) d[role[r]] = str(v); };
+      put('title', e.title || e.url || e.username || '(no title)'); put('group', e.group); put('url', e.url); put('username', e.username);
+      put('password', e.password); put('totp', e.totp); put('notes', e.notes); put('tags', e.tags.join(', '));
+      for (const k of fileKeys) if (!(k in d) && k !== UUID_KEY) d[k] = '';
+      for (const c of e.custom) d[customKey[c.name]] = c.value;
+      if (e.uuid) d[UUID_KEY] = e.uuid;
+      return d;
+    };
+    // match
+    const byUuid = {}; const nameKey = (g, t, u) => norm(g) + '' + norm(t) + '' + norm(u);
+    const recName = {}; const recNameCount = {};
+    for (const r of records) {
+      const d = r.data || {};
+      if (d[UUID_KEY]) byUuid[d[UUID_KEY]] = r;
+      else { const k = nameKey(role.group ? d[role.group] : '', role.title ? d[role.title] : '', role.username ? d[role.username] : ''); recName[k] = r; recNameCount[k] = (recNameCount[k] || 0) + 1; }
+    }
+    const entNameCount = {}; for (const e of entries) { const k = nameKey(e.group, e.title, e.username); entNameCount[k] = (entNameCount[k] || 0) + 1; }
+    const plan = { add: [], update: [], gone: [], same: 0, fields: newFields.length || out.some((f, i) => fields[i] && f.options !== fields[i].options) ? out : null, newFields, byName: 0 };
+    const seen = new Set();
+    const titleOf = (d) => str(role.title ? d[role.title] : '') || '(no title)';
+    for (const e of entries) {
+      let r = e.uuid ? byUuid[e.uuid] : null;
+      if (!r) {
+        const k = nameKey(e.group, e.title, e.username);
+        if (recNameCount[k] === 1 && entNameCount[k] === 1 && !seen.has(recName[k].id)) { r = recName[k]; plan.byName++; }
+      }
+      const d = dataOf(e);
+      if (!r) { const a = {}; for (const k of Object.keys(d)) if (d[k] !== '') a[k] = d[k]; plan.add.push(a); continue; }
+      seen.add(r.id);
+      const old = r.data || {}; const changed = [];
+      for (const k of Object.keys(d)) if (str(old[k]) !== d[k]) { const f = out.find((x) => x.key === k); changed.push(f ? f.label : k); }
+      if (!changed.length) { plan.same++; continue; }
+      const merged = { ...old };
+      for (const k of Object.keys(d)) { if (d[k] === '') delete merged[k]; else merged[k] = d[k]; }
+      plan.update.push({ id: r.id, title: titleOf(merged), data: merged, changed: changed.filter((l, i) => changed.indexOf(l) === i) });
+    }
+    for (const r of records) if (!seen.has(r.id) && r.data && r.data[UUID_KEY]) plan.gone.push({ id: r.id, title: titleOf(r.data) });
+    return plan;
+  }
+
+  return { parseCsv, toCsv, fromCsv, fromText, fromBitwardenJson, readKdbx, writeKdbx, toCollection, fromCollection, planRefresh, totpCode, parseTotp, kdbxTotp,
+    entry, CSV_FORMATS, FORMAT_LIST, KDF_LEVELS, UUID_KEY };
 }));

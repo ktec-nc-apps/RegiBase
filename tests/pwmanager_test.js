@@ -143,4 +143,106 @@ t('back out: a credit-card collection (nothing like a login) loses nothing: ever
   assert.deepStrictEqual(e.custom, [{ name: 'Card number', value: '4111', secret: true }, { name: 'Expiry', value: '2030-01', secret: false }]);
 });
 
-console.log(fail ? '\n' + fail + ' FAILED' : '\nALL PASS'); process.exit(fail ? 1 : 0);
+
+// ---- the KeePass ID, and refreshing a collection from the file (0.24.0)
+const L2 = { title: 'Title', group: 'Group', url: 'URL', username: 'User', password: 'Password', totp: 'TOTP', notes: 'Memo', tags: 'Tags', kpid: 'KeePass ID' };
+const E = (o) => P.entry(o);
+t('collection: entries with a KeePass ID get a hidden "kp_uuid" field that remembers the file', () => {
+  const s = P.toCollection([E({ title: 'a', password: 'p', uuid: 'U1' })], L2, { path: 'Vault/me.kdbx' });
+  const f = s.fields.find((x) => x.key === 'kp_uuid');
+  assert.ok(f); assert.strictEqual(f.list_show, false); assert.strictEqual(f.table_show, false); assert.strictEqual(f.card_show, false);
+  assert.deepStrictEqual(f.options, { kdbx: { path: 'Vault/me.kdbx' } });
+  assert.strictEqual(s.records[0].kp_uuid, 'U1');
+  assert.ok(!P.toCollection([E({ title: 'a' })], L2).fields.some((x) => x.key === 'kp_uuid'), 'a CSV gets no such field');
+});
+t('back out: the KeePass ID is not exported as an extra field, it goes back as the uuid', () => {
+  const s = P.toCollection([E({ title: 'a', password: 'p', uuid: 'U1' })], L2);
+  const e = P.fromCollection(s.fields, s.records.map((d) => ({ data: d })))[0];
+  assert.strictEqual(e.uuid, 'U1'); assert.deepStrictEqual(e.custom, []);
+});
+const coll = () => {
+  const ents = [E({ title: 'Bank', group: 'Money', username: 'me', password: 'old', uuid: 'U1', custom: [{ name: 'PIN', value: '1', secret: true }] }),
+    E({ title: 'Mail', username: 'me@x', password: 'm', uuid: 'U2' }), E({ title: 'Gone', password: 'g', uuid: 'U3' })];
+  const s = P.toCollection(ents, L2, { path: 'k.kdbx' });
+  return { fields: s.fields, records: s.records.map((d, i) => ({ id: 10 + i, data: d })) };
+};
+t('refresh: changed, renamed and moved entries are found by their ID; new ones are added; nothing changes the rest', () => {
+  const c = coll();
+  c.records.push({ id: 99, data: { title: 'Made in RegiBase', password: 'x' } }); // no ID: left alone
+  const file = [E({ title: 'Bank (renamed)', group: 'Money/Cards', username: 'me', password: 'new', uuid: 'U1', custom: [{ name: 'PIN', value: '1', secret: true }] }),
+    E({ title: 'Mail', username: 'me@x', password: 'm', uuid: 'U2' }), E({ title: 'Shop', password: 's', uuid: 'U4' })];
+  const pl = P.planRefresh(c.fields, c.records, file, { kpid: 'KeePass ID', source: { path: 'k.kdbx' } });
+  assert.strictEqual(pl.same, 1); assert.strictEqual(pl.add.length, 1); assert.strictEqual(pl.add[0].title, 'Shop'); assert.strictEqual(pl.add[0].kp_uuid, 'U4');
+  assert.strictEqual(pl.update.length, 1); const u = pl.update[0];
+  assert.strictEqual(u.id, 10); assert.deepStrictEqual(u.changed.sort(), ['Group', 'Password', 'Title']);
+  assert.strictEqual(u.data.password, 'new'); assert.strictEqual(u.data.group, 'Money/Cards'); assert.strictEqual(u.data.c1, '1');
+  assert.deepStrictEqual(pl.gone, [{ id: 12, title: 'Gone' }], 'only a record that came from the file can be "gone"');
+  assert.strictEqual(pl.fields, null); assert.deepStrictEqual(pl.newFields, []);
+});
+t('refresh: a value cleared in KeePass is cleared; a field added in RegiBase is kept', () => {
+  const c = coll(); c.fields.push({ key: 'note2', label: 'My own note', type: 'text' }); c.records[0].data.note2 = 'mine';
+  const file = [E({ title: 'Bank', group: 'Money', username: '', password: 'old', uuid: 'U1', custom: [{ name: 'PIN', value: '1', secret: true }] })];
+  const u = P.planRefresh(c.fields, c.records, file, {}).update[0];
+  assert.ok(!('username' in u.data)); assert.strictEqual(u.data.note2, 'mine'); assert.deepStrictEqual(u.changed, ['User']);
+});
+t('refresh: a new kind of extra field, and a role the collection has no field for, get new fields', () => {
+  const c = coll();
+  const file = [E({ title: 'Bank', group: 'Money', username: 'me', password: 'old', uuid: 'U1', url: 'https://b.test', totp: 'JBSWY3DPEHPK3PXP',
+    custom: [{ name: 'PIN', value: '1', secret: true }, { name: 'Branch', value: 'Tokyo' }] })];
+  const pl = P.planRefresh(c.fields, c.records, file, { totp: 'TOTP' });
+  assert.deepStrictEqual(pl.newFields, ['URL', 'TOTP', 'Branch']);
+  assert.ok(pl.fields.find((f) => f.key === 'totp').secret);
+  const br = pl.fields.find((f) => f.label === 'Branch'); assert.strictEqual(pl.update[0].data[br.key], 'Tokyo');
+  assert.ok(!c.fields.some((f) => f.label === 'Branch'), 'the fields passed in are not changed');
+});
+t('refresh: a collection imported before IDs were kept is matched once by group + title + user name', () => {
+  const c = coll(); c.fields = c.fields.filter((f) => f.key !== 'kp_uuid'); c.records.forEach((r) => delete r.data.kp_uuid);
+  c.records.push({ id: 50, data: { title: 'Twin', password: '1' } }, { id: 51, data: { title: 'Twin', password: '2' } });
+  const file = [E({ title: 'Bank', group: 'Money', username: 'me', password: 'old', uuid: 'U1', custom: [{ name: 'PIN', value: '1', secret: true }] }),
+    E({ title: 'Twin', password: '1', uuid: 'T1' }), E({ title: 'Twin', password: '2', uuid: 'T2' })];
+  const pl = P.planRefresh(c.fields, c.records, file, { kpid: 'KeePass ID', source: { path: 'a/b.kdbx' } });
+  assert.strictEqual(pl.byName, 1); assert.strictEqual(pl.update.length, 1); assert.deepStrictEqual(pl.update[0].changed, ['KeePass ID']); assert.strictEqual(pl.update[0].data.kp_uuid, 'U1');
+  assert.strictEqual(pl.add.length, 2, 'two records of the same name are not guessed: the entries are added');
+  assert.deepStrictEqual(pl.gone, [], 'records with no ID are never "gone"');
+  const f = pl.fields.find((x) => x.key === 'kp_uuid'); assert.deepStrictEqual(f.options, { kdbx: { path: 'a/b.kdbx' } });
+});
+t('refresh: choosing another file updates the remembered path', () => {
+  const c = coll();
+  const pl = P.planRefresh(c.fields, c.records, [], { source: { path: 'new.kdbx' } });
+  assert.deepStrictEqual(pl.fields.find((f) => f.key === 'kp_uuid').options, { kdbx: { path: 'new.kdbx' } });
+  assert.strictEqual(pl.gone.length, 3);
+});
+
+// ---- one-time passwords
+t('TOTP as KeePass 2 keeps it (TimeOtp-*), as KeePassXC keeps it (otp, TOTP Seed/Settings)', () => {
+  const g = (m) => (n) => m[n] || '';
+  assert.strictEqual(P.kdbxTotp(g({ otp: 'otpauth://totp/x?secret=ABC' })), 'otpauth://totp/x?secret=ABC');
+  assert.strictEqual(P.kdbxTotp(g({ 'TimeOtp-Secret-Base32': 'jbsw y3dp' })), 'JBSWY3DP');
+  assert.strictEqual(P.kdbxTotp(g({ 'TimeOtp-Secret-Base32': 'JBSWY3DP', 'TimeOtp-Length': '8', 'TimeOtp-Period': '60', 'TimeOtp-Algorithm': 'HMAC-SHA-256' })), 'otpauth://totp/?secret=JBSWY3DP&digits=8&period=60&algorithm=SHA256');
+  assert.strictEqual(P.kdbxTotp(g({ 'TimeOtp-Secret-Hex': '48656c6c6f' })), 'JBSWY3DP');
+  assert.strictEqual(P.kdbxTotp(g({ 'TimeOtp-Secret': 'Hello' })), 'JBSWY3DP');
+  assert.strictEqual(P.kdbxTotp(g({ 'TimeOtp-Secret-Base64': 'SGVsbG8=' })), 'JBSWY3DP');
+  assert.strictEqual(P.kdbxTotp(g({ 'TOTP Seed': 'JBSWY3DP', 'TOTP Settings': '30;S' })), 'otpauth://totp/?secret=JBSWY3DP&encoder=steam');
+  assert.strictEqual(P.kdbxTotp(g({ 'TOTP Seed': 'JBSWY3DP', 'TOTP Settings': '30;6' })), 'otpauth://totp/?secret=JBSWY3DP');
+  assert.strictEqual(P.kdbxTotp(g({})), '');
+});
+
+// RFC 6238 appendix B test vectors (the secret "12345678901234567890" and its longer forms)
+(async () => {
+  const b32 = (s) => { const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = 0, v = 0, o = ''; for (const b of Buffer.from(s)) { v = (v << 8) | b; bits += 8; while (bits >= 5) { o += A[(v >>> (bits - 5)) & 31]; bits -= 5; } } if (bits) o += A[(v << (5 - bits)) & 31]; return o; };
+  const s1 = b32('12345678901234567890'), s256 = b32('12345678901234567890123456789012'), s512 = b32('1234567890123456789012345678901234567890123456789012345678901234');
+  const cases = [[59, '94287082', '46119246', '90693936'], [1111111109, '07081804', '68084774', '25091201'], [1234567890, '89005924', '91819424', '93441116'], [20000000000, '65353130', '77737706', '47863826']];
+  try {
+    for (const [ts, a, b, c] of cases) {
+      assert.strictEqual((await P.totpCode('otpauth://totp/x?secret=' + s1 + '&digits=8', ts * 1000)).code, a);
+      assert.strictEqual((await P.totpCode('otpauth://totp/x?secret=' + s256 + '&digits=8&algorithm=SHA256', ts * 1000)).code, b);
+      assert.strictEqual((await P.totpCode('otpauth://totp/x?secret=' + s512 + '&digits=8&algorithm=SHA512', ts * 1000)).code, c);
+    }
+    const r = await P.totpCode(s1, 59 * 1000); assert.strictEqual(r.code, '287082'); assert.strictEqual(r.remaining, 1);
+    assert.strictEqual((await P.totpCode('otpauth://totp/?secret=' + s1 + '&encoder=steam', 59000)).code.length, 5);
+    let bad = null; try { await P.totpCode('not base32 !'); } catch (e) { bad = e.code; } assert.strictEqual(bad, 'badtotp');
+    let hotp = null; try { await P.totpCode('otpauth://hotp/x?secret=' + s1); } catch (e) { hotp = e.code; } assert.strictEqual(hotp, 'badtotp');
+    console.log('PASS  TOTP: RFC 6238 test vectors (SHA-1, SHA-256, SHA-512), 6 digits, Steam, bad input');
+  } catch (e) { fail++; console.log('FAIL  TOTP: ' + (e.message || e).split('\n')[0]); }
+  console.log(fail ? '\n' + fail + ' FAILED' : '\nALL PASS'); process.exit(fail ? 1 : 0);
+})();

@@ -19,6 +19,7 @@ Features:
 - Nextcloud Tables integration: import a table into a new collection, or export a collection to a new Tables table
 - Import from CSV / JSON (e.g. Google Password Manager), or from your Nextcloud Contacts (including photos)
 - Import passwords from KeePass (.kdbx) and other password managers (Bitwarden, LastPass, 1Password, Dashlane, Proton Pass, Chrome, Firefox…), and export a collection as a KeePass file — read and written in your browser, nothing sent to the server
+- Keep the KeePass file in Nextcloud and refresh the collection from it (one way, matched by the KeePass ID); see the TOTP code of a one-time password field
 - Attach images and files from Nextcloud Files or Notes
 - Add reminders to Nextcloud Calendar from date fields, and open addresses in a map (Google Maps / Yahoo! Maps / OpenStreetMap / Apple Maps / Bing Maps), configurable per collection
 - Move / copy / merge records between collections
@@ -41,6 +42,7 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 - Nextcloud Tables 連携：テーブルを新しいコレクションとしてインポート、またはコレクションを新しい Tables のテーブルとしてエクスポート
 - CSV / JSON（Google パスワードマネージャーのエクスポートなど）や、Nextcloud Contacts（写真を含む）からのインポート
 - KeePass（.kdbx）や、ほかのパスワード管理ソフト（Bitwarden、LastPass、1Password、Dashlane、Proton Pass、Chrome、Firefox など）からのパスワードの取り込みと、コレクションの KeePass ファイルへの書き出し（ブラウザーの中で読み書きし、サーバーには送りません）
+- KeePass のファイルを Nextcloud に置いたまま、そこからコレクションを更新（一方向。KeePass の ID で対応づけ）。ワンタイムパスワードの欄に TOTP のコードを表示
 - Nextcloud Files や Notes からの画像・ファイルの添付
 - 日付の項目から Nextcloud Calendar へのリマインダー追加と、住所の地図表示（Google マップ／Yahoo!地図／OpenStreetMap／Apple マップ／Bing マップ。コレクションごとに選択可能）
 - コレクション間でのレコードの移動・複製・マージ
@@ -48,7 +50,7 @@ RegiBase は、Contacts、Tables、Files、Notes、Calendar といった他の N
 - occ によるコマンドライン操作：一覧表示、取得、エクスポート、検索（正規表現対応）、マスターキーの管理（設定／変更／削除）。秘匿項目の復号は、オプションを指定したときだけ行います
 - AI-Hub アプリを通じた AI アシスタント：開いているコレクションの横にチャットを表示し、質問に文章で答え、入力すべき内容を示します。秘匿項目の値を見ることはありません。AI-Hub がない場合は表示されません
 - 21 言語に対応（ポルトガル語はブラジル版とポルトガル版の両方）]]></description>
-	<version>0.23.0</version>
+	<version>0.24.0</version>
 	<licence>agpl</licence>
 	<author>KTEC</author>
 	<namespace>RegiBase</namespace>

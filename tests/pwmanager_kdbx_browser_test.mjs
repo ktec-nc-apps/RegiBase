@@ -29,7 +29,7 @@ const r1 = await run(async () => {
   const P = window.RBPw; const out = {};
   const entries = [
     P.entry({ title: '三井住友', group: '銀行/カード', url: 'https://smbc.test', username: 'taro', password: 'P@ss-日本語', totp: 'otpauth://totp/x?secret=ABC', notes: '合言葉: さくら\n2 行目', tags: ['bank', '重要'], custom: [{ name: '暗証番号', value: '4321', secret: true }, { name: '質問', value: '犬' }] }),
-    P.entry({ title: 'no group', password: 'x' }),
+    P.entry({ title: 'no group', password: 'x', uuid: 'AAECAwQFBgcICQoLDA0ODw==' }),
     P.entry({ title: 'dup names', password: 'y', custom: [{ name: 'Password', value: 'second' }, { name: 'URL', value: 'u2' }] }),
   ];
   const t0 = performance.now(); const buf = await P.writeKdbx(entries, { password: 'マスター-pass-2026', name: 'RegiBase test' }); out.writeMs = performance.now() - t0;
@@ -50,10 +50,12 @@ ok(r1.kdf.m === 64 && r1.kdf.i === 8 && r1.kdf.p === 2, 'Argon2 at the standard 
 ok(r1.kdf.uuid === 'nGk+KzlBTmqftJDLO6kPdw==' || r1.kdf.uuid.length > 0, 'and the KDF is Argon2d (' + r1.kdf.uuid + ')');
 ok(r1.name === 'RegiBase test', 'the database name is kept');
 ok(r1.back.length === 3, 'all entries come back', String(r1.back.length));
-const strip = (e) => JSON.stringify({ ...e, created: null, modified: null });
+const strip = (e) => JSON.stringify({ ...e, created: null, modified: null, uuid: '' });
 const byTitle = (list, t) => list.find((e) => e.title === t);
 ok(strip(byTitle(r1.back, '三井住友')) === strip(r1.entries[0]), 'Japanese group path, title, password, TOTP, notes with a line break, tags, protected and plain custom fields: all the same', strip(byTitle(r1.back, '三井住友')) + ' vs ' + strip(r1.entries[0]));
 ok(byTitle(r1.back, 'no group').group === '', 'an entry in no group is at the top level');
+ok(byTitle(r1.back, 'no group').uuid === 'AAECAwQFBgcICQoLDA0ODw==', 'the KeePass ID an entry came with is written back as its ID', byTitle(r1.back, 'no group').uuid);
+ok(/^[A-Za-z0-9+/]{22}==$/.test(byTitle(r1.back, '三井住友').uuid), 'an entry without one gets a new ID from KeePass', byTitle(r1.back, '三井住友').uuid);
 const dn = byTitle(r1.back, 'dup names');
 ok(dn.custom.length === 2 && dn.password === 'y' && dn.url === '', 'a custom field named like a standard one (Password, URL) does not overwrite it', JSON.stringify(dn));
 ok(r1.wrong === 'badkey', 'a wrong master password is refused: ' + r1.wrong, r1.wrong);
