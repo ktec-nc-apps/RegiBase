@@ -125,6 +125,24 @@
     if (!res.ok) { const e = new Error(res.status === 404 ? 'notfound' : res.statusText); e.status = res.status; throw e; }
     return { buf: await res.arrayBuffer(), etag: res.headers.get('ETag') || '' };
   }
+  /**
+   * Write a file of the user's own Files through WebDAV — only if it is still the version that
+   * was read (If-Match: its ETag), so a change another device or KeePass made since is never
+   * overwritten. Nextcloud keeps the version it replaces (Versions).
+   * @returns {Promise<string>} the new ETag
+   */
+  async function davWrite(path, buf, etag) {
+    const uid = (window.OC && OC.getCurrentUser && OC.getCurrentUser()) ? OC.getCurrentUser().uid : '';
+    if (!uid) throw new Error('unauthorized');
+    const base = (window.OC && OC.linkToRemote) ? OC.linkToRemote('dav') : ((window.OC && OC.webroot) || '') + '/remote.php/dav';
+    const url = base + '/files/' + encodeURIComponent(uid) + '/' + String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    const headers = { requesttoken: TOKEN, 'Content-Type': 'application/octet-stream' };
+    if (etag) headers['If-Match'] = etag;
+    const res = await fetch(url, { method: 'PUT', credentials: 'same-origin', headers, body: buf });
+    if (!res.ok) { const e = new Error(res.status === 412 ? 'changed' : res.statusText); e.status = res.status; throw e; }
+    return res.headers.get('ETag') || res.headers.get('OC-ETag') || '';
+  }
+  let pwrRaw = null;   // the sync plan with the opened KeePass database in it: kept out of Vue's reactivity
 
   let _slugSeq = 0;
   let totpTimer = null;   // ticks the one-time password codes of the open record
@@ -1229,10 +1247,11 @@
         <div v-if="pwRefreshable" class="field">
           <label>🔄 {{ t('KeePass file') }}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button type="button" class="btn sm" @click="openPwRefresh">{{ t('🔄 Refresh from KeePass file') }}</button>
+            <button type="button" class="btn sm" @click="openPwRefresh('refresh')">{{ t('🔄 Refresh from KeePass file') }}</button>
+            <button type="button" class="btn sm" @click="openPwRefresh('sync')">{{ t('🔁 Sync with KeePass file') }}</button>
             <span v-if="kdbxPath" style="font-size:12px;color:var(--muted)">📂 {{ kdbxPath }}</span>
           </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Brings the changes made in KeePass into this collection. KeePass stays the master: nothing is written to the KeePass file.') }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ t('Refresh brings the changes made in KeePass into this collection and writes nothing to the KeePass file. Sync goes both ways: the changes made in RegiBase are written to the KeePass file too.') }}</div>
         </div>
 
         <div class="field">
@@ -1392,18 +1411,24 @@
   <!-- Refresh a collection from its KeePass file. KeePass is the master; the file is only read. -->
   <div v-if="modal && modal.type==='pwrefresh'" class="modal-mask">
     <div class="modal wide">
-      <div class="modal-head"><h3>{{ t('🔄 Refresh from KeePass file') }}</h3><button class="icon-btn" @click="closePwRefresh">✕</button></div>
+      <div class="modal-head"><h3>{{ pwr.mode==='sync' ? t('🔁 Sync with KeePass file') : t('🔄 Refresh from KeePass file') }}</h3><button class="icon-btn" @click="closePwRefresh">✕</button></div>
       <div class="modal-body">
         <template v-if="pwr.step===1">
-          <p style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('The changes made in KeePass are brought into this collection. Entries are found by their KeePass ID, so a renamed or moved entry is updated, not added again. Nothing is written to the KeePass file, and the file and its password are used in your browser only.') }}</p>
+          <p v-if="pwr.mode!=='sync'" style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('The changes made in KeePass are brought into this collection. Entries are found by their KeePass ID, so a renamed or moved entry is updated, not added again. Nothing is written to the KeePass file, and the file and its password are used in your browser only.') }}</p>
+          <template v-else>
+            <p style="margin:0 0 6px;color:var(--muted);font-size:13px">{{ t('The changes made since the last sync go both ways, the way KeePass’s own “Synchronize” works: a change made on one side goes to the other, and an entry changed on both sides is shown so you can choose which side wins. Entries are found by their KeePass ID.') }}</p>
+            <p style="margin:0 0 10px;color:var(--muted);font-size:13px">{{ t('The KeePass file in Nextcloud is written to: KeePass keeps the old version of each changed entry in its history, and Nextcloud keeps the previous version of the file. If another device changes the file in the meantime, nothing is overwritten. The file and its password are used in your browser only.') }}</p>
+          </template>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button type="button" class="btn sm" :disabled="pwr.busy" @click="openFilePicker(null, 'pwr')">{{ t('📂 Choose from Nextcloud') }}</button>
-            <label class="filepick">
+            <label v-if="pwr.mode!=='sync'" class="filepick">
               <input type="file" accept=".kdbx,.csv,.json,.txt" @change="onPwrFile" />
               <span class="btn sm">{{ t('📄 Choose file') }}</span>
               <span class="filepick-name">{{ pwr.ncPath ? '📂 ' + pwr.ncPath : (pwr.fileName || t('No file selected')) }}</span>
             </label>
+            <span v-else class="filepick-name">{{ pwr.ncPath ? '📂 ' + pwr.ncPath : t('No file selected') }}</span>
           </div>
+          <div v-if="pwr.mode==='sync' && pwr.ncPath && !pwr.isKdbx" style="margin-top:8px;color:var(--danger);font-size:13px">{{ t('Only a KeePass file (.kdbx) can be synced.') }}</div>
           <template v-if="pwr.isKdbx">
             <div class="field" style="margin-top:10px"><label>{{ t('KeePass master password') }}</label><input type="password" v-model="pwr.password" autocomplete="off" @keydown.enter="readPwr" /></div>
             <div class="field"><label>{{ t('Key file (only if the database has one)') }}</label>
@@ -1411,6 +1436,52 @@
             </div>
           </template>
           <div v-if="pwr.busy" style="margin-top:10px;color:var(--muted)">{{ t('Opening the file…') }}</div>
+        </template>
+        <template v-else-if="pwr.mode==='sync'">
+          <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="chip">→ RegiBase: {{ pwsCount.toRb }}</span>
+            <span class="chip">→ KeePass: {{ pwsCount.toKp }}</span>
+            <span v-if="pwr.plan.conflicts.length" class="chip">⚠ {{ tn('{n} changed on both sides', pwr.plan.conflicts.length, '{n} changed on both sides') }}</span>
+            <span class="chip">＝ {{ tn('{n} unchanged', pwr.plan.same, '{n} unchanged') }}</span>
+          </div>
+          <div v-if="pwr.notes.length" style="margin-bottom:10px;font-size:12px;color:var(--muted)"><div v-for="(n, i) in pwr.notes" :key="i">• {{ n }}</div></div>
+          <div v-if="!pwsHasChanges" style="margin:8px 0">{{ t('This collection and the KeePass file are already in step.') }}</div>
+          <div v-if="pwsCount.toRb" class="field"><label>{{ t('From KeePass to RegiBase') }}</label>
+            <div style="max-height:140px;overflow:auto;font-size:13px">
+              <div v-for="u in pwr.plan.toRb.filter((x) => !x.idOnly).slice(0, 200)" :key="'r' + u.id">✎ {{ u.title }} <span style="color:var(--muted)">— {{ u.changed.join(', ') }}</span></div>
+              <div v-for="(a, i) in pwr.plan.addRb.slice(0, 200)" :key="'ra' + i">＋ {{ a.title }}</div>
+            </div>
+          </div>
+          <div v-if="pwsCount.toKp" class="field"><label>{{ t('From RegiBase to KeePass') }}</label>
+            <div style="max-height:140px;overflow:auto;font-size:13px">
+              <div v-for="u in pwr.plan.toKp.slice(0, 200)" :key="'k' + u.id">✎ {{ u.title }} <span style="color:var(--muted)">— {{ u.changed.join(', ') }}</span></div>
+              <div v-for="a in pwr.plan.addKp.slice(0, 200)" :key="'ka' + a.id">＋ {{ a.title }}</div>
+            </div>
+          </div>
+          <div v-if="pwr.plan.conflicts.length" class="field"><label>{{ t('Changed on both sides') }}</label>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px">{{ t('Choose the side whose values win. A value that only one side has is kept either way. The newer side is chosen to begin with.') }}</div>
+            <div style="max-height:200px;overflow:auto;font-size:13px">
+              <div v-for="c in pwr.plan.conflicts.slice(0, 200)" :key="'c' + c.id" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:3px 0;border-bottom:1px solid var(--border)">
+                <span style="flex:1;min-width:12em">⚠ {{ c.title }} <span style="color:var(--muted)">— {{ c.changed.join(', ') }}</span><span v-if="c.first" style="color:var(--muted)"> {{ t('(not synced before)') }}</span></span>
+                <label style="font-weight:normal;display:flex;gap:4px;align-items:center"><input type="radio" :name="'pws' + c.id" value="kp" v-model="pwr.winners[c.id]" /> KeePass <span style="color:var(--muted);font-size:11px">{{ fmtPwsTime(c.kpTime) }}</span></label>
+                <label style="font-weight:normal;display:flex;gap:4px;align-items:center"><input type="radio" :name="'pws' + c.id" value="rb" v-model="pwr.winners[c.id]" /> RegiBase <span style="color:var(--muted);font-size:11px">{{ fmtPwsTime(c.rbTime) }}</span></label>
+              </div>
+            </div>
+          </div>
+          <div v-if="pwr.plan.deletedKp.length" class="field"><label>{{ t('Deleted in KeePass') }}</label>
+            <div style="max-height:110px;overflow:auto;font-size:13px"><div v-for="g in pwr.plan.deletedKp.slice(0, 200)" :key="'dk' + g.id">－ {{ g.title }}</div></div>
+            <label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-weight:normal"><input type="checkbox" v-model="pwr.delKp" /> {{ tn('Delete these {n} records from RegiBase too', pwr.plan.deletedKp.length, 'Delete this record from RegiBase too') }}</label>
+          </div>
+          <div v-if="pwr.plan.deletedRb.length" class="field"><label>{{ t('Deleted in RegiBase') }}</label>
+            <div style="max-height:110px;overflow:auto;font-size:13px"><div v-for="g in pwr.plan.deletedRb.slice(0, 200)" :key="'dr' + g.uuid">－ {{ g.title }}</div></div>
+            <label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-weight:normal"><input type="checkbox" v-model="pwr.delRb" /> {{ tn('Move these {n} entries to the KeePass recycle bin too', pwr.plan.deletedRb.length, 'Move this entry to the KeePass recycle bin too') }}</label>
+          </div>
+          <div v-if="pwr.plan.deletedKp.length || pwr.plan.deletedRb.length" style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ t('Left unticked, they stay on the other side and are shown again at the next sync.') }}</div>
+          <div v-if="enc.enabled && !enc.unlocked" style="color:var(--danger);font-size:13px;margin-bottom:8px">{{ t('The master key is locked. Unlock it first, so the passwords can be encrypted.') }}</div>
+          <div v-if="pwr.busy" style="margin:8px 0">
+            <div style="height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden"><div :style="{width: (pwr.total ? Math.round(pwr.progress * 100 / pwr.total) : 0) + '%', height: '100%', background: 'var(--primary)'}"></div></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">{{ pwr.progress }} / {{ pwr.total }}</div>
+          </div>
         </template>
         <template v-else>
           <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
@@ -1445,7 +1516,8 @@
       <div class="modal-foot">
         <button v-if="pwr.step===2" type="button" class="btn" :disabled="pwr.busy" @click="pwr.step=1; pwr.err=''">{{ t('← Back') }}</button>
         <button type="button" class="btn" :disabled="pwr.busy && pwr.step===2" @click="closePwRefresh">{{ t('Cancel') }}</button>
-        <button v-if="pwr.step===1" type="button" class="btn primary" :disabled="pwr.busy || (!pwr.file && !pwr.ncPath) || (pwr.isKdbx && !pwr.password && !pwr.keyFile)" @click="readPwr">{{ t('Compare') }}</button>
+        <button v-if="pwr.step===1" type="button" class="btn primary" :disabled="pwr.busy || (!pwr.file && !pwr.ncPath) || (pwr.isKdbx && !pwr.password && !pwr.keyFile) || (pwr.mode==='sync' && (!pwr.ncPath || !pwr.isKdbx))" @click="readPwr">{{ t('Compare') }}</button>
+        <button v-else-if="pwr.mode==='sync'" type="button" class="btn primary" :disabled="pwr.busy || !pwsHasWork || (enc.enabled && !enc.unlocked)" @click="commitPws">{{ t('Sync now') }}</button>
         <button v-else type="button" class="btn primary" :disabled="pwr.busy || !pwrHasWork || (enc.enabled && !enc.unlocked)" @click="commitPwr">{{ t('Apply the changes') }}</button>
       </div>
     </div>
@@ -2288,7 +2360,7 @@
         // passwords in (KeePass and the others) and out (KeePass), js/pwmanager.js
         pw: { step: 1, file: null, fileName: '', ncPath: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', result: null, notes: [], groups: 0, collName: '', progress: 0, total: 0 },
         pwx: { password: '', password2: '', level: 'standard', busy: false, err: '' },
-        pwr: { step: 1, file: null, fileName: '', ncPath: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, progress: 0, total: 0 },
+        pwr: { mode: 'refresh', step: 1, file: null, fileName: '', ncPath: '', etag: '', isKdbx: false, password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, delKp: false, delRb: false, winners: {}, progress: 0, total: 0 },
         totpNow: {},
         views: [
           { key: 'list', label: 'List', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></svg>' },
@@ -2383,6 +2455,15 @@
         return (f && f.options && f.options.kdbx && f.options.kdbx.path) || '';
       },
       pwrHasWork() { const p = this.pwr.plan; return !!(p && (p.add.length || p.update.length || p.fields || (this.pwr.delGone && p.gone.length))); },
+      pwsCount() {
+        const p = this.pwr.plan;
+        if (!p || !p.toRb) return { toRb: 0, toKp: 0 };
+        return { toRb: p.toRb.filter((x) => !x.idOnly).length + p.addRb.length, toKp: p.toKp.length + p.addKp.length };
+      },
+      pwsHasChanges() { const p = this.pwr.plan; return !!(p && p.toRb && (this.pwsCount.toRb || this.pwsCount.toKp || p.conflicts.length || p.deletedKp.length || p.deletedRb.length)); },
+      // something to write: a change, a deletion asked for, or the first sync (it remembers what is in step)
+      // always: a sync with nothing to change still remembers what is in step now (only RegiBase's side is written then)
+      pwsHasWork() { const p = this.pwr.plan; return !!(p && p.toRb); },
       // ---- categories of the collection list (owner, 2026-11-07) ----
       // Each person's own. "Uncategorized" holds the collections in no category and is always
       // first; the others are in the order they were dragged into, new ones at the end.
@@ -5866,7 +5947,8 @@
         if (x.size > 200 * 1024 * 1024) { st.err = T('This file is too large.'); return; }
         st.busy = true;
         try {
-          const { buf } = await davRead(x.path);
+          const { buf, etag } = await davRead(x.path);
+          st.etag = etag;
           st.isKdbx = /\.kdbx$/i.test(x.name);
           st.file = st.isKdbx ? buf : new TextDecoder().decode(buf);
           st.fileName = x.name; st.ncPath = x.path;
@@ -5875,13 +5957,14 @@
         finally { st.busy = false; }
       },
       // ---- refresh a collection from its KeePass file (KeePass is the master; the file is only read) ----
-      openPwRefresh() {
+      openPwRefresh(mode) {
         if (!this.current || !this.pwRefreshable) return;
-        const path = this.kdbxPath;
-        this.pwr = { step: 1, file: null, fileName: path ? path.split('/').pop() : '', ncPath: path, isKdbx: !path || /\.kdbx$/i.test(path), password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, progress: 0, total: 0, recs: null };
+        const path = this.kdbxPath; pwrRaw = null;
+        this.pwr = { mode: mode === 'sync' ? 'sync' : 'refresh', step: 1, file: null, fileName: path ? path.split('/').pop() : '', ncPath: path, etag: '', isKdbx: !path || /\.kdbx$/i.test(path), password: '', keyFile: null, keyFileName: '', busy: false, err: '', plan: null, notes: [], delGone: false, delKp: false, delRb: false, winners: {}, progress: 0, total: 0, recs: null };
         this.modal = { type: 'pwrefresh' };
       },
-      closePwRefresh() { if (this.pwr.busy && this.pwr.step === 2) return; this.pwr = { ...this.pwr, password: '', file: null, keyFile: null, plan: null, recs: null }; this.modal = null; },
+      closePwRefresh() { if (this.pwr.busy && this.pwr.step === 2) return; pwrRaw = null; this.pwr = { ...this.pwr, password: '', file: null, keyFile: null, plan: null, recs: null }; this.modal = null; },
+      fmtPwsTime(ms) { if (!ms) return ''; try { return new Date(ms).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } },
       async onPwrFile(ev) {
         const f = ev.target.files && ev.target.files[0];
         this.pwr.err = '';
@@ -5924,10 +6007,23 @@
               if (!key) throw new Error(T('A secret field could not be read: the key for it is not available.'));
               try { d[k] = await rbcrypto.decrypt(key, d[k]); } catch (e) { throw new Error(T('A secret field could not be decrypted, so nothing was changed.')); }
             }
-            recs.push({ id: r.id, data: d });
+            recs.push({ id: r.id, data: d, updated_at: r.updated_at || '' });
           }
           const L = { kpid: T('KeePass ID'), group: T('Group'), username: T('Username / ID'), password: T('Password'), totp: T('One-time password (TOTP)'), notes: T('Memo'), tags: T('Tags'),
             source: st.ncPath && st.isKdbx ? { path: st.ncPath } : null };
+          if (st.mode === 'sync') {
+            if (!res.db) throw new Error(T('Only a KeePass file (.kdbx) can be synced.'));
+            const raw = window.RBPw.planSync(coll.fields || [], recs, res, L);
+            pwrRaw = raw;
+            const plan = JSON.parse(JSON.stringify(raw));   // what the screen shows; the opened database stays in pwrRaw
+            const notes = [];
+            if (raw.byName) notes.push(TN('{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', raw.byName, '{n} record imported before was matched by group, title and user name; it gets its KeePass ID now.', '{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', { n: raw.byName }));
+            if (raw.newFields.length) notes.push(T('New fields:') + ' ' + raw.newFields.join(', '));
+            if (raw.conflicts.some((c) => c.first)) notes.push(T('This collection was not synced before, so a record that differs from its entry cannot be told apart as changed on one side: it is shown as changed on both sides.'));
+            const winners = {}; for (const c of raw.conflicts) winners[c.id] = c.winner;
+            st.plan = plan; st.notes = notes; st.recs = null; st.winners = winners; st.delKp = false; st.delRb = false; st.password = ''; st.step = 2;
+            return;
+          }
           const plan = window.RBPw.planRefresh(coll.fields || [], recs, res.entries, L);
           const notes = []; const sk = res.skipped || {};
           if (plan.byName) notes.push(TN('{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', plan.byName, '{n} record imported before was matched by group, title and user name; it gets its KeePass ID now.', '{n} records imported before were matched by group, title and user name; they get their KeePass ID now.', { n: plan.byName }));
@@ -5964,6 +6060,66 @@
         } catch (e) {
           st.err = T('The refresh stopped') + ': ' + (e.message || e) + ' — ' + T('Done before it stopped: {a} added, {u} updated, {d} deleted', { a: done.add, u: done.update, d: done.del });
           st.busy = false;
+          this.loadRecords();
+        }
+      },
+      // ---- sync with the KeePass file, both ways: the file is written first (only if nobody changed it since it was read), then the records ----
+      async commitPws() {
+        const st = this.pwr; const raw = pwrRaw;
+        if (st.busy || !raw || !this.current || st.mode !== 'sync') return;
+        if (this.enc.enabled && !this.enc.unlocked) { st.err = T('The master key is locked. Unlock it first, so the passwords can be encrypted.'); return; }
+        const cid = this.current.id;
+        const grp = 'kpsync-' + cid + '-' + (this.uidCounter++);   // RegiBase's changes are undone as one step
+        st.busy = true; st.err = ''; st.progress = 0;
+        const done = { kp: 0, add: 0, update: 0, del: 0 }; let fileWritten = false;
+        pwrRaw = null;   // the opened database is changed now: a second try needs a new comparison
+        try {
+          const applied = window.RBPw.syncApply(raw, { winners: { ...st.winners }, deleteKp: st.delKp, deleteRb: st.delRb });
+          st.total = applied.update.length + applied.add.length + (applied.del.length ? 1 : 0) + 2;
+          if (raw.fields) this.current = await api('collections/' + cid + '/fields', { method: 'PUT', body: JSON.stringify({ fields: raw.fields, _undoGroup: grp }) });
+          // 1. the KeePass file
+          done.kp = applied.kpChanged + applied.kpAdded + applied.kpDeleted;
+          if (done.kp) {
+            const buf = await window.RBPw.syncSave(raw.ctx.file);
+            try { st.etag = await davWrite(st.ncPath, buf, st.etag); fileWritten = true; } catch (e) {
+              if (e.status === 412) throw new Error(T('The KeePass file was changed (by KeePass or another device) after it was compared. Nothing was written. Compare again.'));
+              if (e.status === 403 || e.status === 423) throw new Error(T('The KeePass file cannot be written (it is read-only or locked). Nothing was changed.') + ' (' + e.status + ')');
+              throw new Error(T('The KeePass file could not be written. Nothing was changed.') + (e.status ? ' (' + e.status + ')' : ''));
+            }
+          }
+          st.progress++;
+          // 2. the records
+          const coll = this.current; const key = await this.keyFor(coll);
+          const secretKeys = (coll.fields || []).filter((f) => f.secret).map((f) => f.key);
+          const enc = async (d) => { const o = { ...d }; if (key) for (const k of secretKeys) if (o[k] != null && o[k] !== '' && !rbcrypto.isEnc(o[k])) o[k] = await rbcrypto.encrypt(key, String(o[k])); return o; };
+          const updatedAt = {}; for (const r of raw.ctx.records) updatedAt[r.id] = r.updated_at;
+          const baseOf = {}; for (const r of raw.ctx.records) baseOf[r.id] = r.updated_at;
+          const addedIds = new Array(applied.add.length);
+          const jobs = applied.update.map((u) => async () => {
+            const res = await api('records/' + u.id, { method: 'PUT', body: JSON.stringify({ data: await enc(u.data), _undoGroup: grp, _base: baseOf[u.id] || '' }) });
+            updatedAt[u.id] = res && res.updated_at; done.update++;
+          }).concat(applied.add.map((a, i) => async () => {
+            const res = await api('collections/' + cid + '/records', { method: 'POST', body: JSON.stringify({ data: await enc(a.data) }) });
+            if (res && res.id != null) { addedIds[i] = res.id; updatedAt[res.id] = res.updated_at; }
+            done.add++;
+          }));
+          let next = 0;
+          const worker = async () => { while (next < jobs.length) { const j = jobs[next++]; await j(); st.progress++; } };
+          await Promise.all([worker(), worker(), worker(), worker()]);
+          if (applied.del.length) { const r = await api('records/delete', { method: 'POST', body: JSON.stringify({ ids: applied.del }) }); done.del = (r && r.deleted) || 0; st.progress++; }
+          // 3. what is in step now, for the next sync (times and IDs only)
+          const state = window.RBPw.syncStateAfter(applied, updatedAt, addedIds);
+          const fields = (this.current.fields || []).map((f) => f.key === window.RBPw.UUID_KEY
+            ? { ...f, options: { ...(f.options && typeof f.options === 'object' && !Array.isArray(f.options) ? f.options : {}), kdbx: { ...((f.options && f.options.kdbx) || {}), path: st.ncPath, sync: state } } } : f);
+          this.current = await api('collections/' + cid + '/fields', { method: 'PUT', body: JSON.stringify({ fields, _undoGroup: grp }) });
+          st.progress++;
+          await this.loadRecords();
+          this.showToast(T('Synced with KeePass: {k} entries written to KeePass; in RegiBase {a} added, {u} updated, {d} deleted', { k: done.kp, a: done.add, u: done.update, d: done.del }));
+          this.pwr = { ...this.pwr, plan: null, recs: null, file: null, keyFile: null, busy: false }; this.modal = null;
+        } catch (e) {
+          const msg = e && e.status === 409 ? T('A record was changed in RegiBase after it was compared.') : (e.message || String(e));
+          st.err = T('The sync stopped') + ': ' + msg + (fileWritten ? ' — ' + T('The KeePass file was already written; RegiBase so far: {a} added, {u} updated, {d} deleted. Sync again to finish.', { a: done.add, u: done.update, d: done.del }) : '');
+          st.busy = false; st.step = 1; st.plan = null;
           this.loadRecords();
         }
       },

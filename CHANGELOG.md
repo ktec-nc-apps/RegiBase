@@ -2,6 +2,40 @@
 
 All notable changes to RegiBase.
 
+## 0.24.1 — 2026-11-28
+
+Sync with a KeePass file, both ways.
+（KeePass のファイルとの双方向の同期に対応しました。）
+
+### Added
+
+- **Sync with KeePass file** (collection settings → "🔁 Sync with KeePass file"), next to the one-way refresh. It works the way KeePass's own "Synchronize" does: the changes made since the last sync go both ways — a change made in KeePass comes into RegiBase, a change made in RegiBase is written to the .kdbx in your Nextcloud, a record made in RegiBase becomes a new entry (in its group), an entry new in KeePass becomes a record. "Compare" shows each direction and the fields; "Sync now" does it.
+  （**KeePass のファイルと同期**（コレクションの設定 →「🔁 KeePass のファイルと同期」）。一方向の「更新」の隣にあります。KeePass 自身の「同期」と同じ考え方で、前回の同期以降の変更を双方向に反映します。KeePass での変更は RegiBase へ、RegiBase での変更は Nextcloud にある .kdbx へ書き込みます。RegiBase で作ったレコードは新しい項目に（そのグループに）、KeePass で増えた項目はレコードになります。「比べる」で向きごとの内容と欄を表示し、「同期する」で反映します。）
+- **Changed on both sides**: an entry changed in KeePass and in RegiBase since the last sync is listed with both times; the newer side is chosen, and you can choose the other. A value that only one side has is kept either way.
+  （**両方で変更されたもの**：前回の同期以降に KeePass と RegiBase の両方で変更された項目は、両方の日時と一緒に表示します。新しい側が選ばれていて、もう一方に変えられます。片方にしか無い値は、どちらを選んでも残ります。）
+- **Deletions only when ticked**: an entry deleted in KeePass (or moved to its recycle bin) and a record deleted in RegiBase are listed; the other side is deleted only if you tick it — a record goes the usual way (Undo works), an entry goes to KeePass's recycle bin.
+  （**削除はチェックしたときだけ**：KeePass で削除した（ごみ箱に移した）項目と、RegiBase で削除したレコードを表示し、チェックしたときだけ、もう一方でも削除します。レコードはいつもどおり（元に戻せます）、項目は KeePass のごみ箱に移します。）
+
+### Safety
+
+- The file is written only if it is still the version that was compared (ETag): when KeePass or another device changed it in the meantime, nothing is written and you are asked to compare again. Nextcloud keeps the previous version of the file.
+  （ファイルは、比べたときのバージョンのままの場合だけ書き込みます（ETag）。途中で KeePass やほかの端末が変更していたら、何も書き込まず、もう一度比べるよう表示します。ファイルの前のバージョンは Nextcloud に残ります。）
+- KeePass keeps the old version of every entry RegiBase changes in the entry's history; RegiBase keeps the old version of the record. What RegiBase does not show — attachments, the history, icons, other fields, the recycle bin — stays in the file as it was.
+  （RegiBase が変更した項目の前の内容は KeePass の履歴に、レコードの前の版は RegiBase に残ります。添付ファイル・履歴・アイコン・RegiBase に出ない欄・ごみ箱など、RegiBase が扱わないものは、ファイルにそのまま残ります。）
+- Everything happens in your browser, as before: the KeePass password and the passwords are never sent to the server, and RegiBase stores the secret fields encrypted. To tell what changed where, the collection remembers only the IDs and the times of the last sync, no values.
+  （これまでどおり、すべてブラウザーの中で行います。KeePass のパスワードも中のパスワードもサーバーには送らず、秘密の欄は暗号化して保存します。どちらで変更したかを見分けるために、コレクションが覚えるのは前回の同期の ID と日時だけで、値は覚えません。）
+- An entry imported with more custom field names than the import made fields for (over 40) has the rest in the record's notes as "name: value" lines; the sync gives them fields of their own and does not write those lines into KeePass's notes.
+  （追加の欄の種類が多すぎて（40 を超えて）、取り込みのときに「名前: 値」の行としてメモに入れた分は、同期のときに専用の欄に移し、その行を KeePass のメモに書き込むことはしません。）
+- One-time passwords are written back the way the entry keeps them (KeePass 2's `TimeOtp-*`, KeePassXC's `otp` or `TOTP Seed`); a new one is written the KeePass 2 way in a KeePass 2 file, as `otp` otherwise.
+  （ワンタイムパスワードは、その項目の形（KeePass 2 の `TimeOtp-*`、KeePassXC の `otp` や `TOTP Seed`）のまま書き戻します。新しく設定したものは、KeePass 2 のファイルでは KeePass 2 の形で、それ以外では `otp` で書き込みます。）
+
+### Tested with
+
+- KeePassXC 2.7.12 (KDBX 3.1 and 4) and KeePass 2.57: the synced file opens, shows the changes and computes the same one-time password codes; a change made there is seen as a change in KeePass only.
+  （KeePassXC 2.7.12（KDBX 3.1・4）と KeePass 2.57 で確認しました。同期したファイルが開け、変更が反映され、ワンタイムパスワードのコードも同じでした。向こうで変更すると「KeePass での変更」として扱われます。）
+- The new texts are in all 21 languages.
+  （新しい文言は、21 言語すべてに訳しました。）
+
 ## 0.24.0 — 2026-11-27
 
 A KeePass file kept in Nextcloud, and refreshing a collection from it.

@@ -323,33 +323,49 @@
       if (e && /argon2 (secret key|assoc data)/.test(str(e.message))) throw fail('unsupported', 'This file uses an Argon2 option that is not supported.');
       throw e;
     }
-    const recycle = db.meta && db.meta.recycleBinUuid ? db.meta.recycleBinUuid.id : null;
-    const out = []; const skipped = { attachments: 0, history: 0, recycle: 0 };
+    const skipped = { attachments: 0, history: 0, recycle: 0 };
+    const out = walkKdbx(db, k, skipped).map((x) => x.entry);
+    const res = { format: 'kdbx', label: 'KeePass (.kdbx)', name: db.meta && db.meta.name ? db.meta.name : '', version: db.header.versionMajor + '.' + db.header.versionMinor,
+      entries: out, warnings: [], skipped };
+    // the opened database itself, for writing the changes back (syncSave); not enumerable, so the result can still be copied as data
+    Object.defineProperty(res, 'db', { value: db, enumerable: false });
+    return res;
+  }
+  function countEntries(g) { let n = g.entries.length; g.groups.forEach((c) => { n += countEntries(c); }); return n; }
+  function recycleId(db) { return db.meta && db.meta.recycleBinUuid ? db.meta.recycleBinUuid.id : null; }
+  /** Every entry outside the recycle bin: [{e (the KdbxEntry), entry (the entry model)}]. */
+  function walkKdbx(db, k, skipped) {
+    const recycle = recycleId(db); const out = [];
     (function walk(g, path, isRoot) {
-      if (recycle && g.uuid && g.uuid.id === recycle) { skipped.recycle += countEntries(g); return; }
+      if (recycle && g.uuid && g.uuid.id === recycle) { if (skipped) skipped.recycle += countEntries(g); return; }
       const here = isRoot ? '' : (path ? path + GROUP_SEP : '') + g.name;
       for (const e of g.entries) {
-        const f = e.fields; const custom = [];
-        const totp = kdbxTotp((name) => plain(f.get(name), k));
-        for (const [name, v] of f.entries()) {
-          if (STD.includes(name) || TOTP_SKIP.includes(name) || TOTP_NAMES.includes(name)) continue;
-          const val = plain(v, k);
-          if (val !== '') custom.push({ name, value: val, secret: v instanceof k.ProtectedValue });
-        }
-        skipped.attachments += e.binaries ? e.binaries.size : 0;
-        skipped.history += e.history ? e.history.length : 0;
-        out.push(entry({
-          title: plain(f.get('Title'), k), group: here, url: plain(f.get('URL'), k), username: plain(f.get('UserName'), k), password: plain(f.get('Password'), k),
-          totp, notes: plain(f.get('Notes'), k), tags: e.tags || [], custom, uuid: e.uuid && e.uuid.id ? e.uuid.id : '',
-          created: e.times && e.times.creationTime ? e.times.creationTime.getTime() : null, modified: e.times && e.times.lastModTime ? e.times.lastModTime.getTime() : null,
-        }));
+        if (skipped) { skipped.attachments += e.binaries ? e.binaries.size : 0; skipped.history += e.history ? e.history.length : 0; }
+        out.push({ e, entry: entryOf(e, here, k) });
       }
       for (const c of g.groups) walk(c, here, false);
     })(db.getDefaultGroup(), '', true);
-    return { format: 'kdbx', label: 'KeePass (.kdbx)', name: db.meta && db.meta.name ? db.meta.name : '', version: db.header.versionMajor + '.' + db.header.versionMinor,
-      entries: out, warnings: [], skipped };
+    return out;
   }
-  function countEntries(g) { let n = g.entries.length; g.groups.forEach((c) => { n += countEntries(c); }); return n; }
+  function entryOf(e, group, k) {
+    const f = e.fields; const custom = [];
+    const totp = kdbxTotp((name) => plain(f.get(name), k));
+    for (const [name, v] of f.entries()) {
+      if (STD.includes(name) || TOTP_SKIP.includes(name) || TOTP_NAMES.includes(name)) continue;
+      const val = plain(v, k);
+      if (val !== '') custom.push({ name, value: val, secret: v instanceof k.ProtectedValue });
+    }
+    return entry({
+      title: plain(f.get('Title'), k), group, url: plain(f.get('URL'), k), username: plain(f.get('UserName'), k), password: plain(f.get('Password'), k),
+      totp, notes: plain(f.get('Notes'), k), tags: e.tags || [], custom, uuid: e.uuid && e.uuid.id ? e.uuid.id : '',
+      created: e.times && e.times.creationTime ? e.times.creationTime.getTime() : null, modified: e.times && e.times.lastModTime ? e.times.lastModTime.getTime() : null,
+    });
+  }
+  function groupPath(db, g) {
+    const names = []; const top = db.getDefaultGroup();
+    while (g && g !== top) { names.unshift(g.name); g = g.parentGroup; }
+    return names.join(GROUP_SEP);
+  }
 
   const KDF_LEVELS = { standard: { memoryMiB: 64, iterations: 8, parallelism: 2 }, strong: { memoryMiB: 256, iterations: 16, parallelism: 4 } };
 
@@ -497,6 +513,103 @@
 
   // ------------------------------------------------------------------ refresh a collection from the file
   const norm = (s) => str(s).trim().toLowerCase();
+  const FILE_TYPES = ['image', 'image_crop', 'file'];   // fields that hold a file of Nextcloud: never written to KeePass
+
+  /**
+   * What the collection and the file have in common: the fields each role of an entry goes to
+   * (fields are added when the file has something the collection has no field for), the custom
+   * fields by label, and the fields the file "owns". Shared by the refresh and the sync.
+   * With sync, every field of the collection is owned (a field added in RegiBase goes to KeePass
+   * as a custom field), except the KeePass ID and the file fields.
+   */
+  function prep(fields, entries, o, sync) {
+    const out = fields.map((f) => ({ ...f }));
+    const { role, taken } = roles(out);
+    const newFields = [];
+    const addField = (f) => { out.push(f); newFields.push(f.label); return f.key; };
+    const freeKey = (base) => { let i = 1; while (out.some((f) => f.key === base + i)) i++; return base + i; };
+    // the roles the file needs that the collection has no field for
+    const ROLE_NEW = {
+      group: () => ({ key: role.group || FIELD_KEYS.group, label: o.group || 'Group', type: 'text' }),
+      url: () => ({ key: FIELD_KEYS.url, label: 'URL', type: 'url' }),
+      username: () => ({ key: FIELD_KEYS.username, label: o.username || 'Username', type: 'text' }),
+      password: () => ({ key: FIELD_KEYS.password, label: o.password || 'Password', type: 'password', secret: true }),
+      totp: () => ({ key: FIELD_KEYS.totp, label: o.totp || 'TOTP', type: 'password', secret: true }),
+      notes: () => ({ key: FIELD_KEYS.memo, label: o.notes || 'Notes', type: 'textarea' }),
+      tags: () => ({ key: FIELD_KEYS.tags, label: o.tags || 'Tags', type: 'text' }),
+    };
+    const want = { group: (e) => e.group, url: (e) => e.url, username: (e) => e.username, password: (e) => e.password, totp: (e) => e.totp, notes: (e) => e.notes, tags: (e) => e.tags.length };
+    for (const r of Object.keys(want)) {
+      if (role[r] || !entries.some(want[r])) continue;
+      const f = ROLE_NEW[r]();
+      if (out.some((x) => x.key === f.key)) f.key = freeKey(f.key + '_');
+      role[r] = addField(f); taken.add(f.key);
+    }
+    if (!role.title) { const t = out.find((f) => f.is_title) || out[0]; if (t) role.title = t.key; }
+    // custom fields: matched by label; a new name gets a new field
+    const customKey = {};
+    for (const f of out) if (!taken.has(f.key) && f.label && !(f.label in customKey)) customKey[f.label] = f.key;
+    const fileKeys = new Set(Object.values(role)); // the fields the file "owns": the roles, and the custom names it has
+    for (const e of entries) for (const c of e.custom) {
+      if (!customKey[c.name]) customKey[c.name] = addField({ key: freeKey('c'), label: c.name, type: c.secret ? 'password' : 'text', secret: !!c.secret });
+      fileKeys.add(customKey[c.name]);
+    }
+    if (sync) for (const f of out) if (f.key !== UUID_KEY && !FILE_TYPES.includes(f.type) && f.label && customKey[f.label] === f.key && !STD.includes(f.label) && !TOTP_NAMES.includes(f.label) && !TOTP_SKIP.includes(f.label)) fileKeys.add(f.key);
+    for (const k of Object.values(role)) if (k) { const f = out.find((x) => x.key === k); if (f && FILE_TYPES.includes(f.type)) fileKeys.delete(k); }
+    if (!out.some((f) => f.key === UUID_KEY)) addField(uuidField(o.kpid, o.source));
+    else if (o.source && o.source.path) {
+      const u = out.find((f) => f.key === UUID_KEY);
+      const was = u.options && u.options.kdbx ? u.options.kdbx.path : '';
+      if (was !== o.source.path) u.options = { ...(u.options && typeof u.options === 'object' && !Array.isArray(u.options) ? u.options : {}), kdbx: { ...(u.options && u.options.kdbx ? u.options.kdbx : {}), path: String(o.source.path) } };
+    }
+    fileKeys.delete(UUID_KEY);
+    const labelOf = (k) => { const f = out.find((x) => x.key === k); return f ? f.label : k; };
+    /** The values an entry gives the owned fields ('' for the ones it does not have). */
+    const dataOf = (e) => {
+      const d = {};
+      const put = (r, v) => { if (role[r]) d[role[r]] = str(v); };
+      put('title', e.title || e.url || e.username || '(no title)'); put('group', e.group); put('url', e.url); put('username', e.username);
+      put('password', e.password); put('totp', e.totp); put('notes', e.notes); put('tags', e.tags.join(', '));
+      for (const k of fileKeys) if (!(k in d)) d[k] = '';
+      for (const c of e.custom) d[customKey[c.name]] = c.value;
+      if (e.uuid) d[UUID_KEY] = e.uuid;
+      return d;
+    };
+    const titleOf = (d) => str(role.title ? d[role.title] : '') || '(no title)';
+    const fieldsChanged = newFields.length > 0 || out.some((f, i) => fields[i] && f.options !== fields[i].options);
+    return { out, role, customKey, fileKeys, newFields, labelOf, dataOf, titleOf, fieldsChanged };
+  }
+
+  /**
+   * Which record each entry is: by KeePass ID; a record that has none yet (a collection imported
+   * before IDs were kept, or a record made in RegiBase) once by group + title + user name, when
+   * that is unique on both sides.
+   * @returns {{pairs: {e, r: object|null, byName: boolean}[], left: object[]}} pairs in the order of the
+   *   entries; left = the records no entry went to
+   */
+  function matchEntries(records, entries, role) {
+    const byUuid = {}; const nameKey = (g, t, u) => norm(g) + '\u0001' + norm(t) + '\u0001' + norm(u);
+    const recName = {}; const recNameCount = {};
+    for (const r of records) {
+      const d = r.data || {};
+      if (d[UUID_KEY]) byUuid[d[UUID_KEY]] = r;
+      else { const k = nameKey(role.group ? d[role.group] : '', role.title ? d[role.title] : '', role.username ? d[role.username] : ''); recName[k] = r; recNameCount[k] = (recNameCount[k] || 0) + 1; }
+    }
+    const entNameCount = {}; for (const e of entries) { const k = nameKey(e.group, e.title, e.username); entNameCount[k] = (entNameCount[k] || 0) + 1; }
+    const seen = new Set(); const pairs = [];
+    for (const e of entries) {
+      let r = e.uuid ? byUuid[e.uuid] : null; let byName = false;
+      if (r && seen.has(r.id)) r = null;
+      if (!r) {
+        const k = nameKey(e.group, e.title, e.username);
+        if (recNameCount[k] === 1 && entNameCount[k] === 1 && !seen.has(recName[k].id)) { r = recName[k]; byName = true; }
+      }
+      if (r) seen.add(r.id);
+      pairs.push({ e, r: r || null, byName });
+    }
+    return { pairs, left: records.filter((r) => !seen.has(r.id)) };
+  }
+
   /**
    * What "refresh from the KeePass file" would change in a collection. KeePass is the master:
    * nothing is ever written to the file. Entries are matched by their KeePass ID; a record that
@@ -516,87 +629,284 @@
    */
   function planRefresh(fields, records, entries, o) {
     o = o || {};
-    const out = fields.map((f) => ({ ...f }));
-    const { role, taken } = roles(out);
-    const newFields = [];
-    const addField = (f) => { out.push(f); newFields.push(f.label); return f.key; };
-    const freeKey = (base) => { let i = 1; while (out.some((f) => f.key === base + i)) i++; return base + i; };
-    // the roles the file needs that the collection has no field for
-    const need = (r, test) => entries.some(test);
-    const ROLE_NEW = {
-      group: () => ({ key: role.group || FIELD_KEYS.group, label: o.group || 'Group', type: 'text' }),
-      url: () => ({ key: FIELD_KEYS.url, label: 'URL', type: 'url' }),
-      username: () => ({ key: FIELD_KEYS.username, label: o.username || 'Username', type: 'text' }),
-      password: () => ({ key: FIELD_KEYS.password, label: o.password || 'Password', type: 'password', secret: true }),
-      totp: () => ({ key: FIELD_KEYS.totp, label: o.totp || 'TOTP', type: 'password', secret: true }),
-      notes: () => ({ key: FIELD_KEYS.memo, label: o.notes || 'Notes', type: 'textarea' }),
-      tags: () => ({ key: FIELD_KEYS.tags, label: o.tags || 'Tags', type: 'text' }),
-    };
-    const want = { group: (e) => e.group, url: (e) => e.url, username: (e) => e.username, password: (e) => e.password, totp: (e) => e.totp, notes: (e) => e.notes, tags: (e) => e.tags.length };
-    for (const r of Object.keys(want)) {
-      if (role[r] || !need(r, want[r])) continue;
-      const f = ROLE_NEW[r]();
-      if (out.some((x) => x.key === f.key)) f.key = freeKey(f.key + '_');
-      role[r] = addField(f); taken.add(f.key);
-    }
-    if (!role.title) { const t = out.find((f) => f.is_title) || out[0]; if (t) role.title = t.key; }
-    // custom fields: matched by label; a new name gets a new field
-    const customKey = {};
-    for (const f of out) if (!taken.has(f.key) && f.label && !(f.label in customKey)) customKey[f.label] = f.key;
-    const fileKeys = new Set(Object.values(role)); // the fields the file "owns": the roles, and the custom names it has
-    for (const e of entries) for (const c of e.custom) {
-      if (!customKey[c.name]) customKey[c.name] = addField({ key: freeKey('c'), label: c.name, type: c.secret ? 'password' : 'text', secret: !!c.secret });
-      fileKeys.add(customKey[c.name]);
-    }
-    if (!out.some((f) => f.key === UUID_KEY)) addField(uuidField(o.kpid, o.source));
-    else if (o.source && o.source.path) {
-      const u = out.find((f) => f.key === UUID_KEY);
-      const was = u.options && u.options.kdbx ? u.options.kdbx.path : '';
-      if (was !== o.source.path) u.options = { ...(u.options && typeof u.options === 'object' && !Array.isArray(u.options) ? u.options : {}), kdbx: { path: String(o.source.path) } };
-    }
-    fileKeys.add(UUID_KEY);
-    const dataOf = (e) => {
-      const d = {};
-      const put = (r, v) => { if (role[r]) d[role[r]] = str(v); };
-      put('title', e.title || e.url || e.username || '(no title)'); put('group', e.group); put('url', e.url); put('username', e.username);
-      put('password', e.password); put('totp', e.totp); put('notes', e.notes); put('tags', e.tags.join(', '));
-      for (const k of fileKeys) if (!(k in d) && k !== UUID_KEY) d[k] = '';
-      for (const c of e.custom) d[customKey[c.name]] = c.value;
-      if (e.uuid) d[UUID_KEY] = e.uuid;
-      return d;
-    };
-    // match
-    const byUuid = {}; const nameKey = (g, t, u) => norm(g) + '' + norm(t) + '' + norm(u);
-    const recName = {}; const recNameCount = {};
-    for (const r of records) {
-      const d = r.data || {};
-      if (d[UUID_KEY]) byUuid[d[UUID_KEY]] = r;
-      else { const k = nameKey(role.group ? d[role.group] : '', role.title ? d[role.title] : '', role.username ? d[role.username] : ''); recName[k] = r; recNameCount[k] = (recNameCount[k] || 0) + 1; }
-    }
-    const entNameCount = {}; for (const e of entries) { const k = nameKey(e.group, e.title, e.username); entNameCount[k] = (entNameCount[k] || 0) + 1; }
-    const plan = { add: [], update: [], gone: [], same: 0, fields: newFields.length || out.some((f, i) => fields[i] && f.options !== fields[i].options) ? out : null, newFields, byName: 0 };
-    const seen = new Set();
-    const titleOf = (d) => str(role.title ? d[role.title] : '') || '(no title)';
-    for (const e of entries) {
-      let r = e.uuid ? byUuid[e.uuid] : null;
-      if (!r) {
-        const k = nameKey(e.group, e.title, e.username);
-        if (recNameCount[k] === 1 && entNameCount[k] === 1 && !seen.has(recName[k].id)) { r = recName[k]; plan.byName++; }
-      }
-      const d = dataOf(e);
+    const P = prep(fields, entries, o, false);
+    const plan = { add: [], update: [], gone: [], same: 0, fields: P.fieldsChanged ? P.out : null, newFields: P.newFields, byName: 0 };
+    const M = matchEntries(records, entries, P.role);
+    for (const { e, r, byName } of M.pairs) {
+      const d = P.dataOf(e);
       if (!r) { const a = {}; for (const k of Object.keys(d)) if (d[k] !== '') a[k] = d[k]; plan.add.push(a); continue; }
-      seen.add(r.id);
+      if (byName) plan.byName++;
       const old = r.data || {}; const changed = [];
-      for (const k of Object.keys(d)) if (str(old[k]) !== d[k]) { const f = out.find((x) => x.key === k); changed.push(f ? f.label : k); }
+      for (const k of Object.keys(d)) if (str(old[k]) !== d[k]) changed.push(P.labelOf(k));
       if (!changed.length) { plan.same++; continue; }
       const merged = { ...old };
       for (const k of Object.keys(d)) { if (d[k] === '') delete merged[k]; else merged[k] = d[k]; }
-      plan.update.push({ id: r.id, title: titleOf(merged), data: merged, changed: changed.filter((l, i) => changed.indexOf(l) === i) });
+      plan.update.push({ id: r.id, title: P.titleOf(merged), data: merged, changed: changed.filter((l, i) => changed.indexOf(l) === i) });
     }
-    for (const r of records) if (!seen.has(r.id) && r.data && r.data[UUID_KEY]) plan.gone.push({ id: r.id, title: titleOf(r.data) });
+    for (const r of M.left) if (r.data && r.data[UUID_KEY]) plan.gone.push({ id: r.id, title: P.titleOf(r.data) });
     return plan;
   }
 
-  return { parseCsv, toCsv, fromCsv, fromText, fromBitwardenJson, readKdbx, writeKdbx, toCollection, fromCollection, planRefresh, totpCode, parseTotp, kdbxTotp,
-    entry, CSV_FORMATS, FORMAT_LIST, KDF_LEVELS, UUID_KEY };
+  // ------------------------------------------------------------------ sync both ways (writes the file)
+  /**
+   * The sync state a collection keeps (in the options of its KeePass ID field): for each entry
+   * that was in step at the last sync, [the entry's last change in KeePass (ms), the record's
+   * updated_at]. Only times and IDs, never a value or a hash of one.
+   */
+  function syncState(fields) {
+    const u = (fields || []).find((f) => f.key === UUID_KEY);
+    const s = u && u.options && u.options.kdbx && u.options.kdbx.sync;
+    return s && typeof s === 'object' && !Array.isArray(s) ? s : {};
+  }
+  const msOf = (t) => { const n = Date.parse(t || ''); return Number.isFinite(n) ? n : 0; };
+
+  /**
+   * What "sync with the KeePass file" would do, both ways, the way KeePass's own Synchronize
+   * works: a change made on one side only goes to the other; when both sides changed the same
+   * entry since the last sync, the newer change wins field by field (a value one side does not
+   * have is kept from the other), and the user may choose the other side. KeePass keeps the old
+   * version of every entry it changes in the entry's history; RegiBase keeps it in the record's
+   * versions.
+   *   - an entry new in KeePass becomes a record; a record new in RegiBase becomes an entry;
+   *   - an entry deleted in KeePass (or moved to its recycle bin) and a record deleted in RegiBase
+   *     are deleted on the other side only when the user ticks that (deletedRb / deletedKp).
+   * Nothing is changed here: syncApply does it.
+   *
+   * @param {object[]} fields @param {{id, data, updated_at}[]} records (secrets decrypted)
+   * @param {{entries, db}} file the result of readKdbx  @param {object} [o] labels, as for planRefresh
+   */
+  function planSync(fields, records, file, o) {
+    o = o || {};
+    const entries = file.entries;
+    const P = prep(fields, entries, o, true);
+    const state = syncState(fields);
+    const M = matchEntries(records, entries, P.role);
+    const plan = { toRb: [], toKp: [], conflicts: [], addRb: [], addKp: [], deletedKp: [], deletedRb: [], same: 0, byName: 0,
+      newFields: P.newFields, fields: P.fieldsChanged ? P.out : null };
+    const keys = [...P.fileKeys];
+    const diff = (a, b) => keys.filter((k) => str(a[k]) !== str(b[k]));
+    const labels = (ks) => ks.map(P.labelOf).filter((l, i, a) => a.indexOf(l) === i);
+    // The import puts the custom fields it had no room for (more than CUSTOM_MAX names) into the
+    // notes as "name: value" lines. Those notes are the entry's notes, not a change made in RegiBase:
+    // the custom fields now get fields of their own, and the notes go back to what KeePass has.
+    const hadLabel = new Set(fields.map((f) => f.label));
+    const importNotes = (e) => { let n = e.notes; for (const c of e.custom) if (!hadLabel.has(c.name)) n += (n ? '\n' : '') + c.name + ': ' + c.value; return n; };
+    for (const { e, r, byName } of M.pairs) {
+      const E = P.dataOf(e);
+      if (r && P.role.notes && r.data) {
+        const nk = P.role.notes; const rn = str(r.data[nk]);
+        if (rn !== E[nk] && rn === importNotes(e)) r.data = { ...r.data, [nk]: E[nk] };   // on the record given, so syncApply sees the same
+      }
+      if (!r) {
+        if (e.uuid && state[e.uuid]) { plan.deletedRb.push({ uuid: e.uuid, title: P.titleOf(E) }); continue; }   // was in step, so it was deleted in RegiBase
+        const a = {}; for (const k of Object.keys(E)) if (E[k] !== '') a[k] = E[k];
+        plan.addRb.push({ uuid: e.uuid, title: P.titleOf(E), data: a }); continue;
+      }
+      if (byName) plan.byName++;
+      const R = r.data || {};
+      const ch = diff(E, R);
+      const item = { id: r.id, uuid: e.uuid, title: P.titleOf(R), changed: labels(ch), keys: ch, byName,
+        kpTime: e.modified || 0, rbTime: msOf(r.updated_at) };
+      if (!ch.length) { plan.same++; if (byName || str(R[UUID_KEY]) !== e.uuid) plan.toRb.push({ ...item, idOnly: true }); continue; }
+      const base = state[e.uuid];
+      const kpChanged = !base || item.kpTime > Number(base[0]);
+      const rbChanged = !base || String(r.updated_at || '') !== String(base[1]);
+      if (base && kpChanged && !rbChanged) plan.toRb.push(item);
+      else if (base && rbChanged && !kpChanged) plan.toKp.push(item);
+      else plan.conflicts.push({ ...item, winner: item.kpTime >= item.rbTime ? 'kp' : 'rb', first: !base });
+    }
+    for (const r of M.left) {
+      const d = r.data || {};
+      if (d[UUID_KEY]) plan.deletedKp.push({ id: r.id, uuid: d[UUID_KEY], title: P.titleOf(d) });   // its entry is gone from KeePass
+      else plan.addKp.push({ id: r.id, title: P.titleOf(d) });                                     // made in RegiBase
+    }
+    Object.defineProperty(plan, 'ctx', { value: { P, M, file, records, state, o }, enumerable: false });
+    return plan;
+  }
+
+  const KP2_ALG = { 'SHA-1': 'HMAC-SHA-1', 'SHA-256': 'HMAC-SHA-256', 'SHA-512': 'HMAC-SHA-512' };
+  /**
+   * Put a one-time password back the way the entry keeps it: KeePass 2's TimeOtp-*, KeePassXC's
+   * older TOTP Seed/Settings, or "otp" (an otpauth:// URI: KeePassXC, KeePassDX, Keepass2Android,
+   * Strongbox). An entry that had none gets TimeOtp-* in a file KeePass 2 wrote, "otp" otherwise.
+   */
+  function writeTotp(en, value, k, kp2, title) {
+    const f = en.fields; const has = (n) => f.has(n);
+    const hadKp2 = ['TimeOtp-Secret-Base32', 'TimeOtp-Secret', 'TimeOtp-Secret-Hex', 'TimeOtp-Secret-Base64'].some(has);
+    const hadSeed = has('TOTP Seed'); const hadOtp = has('otp');
+    const clear = () => { for (const n of TOTP_NAMES.concat(TOTP_SKIP)) f.delete(n); };
+    value = str(value).trim();
+    if (!value) { clear(); return; }
+    let p = null; try { p = parseTotp(value); } catch (e) { p = null; }
+    const prot = (s) => k.ProtectedValue.fromString(s);
+    const asUri = () => {
+      if (/^otpauth:\/\//i.test(value)) return value;
+      const q = { secret: b32clean(p.secret) };
+      if (p.period !== 30) q.period = String(p.period); if (p.digits !== 6) q.digits = String(p.digits);
+      if (p.algorithm !== 'SHA-1') q.algorithm = p.algorithm.replace('-', '');
+      if (p.steam) q.encoder = 'steam';
+      return 'otpauth://totp/' + encodeURIComponent(title || 'RegiBase') + '?' + Object.keys(q).map((x) => x + '=' + encodeURIComponent(q[x])).join('&');
+    };
+    if (!p) { clear(); f.set('otp', prot(value)); return; }                       // not one we can read: kept as it is
+    if (!hadOtp && !hadSeed && (hadKp2 || kp2) && !p.steam) {
+      clear();
+      f.set('TimeOtp-Secret-Base32', prot(b32clean(p.secret)));
+      if (p.digits !== 6) f.set('TimeOtp-Length', String(p.digits));
+      if (p.period !== 30) f.set('TimeOtp-Period', String(p.period));
+      if (p.algorithm !== 'SHA-1') f.set('TimeOtp-Algorithm', KP2_ALG[p.algorithm]);
+      return;
+    }
+    if (hadSeed && !hadOtp) {
+      clear();
+      f.set('TOTP Seed', prot(b32clean(p.secret)));
+      if (p.steam || p.period !== 30 || p.digits !== 6) f.set('TOTP Settings', p.period + ';' + (p.steam ? 'S' : p.digits));
+      return;
+    }
+    clear(); f.set('otp', prot(asUri()));
+  }
+
+  function groupAt(db, path, cache) {
+    let g = db.getDefaultGroup(); if (!path) return g;
+    const recycle = recycleId(db); let acc = '';
+    for (const part of path.split(GROUP_SEP).map((s) => s.trim()).filter(Boolean)) {
+      acc += GROUP_SEP + part;
+      if (!cache[acc]) cache[acc] = g.groups.find((c) => c.name === part && !(recycle && c.uuid && c.uuid.id === recycle)) || db.createGroup(g, part);
+      g = cache[acc];
+    }
+    return g;
+  }
+
+  /**
+   * Carry out a sync plan on the opened database (the plan's file) and say what RegiBase has to
+   * change. The database is changed in memory only; the caller saves it (syncSave), writes the file
+   * (refusing when another device changed it since it was read) and only then changes the records.
+   * @param {object} plan from planSync
+   * @param {{winners?: Record<string,'kp'|'rb'>, deleteKp?: boolean, deleteRb?: boolean}} choice
+   *   winners: record id -> the side that wins a conflict (default: the newer one);
+   *   deleteKp: delete the records whose entry was deleted in KeePass; deleteRb: delete the entries whose record was deleted in RegiBase
+   * @returns {{kpChanged: number, kpAdded: number, kpDeleted: number, update: {id, data}[], add: {uuid, data}[], del: number[],
+   *            pairs: {uuid, id: number|null, addIndex?: number, kpTime: number}[], keepState: Record<string, any[]>}}
+   *   update/add data: the plain values (merged onto the record for update); pairs: what is in step after it
+   */
+  function syncApply(plan, choice) {
+    choice = choice || {};
+    const { P, M, file, state } = plan.ctx;
+    const k = ready(); const db = file.db; const cache = {};
+    const keys = [...P.fileKeys];
+    const recById = {}; for (const r of plan.ctx.records) recById[r.id] = r;
+    const entByUuid = {}; let nKp2 = 0; let nOtp = 0;
+    for (const x of walkKdbx(db, k)) { entByUuid[x.entry.uuid] = x.e; if (x.e.fields.has('TimeOtp-Secret-Base32') || x.e.fields.has('TimeOtp-Secret')) nKp2++; if (x.e.fields.has('otp')) nOtp++; }
+    // a file of KeePass 2 itself: it says so (until something else saved it), or its one-time passwords are all kept KeePass 2's way
+    const kp2 = !!(db.meta && /^KeePass$/i.test(str(db.meta.generator))) || (nKp2 > 0 && nOtp === 0);
+    const fieldOf = (key) => P.out.find((f) => f.key === key);
+    const out = { kpChanged: 0, kpAdded: 0, kpDeleted: 0, update: [], add: [], del: [], pairs: [], keepState: {} };
+    const now = new Date();
+    // record values -> the entry
+    const writeEntry = (en, d) => {
+      const f = en.fields; const role = P.role; const get = (r) => (role[r] ? str(d[role[r]]) : null);
+      const setStd = (name, v, protect) => { if (v == null) return; const cur = plain(f.get(name), k); if (cur === v && (f.get(name) != null || v === '')) return; f.set(name, protect ? k.ProtectedValue.fromString(v) : v); };
+      setStd('Title', get('title'), f.get('Title') instanceof k.ProtectedValue);
+      setStd('UserName', get('username'), f.get('UserName') instanceof k.ProtectedValue);
+      setStd('Password', get('password'), true);
+      setStd('URL', get('url'), f.get('URL') instanceof k.ProtectedValue);
+      setStd('Notes', get('notes'), f.get('Notes') instanceof k.ProtectedValue);
+      if (role.tags) { const t = splitTags(d[role.tags]); if (t.join('\u0001') !== (en.tags || []).join('\u0001')) en.tags = t; }
+      if (role.totp) { const cur = kdbxTotp((name) => plain(f.get(name), k)); const v = str(d[role.totp]); if (v !== cur) writeTotp(en, v, k, kp2, get('title')); }
+      for (const key of keys) {
+        if (Object.values(role).includes(key)) continue;
+        const fd = fieldOf(key); if (!fd || !fd.label) continue;
+        const name = fd.label; const v = str(d[key]); const old = f.get(name);
+        if (v === '') { if (old != null) f.delete(name); continue; }
+        if (old != null && plain(old, k) === v) continue;
+        f.set(name, (fd.secret || old instanceof k.ProtectedValue) ? k.ProtectedValue.fromString(v) : v);
+      }
+      if (role.group) {
+        const want = str(d[role.group]).split(GROUP_SEP).map((s) => s.trim()).filter(Boolean).join(GROUP_SEP);
+        if (want !== groupPath(db, en.parentGroup)) db.move(en, groupAt(db, want, cache));
+      }
+    };
+    const viewOf = (en) => P.dataOf(entryOf(en, groupPath(db, en.parentGroup), k));
+    const touch = (en) => { en.times.update(); };
+    // the changes on both sides, entry by entry
+    const winners = choice.winners || {};
+    const work = [];
+    for (const it of plan.toRb) work.push({ it, side: 'kp' });
+    for (const it of plan.toKp) work.push({ it, side: 'rb' });
+    for (const it of plan.conflicts) work.push({ it, side: winners[it.id] || it.winner, merge: true });
+    const handled = new Set();
+    for (const { it, side, merge } of work) {
+      const en = entByUuid[it.uuid]; const r = recById[it.id]; if (!en || !r) continue;
+      handled.add(it.uuid);
+      const R = r.data || {}; const E = viewOf(en);
+      let want;   // the values both sides should have
+      if (it.idOnly || side === 'kp' && !merge) want = E;
+      else if (side === 'rb' && !merge) want = R;
+      else {
+        want = {};
+        for (const key of keys) {
+          const a = str(E[key]); const b = str(R[key]);
+          want[key] = a === b ? a : a === '' ? b : b === '' ? a : (side === 'kp' ? a : b);
+        }
+      }
+      const toKp = keys.filter((key) => str(want[key]) !== str(E[key]));
+      if (toKp.length) { en.pushHistory(); writeEntry(en, want); touch(en); out.kpChanged++; }
+      const E2 = toKp.length ? viewOf(en) : E;
+      const merged = { ...R };
+      for (const key of keys) { if (str(E2[key]) === '') delete merged[key]; else merged[key] = E2[key]; }
+      merged[UUID_KEY] = it.uuid;
+      if (keys.some((key) => str(merged[key]) !== str(R[key])) || str(R[UUID_KEY]) !== it.uuid) out.update.push({ id: r.id, data: merged });
+      out.pairs.push({ uuid: it.uuid, id: r.id, en });
+    }
+    // in step already
+    for (const { e, r } of M.pairs) if (r && !handled.has(e.uuid) && entByUuid[e.uuid]) out.pairs.push({ uuid: e.uuid, id: r.id, en: entByUuid[e.uuid] });
+    // new in KeePass -> records
+    for (const a of plan.addRb) {
+      const en = entByUuid[a.uuid];
+      out.add.push({ uuid: a.uuid, data: a.data });
+      if (en) out.pairs.push({ uuid: a.uuid, id: null, addIndex: out.add.length - 1, en });
+    }
+    // new in RegiBase -> entries
+    for (const x of plan.addKp) {
+      const r = recById[x.id]; if (!r) continue;
+      const R = r.data || {};
+      const en = db.createEntry(groupAt(db, P.role.group ? str(R[P.role.group]) : '', cache));
+      en.times.creationTime = now;
+      writeEntry(en, R); touch(en); out.kpAdded++;
+      const E2 = viewOf(en);
+      const merged = { ...R }; for (const key of keys) { if (str(E2[key]) === '') delete merged[key]; else merged[key] = E2[key]; }
+      merged[UUID_KEY] = en.uuid.id;
+      out.update.push({ id: r.id, data: merged });
+      out.pairs.push({ uuid: en.uuid.id, id: r.id, en });
+    }
+    // deleted on one side
+    if (choice.deleteRb) for (const x of plan.deletedRb) { const en = entByUuid[x.uuid]; if (en) { db.remove(en); out.kpDeleted++; } }
+    else for (const x of plan.deletedRb) if (state[x.uuid]) out.keepState[x.uuid] = state[x.uuid];   // still offered next time
+    if (choice.deleteKp) out.del = plan.deletedKp.map((x) => x.id);
+    else for (const x of plan.deletedKp) if (state[x.uuid]) out.keepState[x.uuid] = state[x.uuid];
+    if (out.kpChanged || out.kpAdded || out.kpDeleted) {
+      // the history limits the file sets (KeePass applies them when it saves, too)
+      try { db.cleanup({ historyRules: true, customIcons: false, binaries: false }); } catch (e) { /* older library */ }
+    }
+    for (const p of out.pairs) { p.kpTime = p.en.times && p.en.times.lastModTime ? p.en.times.lastModTime.getTime() : 0; delete p.en; }
+    return out;
+  }
+  /** The file, after syncApply. */
+  async function syncSave(file) { ready(); return file.db.save(); }
+  /**
+   * The sync state to keep after the records were written.
+   * @param {object} applied syncApply's result  @param {Record<number,string>} updatedAt record id -> updated_at (after the writes)
+   * @param {number[]} addedIds the ids the new records got, in the order of applied.add
+   */
+  function syncStateAfter(applied, updatedAt, addedIds) {
+    const s = { ...applied.keepState };
+    for (const p of applied.pairs) {
+      const id = p.id != null ? p.id : addedIds[p.addIndex];
+      if (id == null || updatedAt[id] == null) continue;
+      s[p.uuid] = [p.kpTime, String(updatedAt[id])];
+    }
+    return s;
+  }
+
+  return { parseCsv, toCsv, fromCsv, fromText, fromBitwardenJson, readKdbx, writeKdbx, toCollection, fromCollection, planRefresh, planSync, syncApply, syncSave, syncStateAfter, syncState,
+    totpCode, parseTotp, kdbxTotp, entry, CSV_FORMATS, FORMAT_LIST, KDF_LEVELS, UUID_KEY };
 }));

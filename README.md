@@ -41,9 +41,11 @@ fields you set up yourself.
   (Nextcloud)**, and export a collection as a KeePass file. Everything is read and written in the browser:
   the KeePass password and the passwords inside are never sent to the server, and secret fields are encrypted
   with your master key before they are saved. Attachments, history and the recycle bin of KeePass are not imported.
-  The .kdbx can be picked from your Nextcloud Files, and the collection can later be **refreshed from that
-  file** (one way: KeePass stays the master and the file is never written to; entries are matched by their
-  KeePass ID). A one-time password field shows the **TOTP code** for now.
+  The .kdbx can be picked from your Nextcloud Files, and the collection can later be **synced with that
+  file, both ways** — like KeePass's own Synchronize: changes on either side go to the other, an entry changed
+  on both sides is shown for you to choose, and the file is never overwritten when another device changed it
+  in the meantime — or **refreshed from it** one way (KeePass stays the master). Entries are matched by their
+  KeePass ID. A one-time password field shows the **TOTP code** for now.
 - **Import** — from **CSV / JSON** (e.g. a Google Password Manager export) or from
   your **Nextcloud Contacts** (including photos). One-way; Contacts is never modified.
   An import is written by the server as it comes in, secret fields included: with a master
@@ -176,8 +178,10 @@ REGIBASE_PASSWORD='…' occ regibase:get Passwords 3708 --reveal --field=Token
   コレクションを KeePass のファイルとして書き出すこともできます。読み書きはすべてブラウザーの中で行い、
   KeePass のパスワードも中のパスワードも、サーバーには送りません。秘密の欄は、保存する前にマスターキーで暗号化します。
   KeePass の添付ファイル、履歴、ごみ箱は取り込みません。
-  .kdbx は Nextcloud の Files から選べ、後で**そのファイルからコレクションを更新**できます（一方向で、KeePass が「正」。
-  ファイルには書き込みません。項目は KeePass の ID で対応づけます）。ワンタイムパスワードの欄には、今の **TOTP のコード**を出します。
+  .kdbx は Nextcloud の Files から選べ、後で**そのファイルとコレクションを双方向に同期**できます（KeePass 自身の
+  「同期」と同じ考え方。片方での変更をもう片方へ反映し、両方で変更した項目はどちらを優先するか選べます。途中でほかの端末が
+  ファイルを変更していたら上書きしません）。**一方向の更新**（KeePass が「正」で、ファイルには書き込まない）もできます。
+  項目は KeePass の ID で対応づけます。ワンタイムパスワードの欄には、今の **TOTP のコード**を出します。
 - **インポート** — **CSV / JSON**（Google パスワードマネージャーのエクスポートなど）や、
   **Nextcloud Contacts**（写真を含む）からインポートできます。インポートは一方向で、Contacts 側のデータは変更しません。
   インポートしたデータは、秘匿項目も含めてそのままサーバーに保存されます。マスターキーを設定している場合は、
